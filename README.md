@@ -34,7 +34,8 @@ desto is a simple and intuitive dashboard for managing and monitoring `tmux` ses
 2. **Sync Dependencies**:
    ```bash
    uv sync  
-   uv pip install -e .```
+   uv pip install -e .
+   ```
 
 3. **Run the Application**:  
 `python src/desto/app/ui.py`
