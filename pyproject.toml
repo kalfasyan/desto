@@ -9,6 +9,7 @@ dependencies = [
     "loguru>=0.7.3",
     "nicegui>=2.16.1",
     "psutil>=7.0.0",
+    "twine>=6.1.0",
 ]
 
 [build-system]
