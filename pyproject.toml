@@ -10,3 +10,7 @@ dependencies = [
     "nicegui>=2.16.1",
     "psutil>=7.0.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
