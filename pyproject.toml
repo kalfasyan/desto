@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "humanize>=4.12.3",
     "ipython>=9.2.0",
+    "loguru>=0.7.3",
     "nicegui>=2.16.1",
     "psutil>=7.0.0",
     "pywebview>=5.4",
