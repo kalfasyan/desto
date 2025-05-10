@@ -1,14 +1,12 @@
 [project]
 name = "desto"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.0.1"
+description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "humanize>=4.12.3",
     "ipython>=9.2.0",
     "loguru>=0.7.3",
     "nicegui>=2.16.1",
     "psutil>=7.0.0",
-    "pywebview>=5.4",
 ]
