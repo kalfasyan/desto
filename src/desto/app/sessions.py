@@ -1,32 +1,16 @@
 import subprocess
 import shlex
-
-
-class UIManager:
-    def __init__(self, ui):
-        """
-        Initializes the UIManager with a sessions container.
-        """
-        self.ui = ui
-        self.sessions_container = ui.column().style("margin-top: 20px;")
-
-    def clear_sessions_container(self):
-        """
-        Clears the sessions container.
-        """
-        self.sessions_container.clear()
-
-    def add_to_sessions_container(self, content):
-        """
-        Adds content to the sessions container.
-        """
-        with self.sessions_container:
-            content()
+from datetime import datetime
 
 
 class TmuxManager:
-    def __init__(self):
+    def __init__(self, ui, logger):
         self.sessions = {}
+        self.ui = ui
+        self.sessions_container = ui.column().style("margin-top: 20px;")
+        self.logger = logger
+        self.pause_updates = None  # Function to pause updates
+        self.resume_updates = None  # Function to resume updates
 
     def start_session(self, session_name, command):
         """Start a new tmux session with the given command."""
@@ -94,47 +78,169 @@ class TmuxManager:
         else:
             print(f"Failed to kill session '{session_name}': {result.stderr}")
 
-    def get_session_cpu_load(self, session_name):
-        """Retrieve the CPU load of a specific tmux session."""
-        result = subprocess.run(
-            [
-                "tmux",
-                "list-panes",
-                "-t",
-                session_name,
-                "-F",
-                "#{pane_id}:#{pane_active}:#{pane_cpu}",
-            ],
-            capture_output=True,
-            text=True,
-        )
+    def clear_sessions_container(self):
+        """
+        Clears the sessions container.
+        """
+        self.sessions_container.clear()
 
-        if result.returncode == 0:
-            cpu_loads = []
-            for line in result.stdout.splitlines():
-                pane_info = line.split(":")
-                pane_id = pane_info[0]
-                pane_active = pane_info[1] == "1"
-                pane_cpu = float(pane_info[2])
-                cpu_loads.append(
-                    {"pane_id": pane_id, "active": pane_active, "cpu": pane_cpu}
-                )
+    def add_to_sessions_container(self, content):
+        """
+        Adds content to the sessions container.
+        """
+        with self.sessions_container:
+            content()
 
-            return cpu_loads
-        else:
-            raise ValueError(
-                f"Failed to retrieve CPU load for session '{session_name}'."
+    @staticmethod
+    def start_tmux_session(session_name, command, logger):
+        """
+        Starts a new tmux session with the given name and command, redirecting output to a log file.
+        """
+        log_file = f"{session_name}.log"  # Log file path
+        try:
+            # Start a detached tmux session
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", session_name, command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            logger.info(
+                f"Tmux session '{session_name}' started with command: {command}"
             )
 
-    def get_session_layout(self, session_name):
-        """Retrieve the layout of a specific tmux session."""
-        result = subprocess.run(
-            ["tmux", "display-message", "-p", "-t", session_name, "#{window_layout}"],
-            capture_output=True,
-            text=True,
+            # Redirect output to the log file
+            subprocess.run(
+                ["tmux", "pipe-pane", "-t", session_name, f"cat > {log_file}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to start tmux session '{session_name}': {e}")
+
+    def update_sessions_status(self):
+        """
+        Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
+        """
+        sessions_status = self.check_sessions()
+
+        self.clear_sessions_container()
+        self.add_to_sessions_container(
+            lambda: self.add_sessions_table(sessions_status, self.ui)
         )
 
-        if result.returncode == 0:
-            return result.stdout.strip()
-        else:
-            raise ValueError(f"Failed to retrieve layout for session '{session_name}'.")
+    def kill_tmux_session(self, session_name):
+        """
+        Kills a tmux session by name.
+        """
+        try:
+            subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
+            self.logger.success(f"Tmux session '{session_name}' killed successfully.")
+            self.update_sessions_status()
+        except subprocess.CalledProcessError as e:
+            self.logger.warning(f"Failed to kill tmux session '{session_name}': {e}")
+
+    def confirm_kill_session(self, session_name):
+        """
+        Displays a confirmation dialog before killing a tmux session and pauses updates.
+        """
+        if self.pause_updates:
+            self.pause_updates()  # Pause the global timer
+
+        with self.ui.dialog() as dialog, self.ui.card():
+            self.ui.label(
+                f"Are you sure you want to kill the session '{session_name}'?"
+            )
+            with self.ui.row():
+                self.ui.button(
+                    "Yes",
+                    on_click=lambda: [
+                        self.kill_tmux_session(session_name),
+                        dialog.close(),
+                        self.resume_updates(),  # Resume updates after killing
+                    ],
+                ).props("color=red")
+                self.ui.button(
+                    "No",
+                    on_click=lambda: [
+                        dialog.close(),
+                        self.resume_updates(),  # Resume updates if canceled
+                    ],
+                )
+
+        dialog.open()
+
+    def add_sessions_table(self, sessions_status, ui):
+        """
+        Adds the sessions table to the UI.
+        """
+        # Add table headers
+        with ui.row().style("font-weight: bold; margin-bottom: 10px;"):
+            ui.label("Session ID").style("width: 100px;")
+            ui.label("Name").style("width: 150px;")
+            ui.label("Created").style("width: 200px;")
+            ui.label("Attached").style("width: 100px;")
+            ui.label("Windows").style("width: 100px;")
+            ui.label("Group").style("width: 100px;")
+            ui.label("Group Size").style("width: 100px;")
+            ui.label("Actions").style("width: 200px;")
+
+        # Add rows for each session
+        for session_name, session in sessions_status.items():
+            with ui.row().style("align-items: center; margin-bottom: 10px;"):
+                ui.label(session["id"]).style("width: 100px;")
+                ui.label(session_name).style("width: 150px;")
+                ui.label(
+                    datetime.fromtimestamp(session["created"]).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                ).style("width: 200px;")
+                ui.label("Yes" if session["attached"] else "No").style("width: 100px;")
+                ui.label(str(session["windows"])).style("width: 100px;")
+                ui.label(session["group"] or "N/A").style("width: 100px;")
+                ui.label(str(session["group_size"])).style("width: 100px;")
+                ui.button(
+                    "Kill",
+                    on_click=lambda s=session_name: self.confirm_kill_session(
+                        s,
+                    ),
+                ).props("color=red flat")
+                ui.button(
+                    "View Log",
+                    on_click=lambda s=session_name: self.view_log(
+                        s,
+                        ui,
+                    ),
+                ).props("color=blue flat")
+
+    def view_log(self, session_name, ui):
+        """
+        Pauses the app and opens a dialog to display the last 100 lines of the session's log file.
+        """
+        if self.pause_updates:
+            self.pause_updates()  # Pause the global timer
+
+        log_file = f"{session_name}.log"  # Log file path
+        try:
+            with open(log_file, "r") as f:
+                lines = f.readlines()[-100:]  # Get the last 100 lines
+            log_content = "".join(lines)
+        except FileNotFoundError:
+            log_content = f"Log file for session '{session_name}' not found."
+
+        with (
+            ui.dialog() as dialog,
+            ui.card().style("width: 100%; height: 80%;"),
+        ):
+            ui.label(f"Log for session '{session_name}'").style("font-weight: bold;")
+            with ui.scroll_area().style("width: 100%; height: 100%;"):
+                ui.label(log_content).style("white-space: pre-wrap;")
+            ui.button(
+                "Close",
+                on_click=lambda: [
+                    dialog.close(),
+                    self.resume_updates(),  # Resume updates when the dialog is closed
+                ],
+            ).props("color=primary")
+        dialog.open()
