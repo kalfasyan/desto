@@ -11,38 +11,53 @@ desto is a simple and intuitive dashboard for managing and monitoring `tmux` ses
 ## Installation
 
 1. **Install `tmux`**:
-   <details>
-   <summary>Instructions for different package managers</summary>
+    <details>
+    <summary>Instructions for different package managers</summary>
 
-   - For Debian/Ubuntu:
-     ```bash
-     sudo apt install tmux
-     ```
+    - For Debian/Ubuntu:
+      ```bash
+      sudo apt install tmux
+      ```
 
-   - For Almalinux/Fedora:
-     ```bash
-     sudo dnf install tmux
-     ```
+    - For Almalinux/Fedora:
+      ```bash
+      sudo dnf install tmux
+      ```
 
-   - For Arch Linux:
-     ```bash
-     sudo pacman -S tmux
-     ```
+    - For Arch Linux:
+      ```bash
+      sudo pacman -S tmux
+      ```
 
-   </details>
+    </details>
 
-2. **Sync Dependencies**:
-   ```bash
-   uv sync  
-   uv pip install -e .
-   ```
+2. **Install `desto`**:
+    <details>
+    <summary>Installation Steps</summary>
+
+    - Navigate to the `scripts` directory:
+      ```bash
+      cd desto/scripts
+      ```
+
+    - Make the installation script executable:
+      ```bash
+      chmod +x install.sh
+      ```
+
+    - Run the installation script:
+      ```bash
+      ./install.sh
+      ```
+
+    </details>
 
 3. **Run the Application**:  
-`python src/desto/app/ui.py`
+Simply type `desto` in your terminal from any directory to start the application.
 
 4. **View on the browser**:  
 You will see the message:  
-    >NiceGUI ready to go on http://localhost:8080, and http://192.168.0.114:8080
+    >NiceGUI ready to go on http://localhost:8088, and http://192.168.0.114:8088
     Opening in existing browser session.
 
 ## Dashboard
