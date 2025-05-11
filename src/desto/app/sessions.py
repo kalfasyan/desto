@@ -2,6 +2,28 @@ import subprocess
 import shlex
 
 
+class UIManager:
+    def __init__(self, ui):
+        """
+        Initializes the UIManager with a sessions container.
+        """
+        self.ui = ui
+        self.sessions_container = ui.column().style("margin-top: 20px;")
+
+    def clear_sessions_container(self):
+        """
+        Clears the sessions container.
+        """
+        self.sessions_container.clear()
+
+    def add_to_sessions_container(self, content):
+        """
+        Adds content to the sessions container.
+        """
+        with self.sessions_container:
+            content()
+
+
 class TmuxManager:
     def __init__(self):
         self.sessions = {}

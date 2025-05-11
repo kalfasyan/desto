@@ -3,7 +3,7 @@ from loguru import logger
 import psutil
 from nicegui import ui
 import subprocess
-from desto.app.sessions import TmuxManager  # Import the TmuxManager class
+from desto.app.sessions import TmuxManager, UIManager
 
 logger.add(
     lambda msg: update_log_messages(msg.strip(), log_messages),
@@ -12,6 +12,7 @@ logger.add(
 )
 
 tmux_manager = TmuxManager()  # Initialize the TmuxManager instance
+ui_manager = UIManager(ui)
 
 # Global variables for timers and log messages
 update_system_info_timer = None
@@ -118,7 +119,9 @@ def confirm_kill_session(
             ui.button(
                 "Yes",
                 on_click=lambda: [
-                    kill_tmux_session(session_name, logger, update_sessions_status),
+                    kill_tmux_session(
+                        session_name, logger, update_sessions_status, ui_manager
+                    ),
                     dialog.close(),
                     resume_updates(
                         update_system_info_timer, update_sessions_status_timer
@@ -178,61 +181,67 @@ def get_tmux_sessions_status(logger):
 
 
 def update_sessions_status(
-    tmux_manager, sessions_container, ui, confirm_kill_session, view_log
+    tmux_manager, ui_manager, ui, confirm_kill_session, view_log
 ):
     """
     Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
     """
     sessions_status = tmux_manager.check_sessions()
 
-    sessions_container.clear()
-    with sessions_container:
-        # Add table headers
-        with ui.row().style("font-weight: bold; margin-bottom: 10px;"):
-            ui.label("Session ID").style("width: 100px;")
-            ui.label("Name").style("width: 150px;")
-            ui.label("Created").style("width: 200px;")
-            ui.label("Attached").style("width: 100px;")
-            ui.label("Windows").style("width: 100px;")
-            ui.label("Group").style("width: 100px;")
-            ui.label("Group Size").style("width: 100px;")
-            ui.label("Actions").style("width: 200px;")
+    ui_manager.clear_sessions_container()
+    ui_manager.add_to_sessions_container(
+        lambda: add_sessions_table(sessions_status, ui, confirm_kill_session, view_log)
+    )
 
-        # Add rows for each session
-        for session_name, session in sessions_status.items():
-            with ui.row().style("align-items: center; margin-bottom: 10px;"):
-                ui.label(session["id"]).style("width: 100px;")
-                ui.label(session_name).style("width: 150px;")
-                ui.label(
-                    datetime.fromtimestamp(session["created"]).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                ).style("width: 200px;")
-                ui.label("Yes" if session["attached"] else "No").style("width: 100px;")
-                ui.label(str(session["windows"])).style("width: 100px;")
-                ui.label(session["group"] or "N/A").style("width: 100px;")
-                ui.label(str(session["group_size"])).style("width: 100px;")
-                ui.button(
-                    "Kill",
-                    on_click=lambda s=session_name: confirm_kill_session(
-                        s,
-                        ui,
-                        kill_tmux_session,
-                        resume_updates,
-                        update_system_info_timer,
-                        update_sessions_status_timer,
-                    ),
-                ).props("color=red flat")
-                ui.button(
-                    "View Log",
-                    on_click=lambda s=session_name: view_log(
-                        s,
-                        ui,
-                        resume_updates,
-                        update_system_info_timer,
-                        update_sessions_status_timer,
-                    ),
-                ).props("color=blue flat")
+
+def add_sessions_table(sessions_status, ui, confirm_kill_session, view_log):
+    """
+    Adds the sessions table to the UI.
+    """
+    # Add table headers
+    with ui.row().style("font-weight: bold; margin-bottom: 10px;"):
+        ui.label("Session ID").style("width: 100px;")
+        ui.label("Name").style("width: 150px;")
+        ui.label("Created").style("width: 200px;")
+        ui.label("Attached").style("width: 100px;")
+        ui.label("Windows").style("width: 100px;")
+        ui.label("Group").style("width: 100px;")
+        ui.label("Group Size").style("width: 100px;")
+        ui.label("Actions").style("width: 200px;")
+
+    # Add rows for each session
+    for session_name, session in sessions_status.items():
+        with ui.row().style("align-items: center; margin-bottom: 10px;"):
+            ui.label(session["id"]).style("width: 100px;")
+            ui.label(session_name).style("width: 150px;")
+            ui.label(
+                datetime.fromtimestamp(session["created"]).strftime("%Y-%m-%d %H:%M:%S")
+            ).style("width: 200px;")
+            ui.label("Yes" if session["attached"] else "No").style("width: 100px;")
+            ui.label(str(session["windows"])).style("width: 100px;")
+            ui.label(session["group"] or "N/A").style("width: 100px;")
+            ui.label(str(session["group_size"])).style("width: 100px;")
+            ui.button(
+                "Kill",
+                on_click=lambda s=session_name: confirm_kill_session(
+                    s,
+                    ui,
+                    kill_tmux_session,
+                    resume_updates,
+                    update_system_info_timer,
+                    update_sessions_status_timer,
+                ),
+            ).props("color=red flat")
+            ui.button(
+                "View Log",
+                on_click=lambda s=session_name: view_log(
+                    s,
+                    ui,
+                    resume_updates,
+                    update_system_info_timer,
+                    update_sessions_status_timer,
+                ),
+            ).props("color=blue flat")
 
 
 def view_log(
@@ -278,7 +287,7 @@ def view_log(
     dialog.open()
 
 
-def kill_tmux_session(session_name, logger, update_sessions_status):
+def kill_tmux_session(session_name, logger, update_sessions_status, ui_manager):
     """
     Kills a tmux session by name.
     """
@@ -286,7 +295,7 @@ def kill_tmux_session(session_name, logger, update_sessions_status):
         subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
         logger.success(f"Tmux session '{session_name}' killed successfully.")
         update_sessions_status(
-            tmux_manager, sessions_container, ui, confirm_kill_session, view_log
+            tmux_manager, ui_manager, ui, confirm_kill_session, view_log
         )
     except subprocess.CalledProcessError as e:
         logger.warning(f"Failed to kill tmux session '{session_name}': {e}")
@@ -400,39 +409,36 @@ with ui.left_drawer().style(
 
 # Main Content Area with Process List
 with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-    ui.label("Dashboard").style("font-size: 2em; font-weight: bold;")
-
-    session_name_input = ui.input(label="Session Name").style("width: 300px;")
-    command_input = ui.input(
-        label="Command",
-        value='for i in {1..1000}; do echo -e "$i\\n"; sleep 0.1; done; echo',
-    ).style("width: 300px;")
-
-    ui.button(
-        "Run in Session",
-        on_click=lambda: start_tmux_session(
-            session_name_input.value, command_input.value, logger
-        ),
-    )
-
+    # Session Input and Command Section
     with ui.card().style(
-        "background-color: #fff; color: #000; padding: 10px; border-radius: 8px; width: 100%;"
+        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
     ):
-        ui.label("Active Sessions").style(
+        ui.label("Start a New Session").style(
             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
         )
-        sessions_container = ui.column().style("margin-top: 20px;")
+        session_name_input = ui.input(label="Session Name").style("width: 300px;")
+        command_input = ui.input(
+            label="Command",
+            value='for i in {1..1000}; do echo -e "$i\\n"; sleep 0.1; done; echo',
+        ).style("width: 300px;")
+        ui.button(
+            "Run in Session",
+            on_click=lambda: start_tmux_session(
+                session_name_input.value, command_input.value, logger
+            ),
+        )
 
+    # Log Messages Card
     with ui.card().style(
-        "background-color: #fff; color: #000; padding: 10px; border-radius: 8px; width: 100%;"
+        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
     ):
         ui.label("Log Messages").style(
-            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; width: 100%; height: 100%;text-align: left;"
+            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
         )
         log_display = (
             ui.textarea("")
             .style(
-                "width: 100%; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;"
+                "width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;"
             )
             .props("readonly")
         )
@@ -456,7 +462,7 @@ update_system_info_timer = ui.timer(
 update_sessions_status_timer = ui.timer(
     2.0,
     lambda: update_sessions_status(
-        tmux_manager, sessions_container, ui, confirm_kill_session, view_log
+        tmux_manager, ui_manager, ui, confirm_kill_session, view_log
     ),
 )
 
@@ -473,9 +479,7 @@ update_system_info(
     disk_free,
     disk_used,
 )
-update_sessions_status(
-    tmux_manager, sessions_container, ui, confirm_kill_session, view_log
-)
+update_sessions_status(tmux_manager, ui_manager, ui, confirm_kill_session, view_log)
 ui.timer(1.0, lambda: refresh_log_display(log_display, log_messages))
 
 # Start the NiceGUI app on a custom port
