@@ -1,6 +1,6 @@
 [project]
 name = "desto"
-version = "0.0.3"
+version = "0.0.4"
 description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -11,6 +11,9 @@ dependencies = [
     "psutil>=7.0.0",
     "twine>=6.1.0",
 ]
+
+[project.scripts]
+desto = "desto.app.dashboard:main"
 
 [build-system]
 requires = ["hatchling"]
