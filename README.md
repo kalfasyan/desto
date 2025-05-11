@@ -2,6 +2,15 @@
 
 desto is a simple and intuitive dashboard for managing and monitoring `tmux` sessions. It provides a user-friendly interface to start, view, and kill `tmux` sessions, as well as monitor system stats and view session logs.
 
+## Usage
+
+For example, 
+* Type "sess" as the Session Name and in the Command field type:  
+`'for i in {1..1000}; do echo -e "$i\\n"; sleep 0.1; done; echo'`  
+* Click `RUN IN SESSION` and see it appear on top of the dashboard.  
+* You can check its logs by clicking on `VIEW LOG` or `KILL` it.
+
+
 ## Features
 
 - **Session Management**: Start, view, and kill `tmux` sessions with ease.
@@ -35,19 +44,16 @@ desto is a simple and intuitive dashboard for managing and monitoring `tmux` ses
     <details>
     <summary>Installation Steps</summary>
 
-    - Navigate to the `scripts` directory:
+    - By adding it to your project:
       ```bash
-      cd desto/scripts
+      uv add desto
       ```
 
-    - Make the installation script executable:
+    - Using `pip`:
       ```bash
-      chmod +x install.sh
-      ```
-
-    - Run the installation script:
-      ```bash
-      ./install.sh
+      pip install desto
+      OR
+      uv pip install desto
       ```
 
     </details>
