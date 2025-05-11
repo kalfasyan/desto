@@ -478,5 +478,5 @@ update_sessions_status(
 )
 ui.timer(1.0, lambda: refresh_log_display(log_display, log_messages))
 
-# Start the NiceGUI app
-ui.run(title="Tmux Dashboard")
+# Start the NiceGUI app on a custom port
+ui.run(title="desto dashboard", port=8088)
