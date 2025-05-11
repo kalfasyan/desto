@@ -2,6 +2,10 @@
 
 desto is a simple and intuitive dashboard for managing and monitoring `tmux` sessions. It provides a user-friendly interface to start, view, and kill `tmux` sessions, as well as monitor system stats and view session logs.
 
+
+## Dashboard
+![Dashboard Screenshot](images/dashboard.png "Desto Dashboard")
+
 ## Usage
 
 For example, 
@@ -9,7 +13,6 @@ For example,
 `'for i in {1..1000}; do echo -e "$i\\n"; sleep 0.1; done; echo'`  
 * Click `RUN IN SESSION` and see it appear on top of the dashboard.  
 * You can check its logs by clicking on `VIEW LOG` or `KILL` it.
-
 
 ## Features
 
@@ -65,6 +68,3 @@ Simply type `desto` in your terminal from any directory to start the application
 You will see the message:  
     >NiceGUI ready to go on http://localhost:8088, and http://192.168.0.114:8088
     Opening in existing browser session.
-
-## Dashboard
-![Dashboard Screenshot](images/dashboard.png "Desto Dashboard")
