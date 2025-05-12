@@ -1,9 +1,13 @@
+from pathlib import Path
 import subprocess
 import shlex
 from datetime import datetime
+from nicegui import ui
 
 
 class TmuxManager:
+    LOG_DIR = Path.cwd() / "desto_log"
+
     def __init__(self, ui, logger):
         self.sessions = {}
         self.ui = ui
@@ -11,6 +15,15 @@ class TmuxManager:
         self.logger = logger
         self.pause_updates = None  # Function to pause updates
         self.resume_updates = None  # Function to resume updates
+
+        # Ensure log directory exists
+        try:
+            self.LOG_DIR.mkdir(exist_ok=True)
+        except Exception as e:
+            msg = f"Failed to create log directory '{self.LOG_DIR}': {e}"
+            self.logger.error(msg)
+            ui.notification(msg, type="negative")
+            raise
 
     def start_session(self, session_name, command):
         """Start a new tmux session with the given command."""
@@ -63,7 +76,7 @@ class TmuxManager:
 
     def kill_session(self, session_name):
         """Kill a tmux session by name."""
-        print(f"Attempting to kill session: '{session_name}'")
+        self.logger.info(f"Attempting to kill session: '{session_name}'")
         escaped_session_name = shlex.quote(session_name)  # Escape the session name
         result = subprocess.run(
             ["tmux", "kill-session", "-t", escaped_session_name],
@@ -72,11 +85,21 @@ class TmuxManager:
             text=True,
         )
         if result.returncode == 0:
-            print(f"Session '{session_name}' killed successfully.")
+            self.logger.success(f"Session '{session_name}' killed successfully.")
+            ui.notification(
+                f"Session '{session_name}' killed successfully.",
+                type="positive",
+            )
             if session_name in self.sessions:
                 del self.sessions[session_name]
         else:
-            print(f"Failed to kill session '{session_name}': {result.stderr}")
+            self.logger.warning(
+                f"Failed to kill session '{session_name}': {result.stderr}"
+            )
+            ui.notification(
+                f"Failed to kill session '{session_name}': {result.stderr}",
+                type="negative",
+            )
 
     def clear_sessions_container(self):
         """
@@ -92,32 +115,68 @@ class TmuxManager:
             content()
 
     @staticmethod
+    def get_log_file(session_name):
+        return TmuxManager.LOG_DIR / f"{session_name}.log"
+
+    @staticmethod
     def start_tmux_session(session_name, command, logger):
         """
         Starts a new tmux session with the given name and command, redirecting output to a log file.
+        Shows notifications for success or failure.
         """
-        log_file = f"{session_name}.log"  # Log file path
+        log_file = TmuxManager.get_log_file(session_name)
         try:
-            # Start a detached tmux session
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name, command],
+            log_file.parent.mkdir(exist_ok=True)
+        except Exception as e:
+            msg = f"Failed to create log directory '{log_file.parent}': {e}"
+            logger.error(msg)
+            ui.notification(msg, type="negative")
+            return
+
+        quoted_log_file = shlex.quote(str(log_file))
+        full_command_for_tmux = f"{command} > {quoted_log_file} 2>&1"
+
+        try:
+            process = subprocess.run(
+                [
+                    "tmux",
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    full_command_for_tmux,
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                text=True,
                 check=True,
             )
             logger.info(
-                f"Tmux session '{session_name}' started with command: {command}"
+                f"Tmux session '{session_name}' started. Command with redirection: '{full_command_for_tmux}'. "
+                f"Tmux process stdout: {process.stdout.strip() if process.stdout else 'None'}"
             )
-
-            # Redirect output to the log file
-            subprocess.run(
-                ["tmux", "pipe-pane", "-t", session_name, f"cat > {log_file}"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
+            ui.notification(
+                f"Session '{session_name}' started successfully.",
+                type="positive",
             )
         except subprocess.CalledProcessError as e:
-            logger.warning(f"Failed to start tmux session '{session_name}': {e}")
+            error_output = e.stderr.strip() if e.stderr else "No stderr output"
+            logger.warning(
+                f"Failed to start tmux session '{session_name}' with command '{full_command_for_tmux}'. "
+                f"Error: {error_output}"
+            )
+            ui.notification(
+                f"Failed to start session '{session_name}': {error_output}",
+                type="negative",
+            )
+        except Exception as e:
+            logger.error(
+                f"An unexpected error occurred while trying to start tmux session '{session_name}': {str(e)}"
+            )
+            ui.notification(
+                f"Unexpected error starting session '{session_name}': {str(e)}",
+                type="negative",
+            )
 
     def update_sessions_status(self):
         """
@@ -137,9 +196,17 @@ class TmuxManager:
         try:
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
             self.logger.success(f"Tmux session '{session_name}' killed successfully.")
+            ui.notification(
+                f"Session '{session_name}' killed successfully.",
+                type="positive",
+            )
             self.update_sessions_status()
         except subprocess.CalledProcessError as e:
             self.logger.warning(f"Failed to kill tmux session '{session_name}': {e}")
+            ui.notification(
+                f"Failed to kill tmux session '{session_name}': {e}",
+                type="negative",
+            )
 
     def confirm_kill_session(self, session_name):
         """
@@ -221,13 +288,15 @@ class TmuxManager:
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
 
-        log_file = f"{session_name}.log"  # Log file path
+        log_file = self.get_log_file(session_name)
         try:
-            with open(log_file, "r") as f:
+            with log_file.open("r") as f:
                 lines = f.readlines()[-100:]  # Get the last 100 lines
             log_content = "".join(lines)
         except FileNotFoundError:
             log_content = f"Log file for session '{session_name}' not found."
+        except Exception as e:
+            log_content = f"Error reading log file: {e}"
 
         with (
             ui.dialog() as dialog,

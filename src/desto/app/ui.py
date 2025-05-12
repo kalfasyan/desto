@@ -2,6 +2,8 @@ from loguru import logger
 import psutil
 from nicegui import ui
 from desto.app.config import config as ui_settings
+from pathlib import Path
+import asyncio
 
 
 class UserInterfaceManager:
@@ -113,23 +115,37 @@ class UserInterfaceManager:
                     "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                 )
                 session_name_input = ui.input(label="Session Name").style(
-                    "width: 300px;"
+                    "width: 100%;"
                 )
-                command_input = ui.input(
-                    label="Command",
-                    value='for i in {1..1000}; do echo -e "$i\\n"; sleep 0.1; done; echo',
-                ).style("width: 300px;")
+                script_path_input = ui.input(
+                    label="Script path",
+                    value="/home/kalfasy/repos/desto/scripts/find_files.sh",
+                ).style("width: 100%;")
+                arguments_input = ui.input(
+                    label="Arguments",
+                    value=".",
+                ).style("width: 100%;")
+                keep_alive_switch = ui.switch("Keep Session Alive").style(
+                    "margin-top: 10px;"
+                )
                 ui.button(
                     "Run in Session",
-                    on_click=lambda: self.tmux_manager.start_tmux_session(
-                        session_name_input.value, command_input.value, logger
+                    on_click=lambda: self.run_session_with_keep_alive(
+                        session_name_input.value,
+                        script_path_input.value,
+                        arguments_input.value,
+                        keep_alive_switch.value,
                     ),
                 )
 
-            # Log Messages Card
-            with ui.card().style(
+            # Log Messages Card with Show/Hide Switch
+            show_logs = ui.switch("Show Log Messages", value=True).style(
+                "margin-bottom: 10px;"
+            )
+            log_card = ui.card().style(
                 "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
-            ):
+            )
+            with log_card:
                 ui.label("Log Messages").style(
                     "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                 )
@@ -140,6 +156,18 @@ class UserInterfaceManager:
                     )
                     .props("readonly")
                 )
+
+            # Bind the visibility of the log card to the switch
+            def toggle_log_card_visibility(value):
+                if value:
+                    log_card.style("opacity: 1; pointer-events: auto;")
+                else:
+                    log_card.style("opacity: 0; pointer-events: none;")
+
+            show_logs.on(
+                "update:model-value", lambda e: toggle_log_card_visibility(e.args[0])
+            )
+            log_card.visible = show_logs.value
 
     def update_log_messages(self, message, number_of_lines=20):
         """
@@ -178,3 +206,67 @@ class UserInterfaceManager:
         self.disk_bar.value = self.disk.percent / 100
         self.disk_free.text = f"{round(self.disk.free / (1024**3), 2)} GB Free"
         self.disk_used.text = f"{round(self.disk.used / (1024**3), 2)} GB Used"
+
+    async def run_session_with_keep_alive(
+        self, session_name, script_path, arguments, keep_alive
+    ):
+        """
+        Runs a tmux session with an optional 'keep alive' functionality.
+        If keep_alive is True, appends 'tail -f /dev/null' to the script if not present.
+        If keep_alive is False, removes 'tail -f /dev/null' and its comment if present.
+        Checks that the script is a bash script before running.
+        Shows notifications for errors.
+        """
+        script_path_obj = Path(script_path)
+        if not script_path_obj.is_file():
+            msg = f"Script path does not exist: {script_path}"
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
+            return
+        try:
+            with script_path_obj.open("r") as script_file:
+                script_lines = script_file.readlines()
+                if (
+                    not script_lines
+                    or not script_lines[0].startswith("#!")
+                    or "bash" not in script_lines[0]
+                ):
+                    msg = f"Script is not a bash script: {script_path}"
+                    logger.warning(msg)
+                    ui.notification(msg, type="negative")
+                    return
+
+            tail_line = "tail -f /dev/null\n"
+            comment_line = "# Keeps the session alive\n"
+
+            if keep_alive:
+                if tail_line not in script_lines:
+                    with script_path_obj.open("a") as script_file:
+                        script_file.write("\n" + comment_line)
+                        script_file.write(tail_line)
+            else:
+                # Remove both the comment and tail line if present
+                new_lines = []
+                skip_next = False
+                for line in script_lines:
+                    if line == comment_line:
+                        skip_next = True
+                        continue
+                    if skip_next and line == tail_line:
+                        skip_next = False
+                        continue
+                    if line == tail_line:
+                        continue
+                    new_lines.append(line)
+                with script_path_obj.open("w") as script_file:
+                    script_file.writelines(new_lines)
+
+            self.tmux_manager.start_tmux_session(
+                session_name,
+                f"{script_path} {arguments}".strip(),
+                logger,
+            )
+        except PermissionError:
+            msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
