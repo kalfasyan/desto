@@ -4,6 +4,7 @@ from nicegui import ui
 from desto.app.config import config as ui_settings
 from pathlib import Path
 import asyncio
+import os
 
 
 class UserInterfaceManager:
@@ -25,6 +26,8 @@ class UserInterfaceManager:
         self.log_display = None
         self.log_messages = []
         self.log_display = None
+        self.tmux_cpu = None
+        self.tmux_mem = None
 
     def build_ui(self):
         # --- UI Definition ---
@@ -105,43 +108,62 @@ class UserInterfaceManager:
                     f"font-size: {ui_settings['labels']['info_font_size']}; color: {ui_settings['labels']['info_color']};"
                 )
 
-        # Main Content Area with Process List
-        with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-            # Session Input and Command Section
-            with ui.card().style(
-                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
-            ):
-                ui.label("Start a New Session").style(
-                    "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
+                # --- Add tmux stats at the bottom ---
+                self.tmux_cpu = ui.label("tmux CPU: N/A").style(
+                    f"font-size: {ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;"
                 )
-                session_name_input = ui.input(label="Session Name").style(
-                    "width: 100%;"
-                )
-                script_path_input = ui.input(
-                    label="Script path",
-                    value="/home/kalfasy/repos/desto/scripts/find_files.sh",
-                ).style("width: 100%;")
-                arguments_input = ui.input(
-                    label="Arguments",
-                    value=".",
-                ).style("width: 100%;")
-                keep_alive_switch = ui.switch("Keep Session Alive").style(
-                    "margin-top: 10px;"
-                )
-                ui.button(
-                    "Run in Session",
-                    on_click=lambda: self.run_session_with_keep_alive(
-                        session_name_input.value,
-                        script_path_input.value,
-                        arguments_input.value,
-                        keep_alive_switch.value,
-                    ),
+                self.tmux_mem = ui.label("tmux MEM: N/A").style(
+                    f"font-size: {ui_settings['labels']['info_font_size']}; color: #888;"
                 )
 
-            # Log Messages Card with Show/Hide Switch
-            show_logs = ui.switch("Show Log Messages", value=True).style(
-                "margin-bottom: 10px;"
-            )
+        # Main Content Area with Tabs
+        with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
+            # Tabs definition
+            with ui.tabs().classes("w-full") as tabs:
+                new_tab = ui.tab("New")
+                recipes_tab = ui.tab("Recipes")
+            with ui.tab_panels(tabs, value=new_tab).classes("w-full"):
+                with ui.tab_panel(new_tab):
+                    with ui.card().style(
+                        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                    ):
+                        ui.label("Start Session").style(
+                            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
+                        )
+                        session_name_input = ui.input(label="Session Name").style(
+                            "width: 100%;"
+                        )
+                        script_path_input = ui.input(
+                            label="Script path",
+                            value="/home/kalfasy/repos/desto/scripts/find_files.sh",
+                        ).style("width: 100%;")
+                        arguments_input = ui.input(
+                            label="Arguments",
+                            value=".",
+                        ).style("width: 100%;")
+                        keep_alive_switch = ui.switch("Keep Alive").style(
+                            "margin-top: 10px;"
+                        )
+                        ui.button(
+                            "Run in Session",
+                            on_click=lambda: self.run_session_with_keep_alive(
+                                session_name_input.value,
+                                script_path_input.value,
+                                arguments_input.value,
+                                keep_alive_switch.value,
+                            ),
+                        )
+                with ui.tab_panel(recipes_tab):
+                    with ui.card().style(
+                        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                    ):
+                        ui.label("Recipes").style(
+                            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
+                        )
+                        # Placeholder for future recipe content
+
+            # Log Messages Card with Show/Hide Switch (shared for both tabs)
+            show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")
             log_card = ui.card().style(
                 "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
             )
@@ -206,6 +228,40 @@ class UserInterfaceManager:
         self.disk_bar.value = self.disk.percent / 100
         self.disk_free.text = f"{round(self.disk.free / (1024**3), 2)} GB Free"
         self.disk_used.text = f"{round(self.disk.used / (1024**3), 2)} GB Used"
+
+        # --- tmux server stats ---
+        tmux_cpu = "N/A"
+        tmux_mem = "N/A"
+        try:
+            # Find the tmux server process (ppid == 1 or lowest ppid)
+            tmux_procs = [
+                p
+                for p in psutil.process_iter(
+                    ["name", "ppid", "cpu_percent", "memory_info", "cmdline"]
+                )
+                if p.info["name"] == "tmux" or "tmux" in p.info["name"]
+            ]
+            if tmux_procs:
+                # Try to find the one with ppid == 1 (the server)
+                server_proc = next((p for p in tmux_procs if p.info["ppid"] == 1), None)
+                if not server_proc:
+                    # Fallback: tmux process with the lowest ppid
+                    server_proc = min(tmux_procs, key=lambda p: p.info["ppid"])
+                tmux_cpu = f"{server_proc.cpu_percent(interval=0.1):.1f}%"
+                mem_mb = server_proc.memory_info().rss / (1024 * 1024)
+                tmux_mem = f"{mem_mb:.1f} MB"
+            else:
+                # Calculate total CPU and memory usage of all tmux processes
+                total_cpu = sum(p.cpu_percent(interval=0.1) for p in tmux_procs)
+                total_mem = sum(p.memory_info().rss for p in tmux_procs)
+                tmux_cpu = f"{total_cpu:.1f}%"
+                tmux_mem = f"{total_mem / (1024 * 1024):.1f} MB"
+        except Exception as e:
+            tmux_cpu = "N/A"
+            tmux_mem = "N/A"
+
+        self.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
+        self.tmux_mem.text = f"tmux MEM: {tmux_mem}"
 
     async def run_session_with_keep_alive(
         self, session_name, script_path, arguments, keep_alive

@@ -2,6 +2,7 @@ from pathlib import Path
 import subprocess
 import shlex
 from datetime import datetime
+import time
 from nicegui import ui
 
 
@@ -242,43 +243,41 @@ class TmuxManager:
         """
         Adds the sessions table to the UI.
         """
-        # Add table headers
-        with ui.row().style("font-weight: bold; margin-bottom: 10px;"):
-            ui.label("Session ID").style("width: 100px;")
-            ui.label("Name").style("width: 150px;")
-            ui.label("Created").style("width: 200px;")
-            ui.label("Attached").style("width: 100px;")
-            ui.label("Windows").style("width: 100px;")
-            ui.label("Group").style("width: 100px;")
-            ui.label("Group Size").style("width: 100px;")
-            ui.label("Actions").style("width: 200px;")
+        header_style = "width: 150px; font-size: 1.2em; font-weight: bold;"
+        cell_style = "width: 150px; font-size: 1.2em;"
 
-        # Add rows for each session
+        with ui.row().style("margin-bottom: 10px;"):
+            ui.label("Session ID").style(header_style)
+            ui.label("Name").style(header_style)
+            ui.label("Created").style(header_style)
+            ui.label("Elapsed").style(header_style)  # New column
+            ui.label("Attached").style(header_style)
+            ui.label("Actions").style(header_style)
+
+        now = time.time()
         for session_name, session in sessions_status.items():
+            created_time = session["created"]
+            elapsed_seconds = int(now - created_time)
+            # Format elapsed as H:MM:SS
+            hours, remainder = divmod(elapsed_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
+
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
-                ui.label(session["id"]).style("width: 100px;")
-                ui.label(session_name).style("width: 150px;")
+                ui.label(session["id"]).style(cell_style)
+                ui.label(session_name).style(cell_style)
                 ui.label(
-                    datetime.fromtimestamp(session["created"]).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                ).style("width: 200px;")
-                ui.label("Yes" if session["attached"] else "No").style("width: 100px;")
-                ui.label(str(session["windows"])).style("width: 100px;")
-                ui.label(session["group"] or "N/A").style("width: 100px;")
-                ui.label(str(session["group_size"])).style("width: 100px;")
+                    datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")
+                ).style(cell_style)
+                ui.label(elapsed_str).style(cell_style)  # Elapsed column
+                ui.label("Yes" if session["attached"] else "No").style(cell_style)
                 ui.button(
                     "Kill",
-                    on_click=lambda s=session_name: self.confirm_kill_session(
-                        s,
-                    ),
+                    on_click=lambda s=session_name: self.confirm_kill_session(s),
                 ).props("color=red flat")
                 ui.button(
                     "View Log",
-                    on_click=lambda s=session_name: self.view_log(
-                        s,
-                        ui,
-                    ),
+                    on_click=lambda s=session_name: self.view_log(s, ui),
                 ).props("color=blue flat")
 
     def view_log(self, session_name, ui):
