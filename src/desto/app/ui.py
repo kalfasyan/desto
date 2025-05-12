@@ -141,7 +141,7 @@ class UserInterfaceManager:
                             label="Arguments",
                             value=".",
                         ).style("width: 100%;")
-                        keep_alive_switch = ui.switch("Keep Alive").style(
+                        keep_alive_switch_new = ui.switch("Keep Alive").style(
                             "margin-top: 10px;"
                         )
                         ui.button(
@@ -150,7 +150,7 @@ class UserInterfaceManager:
                                 session_name_input.value,
                                 script_path_input.value,
                                 arguments_input.value,
-                                keep_alive_switch.value,
+                                keep_alive_switch_new.value,
                             ),
                         )
                 with ui.tab_panel(recipes_tab):
@@ -160,7 +160,167 @@ class UserInterfaceManager:
                         ui.label("Recipes").style(
                             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                         )
-                        # Placeholder for future recipe content
+
+                        recipes = [
+                            {
+                                "title": "Custom Recipe",
+                                "script_name": "custom.sh",
+                                "code": "#!/bin/bash\n",
+                                "args_label": "Arguments (optional)",
+                                "placeholder": "",
+                                "default_session_name": "custom_recipe",
+                                "custom": True,
+                            },
+                            {
+                                "title": "Recursive Pattern Search",
+                                "script_name": "search_pattern.sh",
+                                "code": """#!/bin/bash
+# Usage: ./search_pattern.sh <directory> <pattern>
+dir="$1"
+pattern="$2"
+grep -rnw "$dir" -e "$pattern"
+""",
+                                "args_label": "Directory and Pattern (e.g. /home/user mypattern)",
+                                "placeholder": "/path/to/dir pattern",
+                                "default_session_name": "rec_patt_search",
+                                "custom": False,
+                            },
+                        ]
+
+                        selected_index = 0
+
+                        # --- Custom Recipe textarea state ---
+                        custom_code = {"value": recipes[0]["code"]}
+
+                        def on_recipe_change(e):
+                            nonlocal selected_index
+                            selected_index = e.value
+                            if recipes[selected_index].get("custom"):
+                                # Show editable textarea for custom recipe
+                                custom_code["value"] = (
+                                    custom_code["value"] or "#!/bin/bash\n"
+                                )
+                                code_display.visible = False
+                                custom_code_display.visible = True
+                                custom_code_display.value = custom_code["value"]
+                                args_input.label = recipes[selected_index]["args_label"]
+                                args_input.placeholder = recipes[selected_index][
+                                    "placeholder"
+                                ]
+                                args_input.visible = bool(
+                                    recipes[selected_index]["args_label"]
+                                )
+                            else:
+                                code_display.value = recipes[selected_index]["code"]
+                                code_display.visible = True
+                                custom_code_display.visible = False
+                                args_input.label = recipes[selected_index]["args_label"]
+                                args_input.placeholder = recipes[selected_index][
+                                    "placeholder"
+                                ]
+                                args_input.visible = bool(
+                                    recipes[selected_index]["args_label"]
+                                )
+                            args_input.value = ""
+                            recipe_session_name_input.value = recipes[selected_index][
+                                "default_session_name"
+                            ]
+                            keep_alive_switch_recipe.value = False
+
+                        # Radio group for recipe selection
+                        recipe_options = {
+                            i: recipe["title"] for i, recipe in enumerate(recipes)
+                        }
+                        radio = ui.radio(
+                            recipe_options,
+                            value=selected_index,
+                            on_change=on_recipe_change,
+                        )
+                        radio.props("inline")
+
+                        # Readonly code display for predefined recipe
+                        code_display = (
+                            ui.textarea(recipes[selected_index]["code"])
+                            .style(
+                                "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
+                            )
+                            .props("readonly autogrow")
+                        )
+
+                        # Editable textarea for custom recipe, hidden by default
+                        custom_code_display = (
+                            ui.textarea(
+                                value=custom_code["value"],
+                                label="Custom Bash Script",
+                                placeholder="Write your bash script here...",
+                                on_change=lambda e: custom_code.update(
+                                    {"value": e.value}
+                                ),
+                            )
+                            .style(
+                                "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
+                            )
+                            .props("autogrow")
+                            .bind_visibility_from(radio, "value", lambda v: v == 1)
+                        )
+                        custom_code_display.visible = False  # Hide initially
+
+                        args_input = (
+                            ui.input(
+                                label=recipes[selected_index]["args_label"],
+                                placeholder=recipes[selected_index]["placeholder"],
+                            ).style("width: 100%;")
+                            if recipes[selected_index]["args_label"]
+                            else ui.input(visible=False)
+                        )
+
+                        recipe_session_name_input = ui.input(
+                            label="Session Name",
+                            value=recipes[selected_index]["default_session_name"],
+                        ).style("width: 100%; margin-top: 10px;")
+
+                        keep_alive_switch_recipe = ui.switch("Keep Alive").style(
+                            "margin-top: 10px;"
+                        )
+
+                        def execute_recipe():
+                            idx = radio.value
+                            recipe = recipes[idx]
+                            if recipe.get("custom"):
+                                script_code = (
+                                    custom_code_display.value or "#!/bin/bash\n"
+                                )
+                            else:
+                                script_code = recipe["code"]
+                            args = args_input.value.strip()
+                            session_name = (
+                                recipe_session_name_input.value.strip()
+                                or recipe["default_session_name"]
+                            )
+                            script_path = self.tmux_manager.get_script_file(
+                                recipe["script_name"]
+                            )
+                            with script_path.open("w") as f:
+                                f.write(script_code)
+                            os.chmod(script_path, 0o755)
+                            # Add keep alive if needed
+                            if keep_alive_switch_recipe.value:
+                                with script_path.open("a") as f:
+                                    f.write("\n# Keeps the session alive\n")
+                                    f.write("tail -f /dev/null\n")
+                            self.tmux_manager.start_tmux_session(
+                                session_name,
+                                f"{script_path} {args}",
+                                logger,
+                            )
+                            ui.notification(
+                                f"Recipe '{recipe['title']}' executed.", type="positive"
+                            )
+
+                        ui.button(
+                            "Execute Recipe",
+                            on_click=execute_recipe,
+                        ).props("color=primary")
 
             # Log Messages Card with Show/Hide Switch (shared for both tabs)
             show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")

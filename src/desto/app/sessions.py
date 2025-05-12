@@ -7,7 +7,8 @@ from nicegui import ui
 
 
 class TmuxManager:
-    LOG_DIR = Path.cwd() / "desto_log"
+    LOG_DIR = Path.cwd() / "desto_logs"
+    SCRIPTS_DIR = Path.cwd() / "desto_scripts"  # <-- Add this line
 
     def __init__(self, ui, logger):
         self.sessions = {}
@@ -17,11 +18,12 @@ class TmuxManager:
         self.pause_updates = None  # Function to pause updates
         self.resume_updates = None  # Function to resume updates
 
-        # Ensure log directory exists
+        # Ensure log and scripts directories exist
         try:
             self.LOG_DIR.mkdir(exist_ok=True)
+            self.SCRIPTS_DIR.mkdir(exist_ok=True)  # <-- Add this line
         except Exception as e:
-            msg = f"Failed to create log directory '{self.LOG_DIR}': {e}"
+            msg = f"Failed to create log/scripts directory: {e}"
             self.logger.error(msg)
             ui.notification(msg, type="negative")
             raise
@@ -312,3 +314,7 @@ class TmuxManager:
                 ],
             ).props("color=primary")
         dialog.open()
+
+    @staticmethod
+    def get_script_file(script_name):
+        return TmuxManager.SCRIPTS_DIR / script_name
