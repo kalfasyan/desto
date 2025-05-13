@@ -1,5 +1,6 @@
 [project]
 name = "desto"
+version = "0.1.1"
 description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +18,3 @@ desto = "desto.app.dashboard:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs" # Or "file", if you prefer that.
