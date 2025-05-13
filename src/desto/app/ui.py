@@ -5,6 +5,7 @@ from desto.app.config import config as ui_settings
 from pathlib import Path
 import asyncio
 import os
+from desto.app.recipes import RECIPES
 
 
 class UserInterfaceManager:
@@ -161,86 +162,84 @@ class UserInterfaceManager:
                             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                         )
 
-                        recipes = [
-                            {
-                                "title": "Custom Recipe",
-                                "script_name": "custom.sh",
-                                "code": "#!/bin/bash\n",
+                        selected_key = "custom"
+                        custom_code = {"value": RECIPES["custom"]["code"]}
+                        user_recipes = {}  # Store user-saved recipes in memory for this session
+
+                        def add_user_recipe(name, code):
+                            # Add a new user recipe to RECIPES and update radio options
+                            safe_name = name.strip().replace(" ", "_")[:15]
+                            if (
+                                not safe_name
+                                or safe_name in RECIPES
+                                or safe_name in user_recipes
+                            ):
+                                ui.notification(
+                                    "Invalid or duplicate recipe name.", type="warning"
+                                )
+                                return
+                            user_recipes[safe_name] = {
+                                "title": name,
+                                "script_name": f"{safe_name}.sh",
+                                "code": code,
                                 "args_label": "Arguments (optional)",
                                 "placeholder": "",
-                                "default_session_name": "custom_recipe",
-                                "custom": True,
-                            },
-                            {
-                                "title": "Recursive Pattern Search",
-                                "script_name": "search_pattern.sh",
-                                "code": """#!/bin/bash
-# Usage: ./search_pattern.sh <directory> <pattern>
-dir="$1"
-pattern="$2"
-grep -rnw "$dir" -e "$pattern"
-""",
-                                "args_label": "Directory and Pattern (e.g. /home/user mypattern)",
-                                "placeholder": "/path/to/dir pattern",
-                                "default_session_name": "rec_patt_search",
+                                "default_session_name": safe_name,
                                 "custom": False,
-                            },
-                        ]
-
-                        selected_index = 0
-
-                        # --- Custom Recipe textarea state ---
-                        custom_code = {"value": recipes[0]["code"]}
+                            }
+                            # Add to RECIPES as well for lookup
+                            RECIPES[safe_name] = user_recipes[safe_name]
+                            # Update radio options
+                            recipe_options[safe_name] = name
+                            radio.options = recipe_options
+                            ui.notification(f"Recipe '{name}' saved.", type="positive")
 
                         def on_recipe_change(e):
-                            nonlocal selected_index
-                            selected_index = e.value
-                            if recipes[selected_index].get("custom"):
-                                # Show editable textarea for custom recipe
+                            nonlocal selected_key
+                            selected_key = e.value
+                            # Look up in RECIPES first, then user_recipes
+                            recipe = (
+                                RECIPES[selected_key]
+                                if selected_key in RECIPES
+                                else user_recipes[selected_key]
+                            )
+                            if recipe.get("custom"):
                                 custom_code["value"] = (
                                     custom_code["value"] or "#!/bin/bash\n"
                                 )
                                 code_display.visible = False
                                 custom_code_display.visible = True
                                 custom_code_display.value = custom_code["value"]
-                                args_input.label = recipes[selected_index]["args_label"]
-                                args_input.placeholder = recipes[selected_index][
-                                    "placeholder"
-                                ]
-                                args_input.visible = bool(
-                                    recipes[selected_index]["args_label"]
-                                )
+                                args_input.label = recipe["args_label"]
+                                args_input.placeholder = recipe["placeholder"]
+                                args_input.visible = bool(recipe["args_label"])
                             else:
-                                code_display.value = recipes[selected_index]["code"]
+                                code_display.value = recipe["code"]
                                 code_display.visible = True
                                 custom_code_display.visible = False
-                                args_input.label = recipes[selected_index]["args_label"]
-                                args_input.placeholder = recipes[selected_index][
-                                    "placeholder"
-                                ]
-                                args_input.visible = bool(
-                                    recipes[selected_index]["args_label"]
-                                )
+                                args_input.label = recipe["args_label"]
+                                args_input.placeholder = recipe["placeholder"]
+                                args_input.visible = bool(recipe["args_label"])
                             args_input.value = ""
-                            recipe_session_name_input.value = recipes[selected_index][
+                            recipe_session_name_input.value = recipe[
                                 "default_session_name"
                             ]
                             keep_alive_switch_recipe.value = False
 
                         # Radio group for recipe selection
                         recipe_options = {
-                            i: recipe["title"] for i, recipe in enumerate(recipes)
+                            key: recipe["title"] for key, recipe in RECIPES.items()
                         }
                         radio = ui.radio(
                             recipe_options,
-                            value=selected_index,
+                            value=selected_key,
                             on_change=on_recipe_change,
                         )
                         radio.props("inline")
 
                         # Readonly code display for predefined recipe
                         code_display = (
-                            ui.textarea(recipes[selected_index]["code"])
+                            ui.textarea(RECIPES[selected_key]["code"])
                             .style(
                                 "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
                             )
@@ -261,22 +260,24 @@ grep -rnw "$dir" -e "$pattern"
                                 "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
                             )
                             .props("autogrow")
-                            .bind_visibility_from(radio, "value", lambda v: v == 1)
+                            .bind_visibility_from(
+                                radio, "value", lambda v: v == "custom"
+                            )
                         )
                         custom_code_display.visible = False  # Hide initially
 
                         args_input = (
                             ui.input(
-                                label=recipes[selected_index]["args_label"],
-                                placeholder=recipes[selected_index]["placeholder"],
+                                label=RECIPES[selected_key]["args_label"],
+                                placeholder=RECIPES[selected_key]["placeholder"],
                             ).style("width: 100%;")
-                            if recipes[selected_index]["args_label"]
+                            if RECIPES[selected_key]["args_label"]
                             else ui.input(visible=False)
                         )
 
                         recipe_session_name_input = ui.input(
                             label="Session Name",
-                            value=recipes[selected_index]["default_session_name"],
+                            value=RECIPES[selected_key]["default_session_name"],
                         ).style("width: 100%; margin-top: 10px;")
 
                         keep_alive_switch_recipe = ui.switch("Keep Alive").style(
@@ -284,8 +285,8 @@ grep -rnw "$dir" -e "$pattern"
                         )
 
                         def execute_recipe():
-                            idx = radio.value
-                            recipe = recipes[idx]
+                            key = radio.value
+                            recipe = RECIPES[key]
                             if recipe.get("custom"):
                                 script_code = (
                                     custom_code_display.value or "#!/bin/bash\n"
@@ -321,6 +322,40 @@ grep -rnw "$dir" -e "$pattern"
                             "Execute Recipe",
                             on_click=execute_recipe,
                         ).props("color=primary")
+
+                        # Input for custom recipe name (only visible for custom)
+                        custom_recipe_name_input = (
+                            ui.input(
+                                label="Save Custom Recipe As... (max 15 chars)",
+                                placeholder="MyScript",
+                                validation={
+                                    "Too long!": lambda value: len(value) <= 15
+                                },
+                            )
+                            .style("width: 100%; margin-bottom: 8px;")
+                            .bind_visibility_from(
+                                radio, "value", lambda v: v == "custom"
+                            )
+                        )
+
+                        # Button to save custom recipe
+                        def save_custom_recipe():
+                            name = custom_recipe_name_input.value.strip()
+                            if not name or len(name) > 15:
+                                ui.notification(
+                                    "Please enter a name up to 15 characters.",
+                                    type="warning",
+                                )
+                                return
+                            add_user_recipe(name, custom_code["value"])
+                            # Optionally, auto-select the new recipe
+                            radio.value = name.replace(" ", "_")[:15]
+                            on_recipe_change(type("e", (), {"value": radio.value}))
+
+                        ui.button(
+                            "Save as Recipe",
+                            on_click=save_custom_recipe,
+                        ).bind_visibility_from(radio, "value", lambda v: v == "custom")
 
             # Log Messages Card with Show/Hide Switch (shared for both tabs)
             show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")
