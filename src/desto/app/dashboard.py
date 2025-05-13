@@ -12,7 +12,7 @@ def run_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
     """Function to update the UI and session status."""
     um.update_ui_system_info()
     tm.update_sessions_status()
-    um.refresh_log_display(um.log_display, um.log_messages)
+    um.refresh_log_display()
 
 
 def pause_global_timer():
@@ -36,7 +36,7 @@ def main():
 
     um = UserInterfaceManager(ui, ui_settings, tm)  # Initialize the UI instance
     logger.add(
-        lambda msg: um.update_log_messages(msg.strip()),
+        lambda msg: um.log_panel.update_log_messages(msg.strip()),
         format="{message}",
         level="INFO",
     )
