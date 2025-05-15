@@ -82,9 +82,52 @@ class SystemStatsPanel:
             )
 
 
-class RecipePanel:
+class SettingsPanel:
     def __init__(self, tmux_manager):
         self.tmux_manager = tmux_manager
+        self.scripts_dir_input = None
+        self.logs_dir_input = None
+
+    def build(self):
+        ui.label("Settings").style(
+            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
+        )
+        self.scripts_dir_input = ui.input(
+            label="Scripts Directory",
+            value=str(self.tmux_manager.SCRIPTS_DIR),
+        ).style("width: 100%; margin-bottom: 10px;")
+        self.logs_dir_input = ui.input(
+            label="Logs Directory",
+            value=str(self.tmux_manager.LOG_DIR),
+        ).style("width: 100%; margin-bottom: 10px;")
+        ui.button("Save", on_click=self.save_settings).style(
+            "width: 100%; margin-top: 10px;"
+        )
+
+    def save_settings(self):
+        scripts_dir = Path(self.scripts_dir_input.value).expanduser()
+        logs_dir = Path(self.logs_dir_input.value).expanduser()
+        valid = True
+        if not scripts_dir.is_dir():
+            ui.notification("Invalid scripts directory.", type="warning")
+            self.scripts_dir_input.value = str(self.tmux_manager.SCRIPTS_DIR)
+            valid = False
+        if not logs_dir.is_dir():
+            ui.notification("Invalid logs directory.", type="warning")
+            self.logs_dir_input.value = str(self.tmux_manager.LOG_DIR)
+            valid = False
+        if valid:
+            self.tmux_manager.SCRIPTS_DIR = scripts_dir
+            self.tmux_manager.LOG_DIR = logs_dir
+            ui.notification("Directories updated.", type="positive")
+
+
+class RecipePanel:
+    def __init__(self, tmux_manager, ui_manager=None):
+        self.tmux_manager = tmux_manager
+        self.ui_manager = (
+            ui_manager  # Reference to UI manager for refreshing script list
+        )
         self.selected_key = "custom"
         self.custom_code = {"value": ""}
         self.user_recipes = {}
@@ -148,7 +191,19 @@ class RecipePanel:
             ui.notification("Please enter a name up to 15 characters.", type="warning")
             return
         self.add_user_recipe(name, self.custom_code["value"])
-        saved_key = name.replace(" ", "_")[:15]
+        # Save the script to the scripts directory
+        safe_name = name.strip().replace(" ", "_")[:15]
+        script_path = self.tmux_manager.get_script_file(f"{safe_name}.sh")
+        try:
+            with script_path.open("w") as f:
+                f.write(self.custom_code["value"])
+            os.chmod(script_path, 0o755)
+        except Exception as e:
+            ui.notification(f"Failed to save script: {e}", type="warning")
+        # Refresh script list in UI if possible
+        if self.ui_manager:
+            self.ui_manager.refresh_script_list()
+        saved_key = safe_name
         self.radio.value = saved_key
         self.on_recipe_change(type("e", (), {"value": saved_key}))
         ui.notification(f"Recipe '{name}' saved and selected.", type="positive")
@@ -200,8 +255,8 @@ class RecipePanel:
             "margin-top: 10px;"
         )
         ui.button(
-            "Execute Recipe",
-            on_click=self.execute_recipe,
+            "Run Recipe in Session",
+            on_click=self.run_recipe,
         ).props("color=primary")
         with ui.row().bind_visibility_from(
             self.radio, "value", lambda v: v == "custom"
@@ -212,11 +267,11 @@ class RecipePanel:
                 validation={"Too long!": lambda value: len(value) <= 15},
             ).style("width: 100%; margin-bottom: 8px;")
             ui.button(
-                "Save as Recipe",
+                "Save",
                 on_click=self.save_custom_recipe,
             ).style("width: 28%; margin-bottom: 8px;")
 
-    def execute_recipe(self):
+    def run_recipe(self):
         key = self.radio.value
         recipe = RECIPES[key]
         if recipe.get("custom"):
@@ -293,8 +348,18 @@ class UserInterfaceManager:
         self.ui = ui
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
-        self.recipe_panel = RecipePanel(tmux_manager)
+        self.recipe_panel = RecipePanel(tmux_manager, self)
         self.log_panel = LogPanel()
+        self.script_path_select = None  # Reference to the script select component
+
+    def refresh_script_list(self):
+        script_files = [
+            f.name for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh") if f.is_file()
+        ]
+        if self.script_path_select:
+            self.script_path_select.options = script_files
+            if script_files:
+                self.script_path_select.value = script_files[0]
 
     def build_ui(self):
         with (
@@ -303,7 +368,7 @@ class UserInterfaceManager:
                 f"background-color: {self.ui_settings['header']['background_color']}; "
                 f"color: {self.ui_settings['header']['color']};"
             )
-            .classes(replace="row items-center")
+            .classes(replace="row items-center justify-between")
         ):
             ui.button(on_click=lambda: left_drawer.toggle(), icon="menu").props(
                 "flat color=white"
@@ -311,6 +376,9 @@ class UserInterfaceManager:
             ui.label("desto").style(
                 f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;"
             )
+            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props(
+                "flat color=white"
+            ).style("margin-left: auto;")
         with ui.left_drawer().style(
             f"width: {self.ui_settings['sidebar']['width']}; "
             f"padding: {self.ui_settings['sidebar']['padding']}; "
@@ -319,12 +387,29 @@ class UserInterfaceManager:
             "display: flex; flex-direction: column;"
         ) as left_drawer:
             self.stats_panel.build()
+
+        with ui.right_drawer(top_corner=False, bottom_corner=True, value=False).style(
+            f"width: {self.ui_settings['sidebar']['width']}; "
+            f"padding: {self.ui_settings['sidebar']['padding']}; "
+            f"background-color: {self.ui_settings['sidebar']['background_color']}; "
+            f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
+            "display: flex; flex-direction: column;"
+        ) as right_drawer:
+            self.settings_panel = SettingsPanel(self.tmux_manager)
+            self.settings_panel.build()
+
+        # ui.upload(on_upload=lambda e: ui.notify(f"Uploaded {e.name}")).classes(
+        #     "max-w-full"
+        # )
+
+        # ui.link("Visit other page", other_page)
+
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
             with ui.tabs().classes("w-full") as tabs:
-                new_tab = ui.tab("New")
+                create_session_tab = ui.tab("Start")
                 recipes_tab = ui.tab("Recipes")
-            with ui.tab_panels(tabs, value=new_tab).classes("w-full"):
-                with ui.tab_panel(new_tab):
+            with ui.tab_panels(tabs, value=create_session_tab).classes("w-full"):
+                with ui.tab_panel(create_session_tab):
                     with ui.card().style(
                         "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
                     ):
@@ -334,9 +419,15 @@ class UserInterfaceManager:
                         session_name_input = ui.input(label="Session Name").style(
                             "width: 100%;"
                         )
-                        script_path_input = ui.input(
-                            label="Script path",
-                            value="/home/kalfasy/repos/desto/scripts/find_files.sh",
+                        script_files = [
+                            f.name
+                            for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh")
+                            if f.is_file()
+                        ]
+                        self.script_path_select = ui.select(
+                            options=script_files,
+                            label="Script",
+                            value=script_files[0] if script_files else "",
                         ).style("width: 100%;")
                         arguments_input = ui.input(
                             label="Arguments",
@@ -349,7 +440,10 @@ class UserInterfaceManager:
                             "Run in Session",
                             on_click=lambda: self.run_session_with_keep_alive(
                                 session_name_input.value,
-                                script_path_input.value,
+                                str(
+                                    self.tmux_manager.SCRIPTS_DIR
+                                    / self.script_path_select.value
+                                ),
                                 arguments_input.value,
                                 keep_alive_switch_new.value,
                             ),

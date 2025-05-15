@@ -7,10 +7,9 @@ from nicegui import ui
 
 
 class TmuxManager:
-    LOG_DIR = Path.cwd() / "desto_logs"
-    SCRIPTS_DIR = Path.cwd() / "desto_scripts"  # <-- Add this line
-
-    def __init__(self, ui, logger):
+    def __init__(self, ui, logger, log_dir=None, scripts_dir=None):
+        self.LOG_DIR = log_dir or (Path.cwd() / "desto_logs")
+        self.SCRIPTS_DIR = scripts_dir or (Path.cwd() / "desto_scripts")
         self.sessions = {}
         self.ui = ui
         self.sessions_container = ui.column().style("margin-top: 20px;")
@@ -112,17 +111,18 @@ class TmuxManager:
         with self.sessions_container:
             content()
 
-    @staticmethod
-    def get_log_file(session_name):
-        return TmuxManager.LOG_DIR / f"{session_name}.log"
+    def get_log_file(self, session_name):
+        return self.LOG_DIR / f"{session_name}.log"
 
-    @staticmethod
-    def start_tmux_session(session_name, command, logger):
+    def get_script_file(self, script_name):
+        return self.SCRIPTS_DIR / script_name
+
+    def start_tmux_session(self, session_name, command, logger):
         """
         Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
         """
-        log_file = TmuxManager.get_log_file(session_name)
+        log_file = self.get_log_file(session_name)
         try:
             log_file.parent.mkdir(exist_ok=True)
         except Exception as e:
@@ -135,7 +135,7 @@ class TmuxManager:
         full_command_for_tmux = f"{command} > {quoted_log_file} 2>&1"
 
         try:
-            process = subprocess.run(
+            subprocess.run(
                 [
                     "tmux",
                     "new-session",
@@ -158,7 +158,7 @@ class TmuxManager:
             logger.warning(msg)
             ui.notification(msg, type="negative")
         except Exception as e:
-            msg = (f"Unexpected error starting session '{session_name}': {str(e)}",)
+            msg = f"Unexpected error starting session '{session_name}': {str(e)}"
             logger.error(msg)
             ui.notification(msg, type="negative")
 
@@ -291,7 +291,3 @@ class TmuxManager:
                 ],
             ).props("color=primary")
         dialog.open()
-
-    @staticmethod
-    def get_script_file(script_name):
-        return TmuxManager.SCRIPTS_DIR / script_name
