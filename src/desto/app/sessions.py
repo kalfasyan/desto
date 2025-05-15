@@ -79,7 +79,8 @@ class TmuxManager:
 
     def kill_session(self, session_name):
         """Kill a tmux session by name."""
-        self.logger.info(f"Attempting to kill session: '{session_name}'")
+        msg = f"Attempting to kill session: '{session_name}'"
+        self.logger.info(msg)
         escaped_session_name = shlex.quote(session_name)  # Escape the session name
         result = subprocess.run(
             ["tmux", "kill-session", "-t", escaped_session_name],
@@ -88,21 +89,15 @@ class TmuxManager:
             text=True,
         )
         if result.returncode == 0:
-            self.logger.success(f"Session '{session_name}' killed successfully.")
-            ui.notification(
-                f"Session '{session_name}' killed successfully.",
-                type="positive",
-            )
+            msg = f"Session '{session_name}' killed successfully."
+            self.logger.success(msg)
+            ui.notification(msg, type="positive")
             if session_name in self.sessions:
                 del self.sessions[session_name]
         else:
-            self.logger.warning(
-                f"Failed to kill session '{session_name}': {result.stderr}"
-            )
-            ui.notification(
-                f"Failed to kill session '{session_name}': {result.stderr}",
-                type="negative",
-            )
+            msg = f"Failed to kill session '{session_name}': {result.stderr}"
+            self.logger.warning(msg)
+            ui.notification(msg, type="negative")
 
     def clear_sessions_container(self):
         """
@@ -154,32 +149,18 @@ class TmuxManager:
                 text=True,
                 check=True,
             )
-            logger.info(
-                f"Tmux session '{session_name}' started. Command with redirection: '{full_command_for_tmux}'. "
-                f"Tmux process stdout: {process.stdout.strip() if process.stdout else 'None'}"
-            )
-            ui.notification(
-                f"Session '{session_name}' started successfully.",
-                type="positive",
-            )
+            msg = f"Tmux session '{session_name}' started. Command: '{full_command_for_tmux}'."
+            logger.info(msg)
+            ui.notification(msg, type="positive")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"
-            logger.warning(
-                f"Failed to start tmux session '{session_name}' with command '{full_command_for_tmux}'. "
-                f"Error: {error_output}"
-            )
-            ui.notification(
-                f"Failed to start session '{session_name}': {error_output}",
-                type="negative",
-            )
+            msg = f"Failed to start session '{session_name}': {error_output}"
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
         except Exception as e:
-            logger.error(
-                f"An unexpected error occurred while trying to start tmux session '{session_name}': {str(e)}"
-            )
-            ui.notification(
-                f"Unexpected error starting session '{session_name}': {str(e)}",
-                type="negative",
-            )
+            msg = (f"Unexpected error starting session '{session_name}': {str(e)}",)
+            logger.error(msg)
+            ui.notification(msg, type="negative")
 
     def update_sessions_status(self):
         """
@@ -198,18 +179,14 @@ class TmuxManager:
         """
         try:
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
-            self.logger.success(f"Tmux session '{session_name}' killed successfully.")
-            ui.notification(
-                f"Session '{session_name}' killed successfully.",
-                type="positive",
-            )
+            msg = f"Tmux session '{session_name}' killed successfully."
+            self.logger.success(msg)
+            ui.notification(msg, type="positive")
             self.update_sessions_status()
         except subprocess.CalledProcessError as e:
-            self.logger.warning(f"Failed to kill tmux session '{session_name}': {e}")
-            ui.notification(
-                f"Failed to kill tmux session '{session_name}': {e}",
-                type="negative",
-            )
+            msg = f"Failed to kill tmux session '{session_name}': {e}"
+            self.logger.warning(msg)
+            ui.notification(msg, type="negative")
 
     def confirm_kill_session(self, session_name):
         """
