@@ -4,12 +4,23 @@ import shlex
 from datetime import datetime
 import time
 from nicegui import ui
+import os
 
 
 class TmuxManager:
     def __init__(self, ui, logger, log_dir=None, scripts_dir=None):
-        self.LOG_DIR = log_dir or (Path.cwd() / "desto_logs")
-        self.SCRIPTS_DIR = scripts_dir or (Path.cwd() / "desto_scripts")
+        scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
+        logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
+        self.SCRIPTS_DIR = (
+            Path(scripts_dir_env)
+            if scripts_dir_env
+            else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        )
+        self.LOG_DIR = (
+            Path(logs_dir_env)
+            if logs_dir_env
+            else Path(log_dir or Path.cwd() / "desto_logs")
+        )
         self.sessions = {}
         self.ui = ui
         self.sessions_container = ui.column().style("margin-top: 20px;")
@@ -20,7 +31,7 @@ class TmuxManager:
         # Ensure log and scripts directories exist
         try:
             self.LOG_DIR.mkdir(exist_ok=True)
-            self.SCRIPTS_DIR.mkdir(exist_ok=True)  # <-- Add this line
+            self.SCRIPTS_DIR.mkdir(exist_ok=True)
         except Exception as e:
             msg = f"Failed to create log/scripts directory: {e}"
             self.logger.error(msg)

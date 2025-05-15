@@ -425,9 +425,13 @@ class UserInterfaceManager:
                             if f.is_file()
                         ]
                         self.script_path_select = ui.select(
-                            options=script_files,
+                            options=script_files
+                            if script_files
+                            else ["No scripts found"],
                             label="Script",
-                            value=script_files[0] if script_files else "",
+                            value=script_files[0]
+                            if script_files
+                            else "No scripts found",
                         ).style("width: 100%;")
                         arguments_input = ui.input(
                             label="Arguments",
