@@ -109,6 +109,14 @@
 
 ---
 
+## TODO
+
+- [ ] Explore possibility to pause processes running inside a session
+- [ ] Make it more intuitive to export/import custom recipes/scripts
+- [ ] Add dark mode/theme toggle for the dashboard UI
+
+---
+
 ## Requirements
 
 - Python 3.11+
