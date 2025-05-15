@@ -1,4 +1,3 @@
-import pytest
 from desto.app.ui import UserInterfaceManager
 from unittest.mock import MagicMock
 

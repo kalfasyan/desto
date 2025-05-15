@@ -1,0 +1,14 @@
+repos:
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        name: ruff (formatting/lint)
+        args: ["--output-format=github"]
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (run tests)
+        entry: pytest tests/
+        language: system
+        types: [python]
