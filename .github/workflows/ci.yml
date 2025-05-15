@@ -24,6 +24,5 @@ jobs:
         run: ruff check .
       - name: Run pytest
         run: pytest tests/
-        working-directory: ${{ github.workspace }}
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/..
