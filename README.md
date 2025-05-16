@@ -17,6 +17,16 @@
 - **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
 
 ---
+
+## TODO
+
+- [ ] Explore possibility to pause processes running inside a session
+- [ ] Make it more intuitive to export/import custom recipes/scripts
+- [ ] Add dark mode/theme toggle for the dashboard UI
+- [ ] Implement notifications for session completion or errors
+
+---
+
 ## Dashboard
 
 

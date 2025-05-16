@@ -83,8 +83,9 @@ class SystemStatsPanel:
 
 
 class SettingsPanel:
-    def __init__(self, tmux_manager):
+    def __init__(self, tmux_manager, ui_manager=None):
         self.tmux_manager = tmux_manager
+        self.ui_manager = ui_manager
         self.scripts_dir_input = None
         self.logs_dir_input = None
 
@@ -120,6 +121,8 @@ class SettingsPanel:
             self.tmux_manager.SCRIPTS_DIR = scripts_dir
             self.tmux_manager.LOG_DIR = logs_dir
             ui.notification("Directories updated.", type="positive")
+            if self.ui_manager:
+                self.ui_manager.refresh_script_list()
 
 
 class RecipePanel:
@@ -226,18 +229,24 @@ class RecipePanel:
             .props("readonly autogrow")
             .bind_visibility_from(self.radio, "value", lambda v: v != "custom")
         )
+        if self.radio.value == "custom":
+            ui.label("Custom Bash Script")
         self.custom_code_display = (
-            ui.textarea(
-                value=self.custom_code["value"],
-                label="Custom Bash Script",
-                placeholder="Write your bash script here...",
+            ui.codemirror(
+                self.custom_code["value"],
+                language="bash",
                 on_change=lambda e: self.custom_code.update({"value": e.value}),
             )
             .style(
                 "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
             )
-            .props("autogrow")
+            .classes("h-48")
             .bind_visibility_from(self.radio, "value", lambda v: v == "custom")
+        )
+        ui.select(self.custom_code_display.supported_themes, label="Theme").classes(
+            "w-32"
+        ).bind_value(self.custom_code_display, "theme").bind_visibility_from(
+            self.radio, "value", lambda v: v == "custom"
         )
         self.args_input = (
             ui.input(
@@ -357,9 +366,16 @@ class UserInterfaceManager:
             f.name for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh") if f.is_file()
         ]
         if self.script_path_select:
-            self.script_path_select.options = script_files
+            self.script_path_select.options = (
+                script_files if script_files else ["No scripts found"]
+            )
             if script_files:
                 self.script_path_select.value = script_files[0]
+            else:
+                self.script_path_select.value = "No scripts found"
+                msg = f"No script files found in {self.tmux_manager.SCRIPTS_DIR}. Select a different directory or add scripts."
+                logger.warning(msg)
+                ui.notification(msg, type="warning")
 
     def build_ui(self):
         with (
@@ -395,14 +411,8 @@ class UserInterfaceManager:
             f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
             "display: flex; flex-direction: column;"
         ) as right_drawer:
-            self.settings_panel = SettingsPanel(self.tmux_manager)
+            self.settings_panel = SettingsPanel(self.tmux_manager, self)
             self.settings_panel.build()
-
-        # ui.upload(on_upload=lambda e: ui.notify(f"Uploaded {e.name}")).classes(
-        #     "max-w-full"
-        # )
-
-        # ui.link("Visit other page", other_page)
 
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
             with ui.tabs().classes("w-full") as tabs:
@@ -437,6 +447,41 @@ class UserInterfaceManager:
                             label="Arguments",
                             value=".",
                         ).style("width: 100%;")
+
+                        # Add these lines after self.script_path_select is created
+                        script_preview_content = ""
+                        if (
+                            script_files
+                            and (
+                                self.tmux_manager.SCRIPTS_DIR / script_files[0]
+                            ).is_file()
+                        ):
+                            with open(
+                                self.tmux_manager.SCRIPTS_DIR / script_files[0], "r"
+                            ) as f:
+                                script_preview_content = f.read()
+
+                        self.script_preview_editor = (
+                            ui.codemirror(
+                                script_preview_content,
+                                language="bash",
+                                theme="basicLight",
+                                line_wrapping=True,
+                                highlight_whitespace=True,
+                                indent="    ",
+                                on_change=None,  # Read-only
+                            )
+                            .style("width: 100%; margin-top: 10px;")
+                            .classes("h-48")
+                        )
+                        self.script_preview_editor.props("readonly")
+
+                        ui.select(
+                            self.script_preview_editor.supported_themes, label="Theme"
+                        ).classes("w-32").bind_value(
+                            self.script_preview_editor, "theme"
+                        )
+
                         keep_alive_switch_new = ui.switch("Keep Alive").style(
                             "margin-top: 10px;"
                         )
@@ -451,6 +496,10 @@ class UserInterfaceManager:
                                 arguments_input.value,
                                 keep_alive_switch_new.value,
                             ),
+                        )
+
+                        self.script_path_select.on(
+                            "update:model-value", self.update_script_preview
                         )
                 with ui.tab_panel(recipes_tab):
                     with ui.card().style(
@@ -563,3 +612,28 @@ class UserInterfaceManager:
             msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
             logger.warning(msg)
             ui.notification(msg, type="negative")
+
+    def update_script_preview(self, e):
+        selected = e.args
+        script_files = [
+            f.name for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh") if f.is_file()
+        ]
+        # If selected is a list/tuple, get the first element
+        if isinstance(selected, (list, tuple)):
+            selected = selected[0]
+        # If selected is a dict (option object), get the value
+        if isinstance(selected, dict):
+            selected = selected.get("value", "")
+        # If selected is an int, treat it as an index
+        if isinstance(selected, int):
+            if 0 <= selected < len(script_files):
+                selected = script_files[selected]
+            else:
+                selected = ""
+        # Now selected should be a string (filename)
+        script_path = self.tmux_manager.SCRIPTS_DIR / selected
+        if script_path.is_file():
+            with open(script_path, "r") as f:
+                self.script_preview_editor.value = f.read()
+        else:
+            self.script_preview_editor.value = "# Script not found."
