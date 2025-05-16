@@ -3,7 +3,7 @@ import psutil
 from nicegui import ui
 from pathlib import Path
 import os
-from desto.app.recipes import RECIPES
+from desto.app.templates import TEMPLATES
 
 
 class SystemStatsPanel:
@@ -125,7 +125,7 @@ class SettingsPanel:
                 self.ui_manager.refresh_script_list()
 
 
-class RecipePanel:
+class TemplatePanel:
     def __init__(self, tmux_manager, ui_manager=None):
         self.tmux_manager = tmux_manager
         self.ui_manager = (
@@ -133,22 +133,24 @@ class RecipePanel:
         )
         self.selected_key = "custom"
         self.custom_code = {"value": ""}
-        self.user_recipes = {}
-        self.recipe_options = {key: recipe["title"] for key, recipe in RECIPES.items()}
+        self.user_templates = {}
+        self.template_options = {
+            key: template["title"] for key, template in TEMPLATES.items()
+        }
         self.radio = None
         self.code_display = None
         self.custom_code_display = None
         self.args_input = None
-        self.recipe_session_name_input = None
-        self.keep_alive_switch_recipe = None
-        self.custom_recipe_name_input = None
+        self.template_session_name_input = None
+        self.keep_alive_switch_template = None
+        self.custom_template_name_input = None
 
-    def add_user_recipe(self, name, code):
+    def add_user_template(self, name, code):
         safe_name = name.strip().replace(" ", "_")[:15]
-        if not safe_name or safe_name in RECIPES or safe_name in self.user_recipes:
-            ui.notification("Invalid or duplicate recipe name.", type="warning")
+        if not safe_name or safe_name in TEMPLATES or safe_name in self.user_templates:
+            ui.notification("Invalid or duplicate template name.", type="warning")
             return
-        self.user_recipes[safe_name] = {
+        self.user_templates[safe_name] = {
             "title": name,
             "script_name": f"{safe_name}.sh",
             "code": code,
@@ -157,43 +159,43 @@ class RecipePanel:
             "default_session_name": safe_name,
             "custom": False,
         }
-        RECIPES[safe_name] = self.user_recipes[safe_name]
-        self.recipe_options[safe_name] = name
-        self.radio.options = self.recipe_options
-        ui.notification(f"Recipe '{name}' saved.", type="positive")
+        TEMPLATES[safe_name] = self.user_templates[safe_name]
+        self.template_options[safe_name] = name
+        self.radio.options = self.template_options
+        ui.notification(f"Template '{name}' saved.", type="positive")
 
-    def on_recipe_change(self, e):
+    def on_template_change(self, e):
         self.selected_key = e.value
-        recipe = (
-            RECIPES[self.selected_key]
-            if self.selected_key in RECIPES
-            else self.user_recipes[self.selected_key]
+        template = (
+            TEMPLATES[self.selected_key]
+            if self.selected_key in TEMPLATES
+            else self.user_templates[self.selected_key]
         )
-        if recipe.get("custom"):
+        if template.get("custom"):
             self.custom_code["value"] = self.custom_code["value"] or "#!/bin/bash\n"
             self.code_display.visible = False
             self.custom_code_display.visible = True
             self.custom_code_display.value = self.custom_code["value"]
-            self.args_input.label = recipe["args_label"]
-            self.args_input.placeholder = recipe["placeholder"]
-            self.args_input.visible = bool(recipe["args_label"])
+            self.args_input.label = template["args_label"]
+            self.args_input.placeholder = template["placeholder"]
+            self.args_input.visible = bool(template["args_label"])
         else:
-            self.code_display.value = recipe["code"]
+            self.code_display.value = template["code"]
             self.code_display.visible = True
             self.custom_code_display.visible = False
-            self.args_input.label = recipe["args_label"]
-            self.args_input.placeholder = recipe["placeholder"]
-            self.args_input.visible = bool(recipe["args_label"])
+            self.args_input.label = template["args_label"]
+            self.args_input.placeholder = template["placeholder"]
+            self.args_input.visible = bool(template["args_label"])
         self.args_input.value = ""
-        self.recipe_session_name_input.value = recipe["default_session_name"]
-        self.keep_alive_switch_recipe.value = False
+        self.template_session_name_input.value = template["default_session_name"]
+        self.keep_alive_switch_template.value = False
 
-    def save_custom_recipe(self):
-        name = self.custom_recipe_name_input.value.strip()
+    def save_custom_template(self):
+        name = self.custom_template_name_input.value.strip()
         if not name or len(name) > 15:
             ui.notification("Please enter a name up to 15 characters.", type="warning")
             return
-        self.add_user_recipe(name, self.custom_code["value"])
+        self.add_user_template(name, self.custom_code["value"])
         # Save the script to the scripts directory
         safe_name = name.strip().replace(" ", "_")[:15]
         script_path = self.tmux_manager.get_script_file(f"{safe_name}.sh")
@@ -208,95 +210,101 @@ class RecipePanel:
             self.ui_manager.refresh_script_list()
         saved_key = safe_name
         self.radio.value = saved_key
-        self.on_recipe_change(type("e", (), {"value": saved_key}))
-        ui.notification(f"Recipe '{name}' saved and selected.", type="positive")
+        self.on_template_change(type("e", (), {"value": saved_key}))
+        ui.notification(f"Template '{name}' saved and selected.", type="positive")
 
     def build(self):
-        ui.label("Recipes").style(
+        ui.label("Templates").style(
             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
         )
         self.radio = ui.radio(
-            self.recipe_options,
+            self.template_options,
             value=self.selected_key,
-            on_change=self.on_recipe_change,
+            on_change=self.on_template_change,
         )
         self.radio.props("inline")
-        self.code_display = (
-            ui.textarea(RECIPES[self.selected_key]["code"])
-            .style(
-                "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
-            )
-            .props("readonly autogrow")
-            .bind_visibility_from(self.radio, "value", lambda v: v != "custom")
-        )
-        if self.radio.value == "custom":
-            ui.label("Custom Bash Script")
-        self.custom_code_display = (
-            ui.codemirror(
-                self.custom_code["value"],
-                language="bash",
-                on_change=lambda e: self.custom_code.update({"value": e.value}),
-            )
-            .style(
-                "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
-            )
-            .classes("h-48")
-            .bind_visibility_from(self.radio, "value", lambda v: v == "custom")
-        )
-        ui.select(self.custom_code_display.supported_themes, label="Theme").classes(
-            "w-32"
-        ).bind_value(self.custom_code_display, "theme").bind_visibility_from(
-            self.radio, "value", lambda v: v == "custom"
-        )
+
+        # 1. Session Name
+        self.template_session_name_input = ui.input(
+            label="Session Name",
+            value=TEMPLATES[self.selected_key]["default_session_name"],
+        ).style("width: 100%; margin-top: 10px;")
+
+        # 2. Arguments
         self.args_input = (
             ui.input(
-                label=RECIPES[self.selected_key]["args_label"],
-                placeholder=RECIPES[self.selected_key]["placeholder"],
+                label=TEMPLATES[self.selected_key]["args_label"],
+                placeholder=TEMPLATES[self.selected_key]["placeholder"],
             ).style("width: 100%;")
-            if RECIPES[self.selected_key]["args_label"]
+            if TEMPLATES[self.selected_key]["args_label"]
             else ui.input(visible=False)
         )
-        self.recipe_session_name_input = ui.input(
-            label="Session Name",
-            value=RECIPES[self.selected_key]["default_session_name"],
-        ).style("width: 100%; margin-top: 10px;")
-        self.keep_alive_switch_recipe = ui.switch("Keep Alive").style(
+
+        # 3. Code display/editor and theme selector
+        with ui.row().style("width: 100%; align-items: flex-start;"):
+            self.code_display = (
+                ui.textarea(TEMPLATES[self.selected_key]["code"])
+                .style(
+                    "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
+                )
+                .props("readonly autogrow")
+                .bind_visibility_from(self.radio, "value", lambda v: v != "custom")
+            )
+            self.custom_code_display = (
+                ui.codemirror(
+                    self.custom_code["value"],
+                    language="bash",
+                    on_change=lambda e: self.custom_code.update({"value": e.value}),
+                )
+                .style(
+                    "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
+                )
+                .classes("h-48")
+                .bind_visibility_from(self.radio, "value", lambda v: v == "custom")
+            )
+            ui.select(self.custom_code_display.supported_themes, label="Theme").classes(
+                "w-32"
+            ).bind_value(self.custom_code_display, "theme").bind_visibility_from(
+                self.radio, "value", lambda v: v == "custom"
+            )
+
+        self.keep_alive_switch_template = ui.switch("Keep Alive").style(
             "margin-top: 10px;"
         )
         ui.button(
-            "Run Recipe in Session",
-            on_click=self.run_recipe,
+            "Run Template",
+            on_click=self.run_template,
         ).props("color=primary")
         with ui.row().bind_visibility_from(
             self.radio, "value", lambda v: v == "custom"
         ):
-            self.custom_recipe_name_input = ui.input(
-                label="Save Custom Recipe As... (max 15 chars)",
+            self.custom_template_name_input = ui.input(
+                label="Save Template As... (max 15 chars)",
                 placeholder="MyScript",
                 validation={"Too long!": lambda value: len(value) <= 15},
             ).style("width: 100%; margin-bottom: 8px;")
             ui.button(
                 "Save",
-                on_click=self.save_custom_recipe,
+                on_click=self.save_custom_template,
             ).style("width: 28%; margin-bottom: 8px;")
 
-    def run_recipe(self):
+    def run_template(self):
         key = self.radio.value
-        recipe = RECIPES[key]
-        if recipe.get("custom"):
+        template = TEMPLATES[key]
+        if template.get("custom"):
             script_code = self.custom_code_display.value or "#!/bin/bash\n"
         else:
-            script_code = recipe["code"]
+            script_code = template["code"]
         args = self.args_input.value.strip()
         session_name = (
-            self.recipe_session_name_input.value.strip()
-            or recipe["default_session_name"]
+            self.template_session_name_input.value.strip()
+            or template["default_session_name"]
         )
-        script_path = self.tmux_manager.get_script_file(recipe["script_name"])
+        script_path = self.tmux_manager.get_script_file(template["script_name"])
         with script_path.open("w") as f:
             f.write(script_code)
         os.chmod(script_path, 0o755)
-        if self.keep_alive_switch_recipe.value:
+        if self.keep_alive_switch_template.value:
             with script_path.open("a") as f:
                 f.write("\n# Keeps the session alive\n")
                 f.write("tail -f /dev/null\n")
@@ -305,7 +313,7 @@ class RecipePanel:
             f"{script_path} {args}",
             logger,
         )
-        ui.notification(f"Recipe '{recipe['title']}' executed.", type="positive")
+        ui.notification(f"Template '{template['title']}' executed.", type="positive")
 
 
 class LogPanel:
@@ -357,7 +365,7 @@ class UserInterfaceManager:
         self.ui = ui
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
-        self.recipe_panel = RecipePanel(tmux_manager, self)
+        self.template_panel = TemplatePanel(tmux_manager, self)
         self.log_panel = LogPanel()
         self.script_path_select = None  # Reference to the script select component
 
@@ -416,14 +424,14 @@ class UserInterfaceManager:
 
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
             with ui.tabs().classes("w-full") as tabs:
-                create_session_tab = ui.tab("Start")
-                recipes_tab = ui.tab("Recipes")
-            with ui.tab_panels(tabs, value=create_session_tab).classes("w-full"):
-                with ui.tab_panel(create_session_tab):
+                scripts_tab = ui.tab("Scripts")
+                templates_tab = ui.tab("Templates")
+            with ui.tab_panels(tabs, value=scripts_tab).classes("w-full"):
+                with ui.tab_panel(scripts_tab):
                     with ui.card().style(
                         "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
                     ):
-                        ui.label("Start Session").style(
+                        ui.label("Launch Script").style(
                             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                         )
                         session_name_input = ui.input(label="Session Name").style(
@@ -486,7 +494,7 @@ class UserInterfaceManager:
                             "margin-top: 10px;"
                         )
                         ui.button(
-                            "Run in Session",
+                            "Launch",
                             on_click=lambda: self.run_session_with_keep_alive(
                                 session_name_input.value,
                                 str(
@@ -501,11 +509,11 @@ class UserInterfaceManager:
                         self.script_path_select.on(
                             "update:model-value", self.update_script_preview
                         )
-                with ui.tab_panel(recipes_tab):
+                with ui.tab_panel(templates_tab):
                     with ui.card().style(
                         "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
                     ):
-                        self.recipe_panel.build()
+                        self.template_panel.build()
             self.log_panel.build()
 
     def update_log_messages(self, message, number_of_lines=20):

@@ -10,7 +10,7 @@
 
 - **Session Management**: Start, view, and kill `tmux` sessions with a single click.
 - **System Monitoring**: Real-time CPU, memory, and disk usage stats in the sidebar.
-- **Recipes & Custom Scripts**: Run predefined "recipes" (like recursive pattern search) or write your own bash scripts directly in the browser.
+- **Templates & Custom Scripts**: Run predefined templates (like recursive pattern search) or write your own bash scripts directly in the browser.
 - **Keep Alive Option**: Optionally keep sessions running after your script finishes.
 - **Live Log Viewer**: View live logs for each session in a scrollable, syntax-highlighted interface.
 - **Responsive UI**: Clean, modern interface built with [NiceGUI](https://nicegui.io/).
@@ -21,7 +21,7 @@
 ## TODO
 
 - [ ] Explore possibility to pause processes running inside a session
-- [ ] Make it more intuitive to export/import custom recipes/scripts
+- [ ] Make it more intuitive to export/import custom templates/scripts
 - [ ] Add dark mode/theme toggle for the dashboard UI
 - [ ] Implement notifications for session completion or errors
 
@@ -37,9 +37,9 @@
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
 
-**Execute Custom or Pre-defined Recipes**
+**Execute Custom or Pre-defined Template**
 
-<img src="images/custom_recipe.png" alt="Custom Recipe" title="Custom Recipe" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+<img src="images/custom_template.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
 </div>
 
@@ -98,11 +98,11 @@
   - Click **Run in Session** to launch it in tmux.
   - The session appears in the dashboard; view logs or kill it anytime.
 
-- **Use a Recipe or Custom Script**  
-  - Switch to the **Recipes** tab.
-  - Select a predefined recipe or "Custom Recipe" to write your own bash script.
+- **Use a Template or Custom Script**  
+  - Switch to the **Templates** tab.
+  - Select a predefined template or "Custom Template" to write your own bash script.
   - Fill in any required arguments, set a session name, and optionally enable "Keep Alive".
-  - Click **Execute Recipe** to run it in a new tmux session.
+  - Click **Execute Template** to run it in a new tmux session.
 
 - **Monitor System Stats**  
   - Sidebar displays live CPU, memory, disk, and tmux server resource usage.
@@ -115,14 +115,14 @@
 ## File Structure
 
 - **desto_logs/**: All session logs are stored here.
-- **desto_scripts/**: Scripts run via recipes or custom scripts are saved here.
+- **desto_scripts/**: Scripts run via templates or custom scripts are saved here.
 
 ---
 
 ## TODO
 
 - [ ] Explore possibility to pause processes running inside a session
-- [ ] Make it more intuitive to export/import custom recipes/scripts
+- [ ] Make it more intuitive to export/import custom templates/scripts
 - [ ] Add dark mode/theme toggle for the dashboard UI
 
 ---

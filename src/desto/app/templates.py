@@ -1,11 +1,11 @@
-RECIPES = {
+TEMPLATES = {
     "custom": {
-        "title": "Custom Recipe",
+        "title": "Custom Template",
         "script_name": "custom.sh",
         "code": "#!/bin/bash\n",
         "args_label": "Arguments (optional)",
         "placeholder": "",
-        "default_session_name": "custom_recipe",
+        "default_session_name": "custom_template",
         "custom": True,
     },
     "rec_patt_search": {
@@ -40,5 +40,5 @@ grep -rnw "$dir" -e "$pattern"
         "default_session_name": "sync_folders",
         "custom": False,
     },
-    # Add more recipes here...
+    # Add more templates here...
 }
