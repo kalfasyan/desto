@@ -185,6 +185,12 @@ class NewScriptPanel:
 
         if self.ui_manager:
             self.ui_manager.refresh_script_list()
+            # Select the new script in the scripts tab and update the preview
+            if hasattr(self.ui_manager, "script_path_select"):
+                self.ui_manager.script_path_select.value = f"{safe_name}.sh"
+                self.ui_manager.update_script_preview(
+                    type("E", (), {"args": f"{safe_name}.sh"})()
+                )
 
         ui.notification(
             f"Script '{name}' saved and available in Scripts.", type="positive"
