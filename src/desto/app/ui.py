@@ -657,13 +657,13 @@ class UserInterfaceManager:
                 ui.notification(msg, type="negative")
             dialog.close()
 
-        with ui.dialog() as dialog, ui.card():
+        with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete '{selected_script}'?")
             with ui.row():
-                ui.button("Cancel", on_click=dialog.close)
+                ui.button("Cancel", on_click=confirm_dialog.close)
                 ui.button("Delete", color="red", on_click=do_delete)
         logger.debug(f"Opened delete confirmation dialog for: {selected_script}")
         ui.notification(
             f"Delete confirmation opened for '{selected_script}'", type="info"
         )
-        dialog.open()
+        confirm_dialog.open()
