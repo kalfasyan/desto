@@ -3,7 +3,6 @@ import psutil
 from nicegui import ui
 from pathlib import Path
 import os
-from desto.app.templates import TEMPLATES
 
 
 class SystemStatsPanel:
@@ -125,79 +124,6 @@ class SettingsPanel:
                 self.ui_manager.refresh_script_list()
 
 
-class TemplatePanel:
-    def __init__(self, tmux_manager, ui_manager=None):
-        self.tmux_manager = tmux_manager
-        self.ui_manager = ui_manager
-        self.selected_key = next(iter(TEMPLATES))  # Default to first template
-        self.user_templates = {}
-        self.template_options = {
-            key: template["title"] for key, template in TEMPLATES.items()
-        }
-        self.select = None
-        self.code_display = None
-        self.args_input = None
-        self.template_session_name_input = None
-        self.keep_alive_switch_template = None
-
-    def on_template_change(self, e):
-        self.selected_key = e.value
-        template = TEMPLATES[self.selected_key]
-        self.code_display.value = template["code"]
-        self.code_display.visible = True
-        if self.args_input:
-            self.args_input.label = template["args_label"]
-            self.args_input.placeholder = template["placeholder"]
-            self.args_input.visible = bool(template["args_label"])
-            self.args_input.value = ""
-        if self.template_session_name_input:
-            self.template_session_name_input.value = template["default_session_name"]
-        if self.keep_alive_switch_template:
-            self.keep_alive_switch_template.value = False
-
-    def build(self):
-        ui.label("Templates").style(
-            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
-        )
-        options = list(self.template_options.keys())
-        valid_keys = options
-
-        if not valid_keys:
-            self.selected_key = None
-        elif self.selected_key not in valid_keys:
-            self.selected_key = valid_keys[0]
-
-        self.select = ui.select(
-            options=options,
-            label="Template",
-            value=self.selected_key,
-            on_change=self.on_template_change,
-        ).style("width: 100%; margin-bottom: 10px;")
-
-        if self.selected_key is None:
-            ui.label("No templates available.").style("color: #888; margin-top: 20px;")
-            return
-
-        with ui.row().style("width: 100%; align-items: flex-start;"):
-            self.code_display = (
-                ui.codemirror(
-                    TEMPLATES[self.selected_key]["code"],
-                    language="bash",
-                    theme="vscodeLight",
-                    line_wrapping=True,
-                    highlight_whitespace=True,
-                    indent="    ",
-                    on_change=None,  # Read-only
-                )
-                .style("width: 100%; margin-top: 10px;")
-                .classes("h-48")
-            )
-            self.code_display.props("readonly")
-            ui.select(self.code_display.supported_themes, label="Theme").classes(
-                "w-32"
-            ).bind_value(self.code_display, "theme")
-
-
 class NewScriptPanel:
     def __init__(self, tmux_manager, ui_manager=None):
         self.tmux_manager = tmux_manager
@@ -225,16 +151,16 @@ class NewScriptPanel:
             "w-32"
         ).bind_value(code_editor, "theme")
         self.custom_template_name_input = ui.input(
-            label="Save Template As... (max 15 chars)",
+            label="Save Script As... (max 15 chars)",
             placeholder="MyScript",
             validation={"Too long!": lambda value: len(value) <= 15},
         ).style("width: 100%; margin-bottom: 8px;")
         ui.button(
             "Save",
-            on_click=self.save_custom_template,
+            on_click=self.save_custom_script,
         ).style("width: 28%; margin-bottom: 8px;")
 
-    def save_custom_template(self):
+    def save_custom_script(self):
         name = self.custom_template_name_input.value.strip()
         if not name or len(name) > 15:
             ui.notification("Please enter a name up to 15 characters.", type="warning")
@@ -243,18 +169,7 @@ class NewScriptPanel:
         code = self.custom_code["value"]
         if not code.startswith("#!"):
             code = "#!/bin/bash\n" + code
-        template = {
-            "title": name,
-            "script_name": f"{safe_name}.sh",
-            "code": code,
-            "args_label": "Arguments (optional)",
-            "placeholder": "",
-            "default_session_name": safe_name,
-            "custom": False,
-        }
-        TEMPLATES[safe_name] = template
 
-        # Save the script to the scripts directory
         script_path = self.tmux_manager.get_script_file(f"{safe_name}.sh")
         try:
             with script_path.open("w") as f:
@@ -268,17 +183,11 @@ class NewScriptPanel:
             logger.error(msg)
             ui.notification(msg, type="warning")
 
-        # Update Templates tab UI
-        if self.ui_manager and hasattr(self.ui_manager, "template_panel"):
-            panel = self.ui_manager.template_panel
-            panel.template_options[safe_name] = name
-            panel.build()  # Rebuilds the template panel with correct options
-
         if self.ui_manager:
             self.ui_manager.refresh_script_list()
 
         ui.notification(
-            f"Template '{name}' saved and available in Templates.", type="positive"
+            f"Script '{name}' saved and available in Scripts.", type="positive"
         )
 
 
@@ -331,7 +240,6 @@ class UserInterfaceManager:
         self.ui = ui
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
-        self.template_panel = TemplatePanel(tmux_manager, self)
         self.new_script_panel = NewScriptPanel(tmux_manager, self)
         self.log_panel = LogPanel()
         self.script_path_select = None  # Reference to the script select component
@@ -361,13 +269,12 @@ class UserInterfaceManager:
             )
             .classes(replace="row items-center justify-between")
         ):
-            ui.button(on_click=lambda: left_drawer.toggle(), icon="menu").props(
+            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props(
                 "flat color=white"
             )
             ui.label("desto").style(
                 f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;"
             )
-            ui.icon("preview", size="2.1rem").style("margin-left: 20px;")
             ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props(
                 "flat color=white"
             ).style("margin-left: auto;")
@@ -390,11 +297,13 @@ class UserInterfaceManager:
             self.settings_panel = SettingsPanel(self.tmux_manager, self)
             self.settings_panel.build()
 
+        ui.button(
+            "Settings", on_click=lambda: right_drawer.toggle(), icon="settings"
+        ).props("flat color=blue").style("margin-right: auto;")
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
             with ui.tabs().classes("w-full") as tabs:
                 scripts_tab = ui.tab("Scripts", icon="rocket_launch")
                 new_script_tab = ui.tab("New Script", icon="add")
-                templates_tab = ui.tab("Templates", icon="menu_book")
 
             with ui.tab_panels(tabs, value=scripts_tab).classes("w-full"):
                 with ui.tab_panel(scripts_tab):
@@ -426,7 +335,6 @@ class UserInterfaceManager:
                             value=".",
                         ).style("width: 100%;")
 
-                        # Add these lines after self.script_path_select is created
                         script_preview_content = ""
                         if (
                             script_files
@@ -492,11 +400,6 @@ class UserInterfaceManager:
                         "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
                     ):
                         self.new_script_panel.build()
-                with ui.tab_panel(templates_tab):
-                    with ui.card().style(
-                        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
-                    ):
-                        self.template_panel.build()
             self.log_panel.build()
 
     def update_log_messages(self, message, number_of_lines=20):
@@ -637,8 +540,6 @@ class UserInterfaceManager:
             ui.notification(msg, type="warning")
             return
 
-        dialog = None  # Will hold the dialog instance
-
         def do_delete():
             script_path = self.tmux_manager.SCRIPTS_DIR / selected_script
             try:
@@ -655,7 +556,7 @@ class UserInterfaceManager:
                 msg = f"Failed to delete: {e}"
                 logger.error(msg)
                 ui.notification(msg, type="negative")
-            dialog.close()
+            confirm_dialog.close()  # <-- Use the correct dialog instance here
 
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete '{selected_script}'?")
