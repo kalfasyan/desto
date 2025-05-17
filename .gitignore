@@ -175,3 +175,4 @@ cython_debug/
 
 desto_logs/
 desto_scripts/
+desto_log/

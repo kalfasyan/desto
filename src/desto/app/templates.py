@@ -1,13 +1,4 @@
 TEMPLATES = {
-    "custom": {
-        "title": "Custom Template",
-        "script_name": "custom.sh",
-        "code": "#!/bin/bash\n",
-        "args_label": "Arguments (optional)",
-        "placeholder": "",
-        "default_session_name": "custom_template",
-        "custom": True,
-    },
     "rec_patt_search": {
         "title": "Pattern Search",
         "script_name": "search_pattern.sh",

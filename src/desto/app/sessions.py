@@ -162,7 +162,7 @@ class TmuxManager:
             )
             msg = f"Tmux session '{session_name}' started. Command: '{full_command_for_tmux}'."
             logger.info(msg)
-            ui.notification(msg, type="positive")
+            ui.notification(f"Tmux session '{session_name}' started.", type="positive")
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"
             msg = f"Failed to start session '{session_name}': {error_output}"
