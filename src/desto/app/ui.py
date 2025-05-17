@@ -399,7 +399,6 @@ class UserInterfaceManager:
 
                         # Launch logic: warn if unsaved changes
                         async def launch_with_save_check():
-                            selected_script = self.script_path_select.value
                             if script_edited["changed"]:
                                 ui.notification(
                                     "You have unsaved changes. Please save before launching or use 'Save as New'.",
@@ -491,60 +490,6 @@ class UserInterfaceManager:
             tmux_mem = "N/A"
         self.stats_panel.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
         self.stats_panel.tmux_mem.text = f"tmux MEM: {tmux_mem}"
-
-    async def run_session_with_keep_alive(
-        self, session_name, script_path, arguments, keep_alive
-    ):
-        """Launch a tmux session with or without keep-alive."""
-        script_path_obj = Path(script_path)
-        if not script_path_obj.is_file():
-            msg = f"Script path does not exist: {script_path}"
-            logger.warning(msg)
-            ui.notification(msg, type="negative")
-            return
-        try:
-            with script_path_obj.open("r") as script_file:
-                script_lines = script_file.readlines()
-                if (
-                    not script_lines
-                    or not script_lines[0].startswith("#!")
-                    or "bash" not in script_lines[0]
-                ):
-                    msg = f"Script is not a bash script: {script_path}"
-                    logger.warning(msg)
-                    ui.notification(msg, type="negative")
-                    return
-            tail_line = "tail -f /dev/null\n"
-            comment_line = "# Keeps the session alive\n"
-            if keep_alive:
-                if tail_line not in script_lines:
-                    with script_path_obj.open("a") as script_file:
-                        script_file.write("\n" + comment_line)
-                        script_file.write(tail_line)
-            else:
-                new_lines = []
-                skip_next = False
-                for line in script_lines:
-                    if line == comment_line:
-                        skip_next = True
-                        continue
-                    if skip_next and line == tail_line:
-                        skip_next = False
-                        continue
-                    if line == tail_line:
-                        continue
-                    new_lines.append(line)
-                with script_path_obj.open("w") as script_file:
-                    script_file.writelines(new_lines)
-            self.tmux_manager.start_tmux_session(
-                session_name,
-                f"{script_path} {arguments}".strip(),
-                logger,
-            )
-        except PermissionError:
-            msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
-            logger.warning(msg)
-            ui.notification(msg, type="negative")
 
     def update_script_preview(self, e):
         """Update the script preview editor when a new script is selected."""
