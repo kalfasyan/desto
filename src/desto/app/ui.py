@@ -4,7 +4,6 @@ from nicegui import ui
 from pathlib import Path
 import os
 from desto.app.templates import TEMPLATES
-import reprlib
 
 
 class SystemStatsPanel:
@@ -197,39 +196,6 @@ class TemplatePanel:
             ui.select(self.code_display.supported_themes, label="Theme").classes(
                 "w-32"
             ).bind_value(self.code_display, "theme")
-
-        # self.keep_alive_switch_template = ui.switch("Keep Alive").style(
-        #     "margin-top: 10px;"
-        # )
-
-    #     ui.button(
-    #         "Run Template",
-    #         on_click=self.run_template,
-    #     ).props("color=primary")
-
-    # def run_template(self):
-    #     key = self.select.value
-    #     template = TEMPLATES[key]
-    #     script_code = template["code"]
-    #     args = self.args_input.value.strip()
-    #     session_name = (
-    #         self.template_session_name_input.value.strip()
-    #         or template["default_session_name"]
-    #     )
-    #     script_path = self.tmux_manager.get_script_file(template["script_name"])
-    #     with script_path.open("w") as f:
-    #         f.write(script_code)
-    #     os.chmod(script_path, 0o755)
-    #     if self.keep_alive_switch_template.value:
-    #         with script_path.open("a") as f:
-    #             f.write("\n# Keeps the session alive\n")
-    #             f.write("tail -f /dev/null\n")
-    #     self.tmux_manager.start_tmux_session(
-    #         session_name,
-    #         f"{script_path} {args}",
-    #         logger,
-    #     )
-    #     ui.notification(f"Template '{template['title']}' executed.", type="positive")
 
 
 class NewScriptPanel:
