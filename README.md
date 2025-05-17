@@ -8,58 +8,30 @@
 
 ## Features
 
-- **Session Management**: Start, view, and kill `tmux` sessions with a single click.
-- **System Monitoring**: Real-time CPU, memory, and disk usage stats in the sidebar.
-- **Templates & Custom Scripts**: View predefined templates (like recursive pattern search) or write your own bash scripts directly in the browser.
-- **Keep Alive Option**: Optionally keep sessions running after your script finishes.
-- **Live Log Viewer**: View live logs for each session in a scrollable, syntax-highlighted interface.
-- **Responsive UI**: Clean, modern interface built with [NiceGUI](https://nicegui.io/).
-- **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
+🚀 **Session Management**: Start, view, and kill `tmux` sessions with a single click.
 
----
+📊 **System Monitoring**: Real-time CPU, memory, and disk usage stats in the sidebar.
 
-## TODO
+📝 **Templates & Custom Scripts**: View predefined templates (like recursive pattern search) or write your own bash scripts directly in the browser.
 
-- [ ] Explore possibility to pause processes running inside a session
-- [ ] Make it more intuitive to export/import custom templates/scripts
-- [ ] Add dark mode/theme toggle for the dashboard UI
-- [ ] Implement notifications for session completion or errors
+🔄 **Keep Alive Option**: Optionally keep sessions running after your script finishes.
 
----
+📜 **Live Log Viewer**: View live logs for each session in a scrollable, syntax-highlighted interface.
 
-## Functionality
+💎 **Responsive UI**: Clean, modern interface built with [NiceGUI](https://nicegui.io/).
 
-<div align="left">
+💾 **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
 
-**Dashboard Overview**
 
-<img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+## Requirements
 
-**Write new scripts and save them**
-
-<img src="images/new_script.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+- Python 3.11+
+- [tmux](https://github.com/tmux/tmux)  
   
+Check [`pyproject.toml`](pyproject.toml)
 
-**Check some pre-defined templates**  
-  
-*(soon users will be able to save their own)*  
-<img src="images/example_template.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-   
 
-**Change settings**  
-  
-<img src="images/settings.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-  
-
-**View your script's logs**  
-  
-<img src="images/view_logs.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-
-</div>
-
----
-
-## Quick Start
+## Installation
 
 1. **Install `tmux`**  
    <details>
@@ -104,14 +76,44 @@
    After starting, visit [http://localhost:8088](http://localhost:8088) (or the address shown in your terminal).
 
 
+## Functionality
+
+<div align="left">
+
+**Dashboard Overview**
+
+<img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+  
 ---
+**Launch your scripts as `tmux` sessions**  
+    
+1. Set a `tmux` session name
+2. Select one of your scripts
+3. (OPTIONAL) edit and save your changes
+4. Click "Launch"!
 
+<img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
-## Requirements
+---
+**Write new scripts and save them**
+  
+If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
+  
+<img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+  
+---
+**Change settings**  
+  
+More settings to be added! 
+  
+<img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+  
+---
+**View your script's logs**  
+  
+<img src="images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
-- Python 3.11+
-- [tmux](https://github.com/tmux/tmux)
-- [NiceGUI](https://nicegui.io/)
+</div>
 
 ---
 
@@ -127,6 +129,13 @@ This work is licensed under a
 [cc-by]: http://creativecommons.org/licenses/by/4.0/
 [cc-by-image]: https://i.creativecommons.org/l/by/4.0/88x31.png
 [cc-by-shield]: https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg
+
+---
+
+## TODO
+
+- [ ] Explore possibility to pause processes running inside a session
+- [ ] Add dark mode/theme toggle for the dashboard UI
 
 ---
 
