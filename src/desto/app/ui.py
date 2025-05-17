@@ -347,6 +347,12 @@ class UserInterfaceManager:
                             ) as f:
                                 script_preview_content = f.read()
 
+                        # Track if the script was edited
+                        script_edited = {"changed": False}
+
+                        def on_script_edit(e):
+                            script_edited["changed"] = True
+
                         self.script_preview_editor = (
                             ui.codemirror(
                                 script_preview_content,
@@ -355,12 +361,11 @@ class UserInterfaceManager:
                                 line_wrapping=True,
                                 highlight_whitespace=True,
                                 indent="    ",
-                                on_change=None,  # Read-only
+                                on_change=on_script_edit,
                             )
                             .style("width: 100%; margin-top: 10px;")
                             .classes("h-48")
                         )
-                        self.script_preview_editor.props("readonly")
 
                         ui.select(
                             self.script_preview_editor.supported_themes, label="Theme"
@@ -368,23 +373,51 @@ class UserInterfaceManager:
                             self.script_preview_editor, "theme"
                         )
 
+                        # Save/Save as New Buttons
+                        with ui.row().style("gap: 10px; margin-top: 10px;"):
+                            ui.button(
+                                "Save Changes",
+                                on_click=lambda: self.save_current_script(
+                                    script_edited
+                                ),
+                                color="primary",
+                            )
+                            ui.button(
+                                "Save as New",
+                                on_click=self.save_as_new_dialog,
+                                color="secondary",
+                            )
+
+                        # Keep Alive switch
                         keep_alive_switch_new = ui.switch("Keep Alive").style(
                             "margin-top: 10px;"
                         )
+
+                        # Launch logic: warn if unsaved changes
+                        async def launch_with_save_check():
+                            selected_script = self.script_path_select.value
+                            if script_edited["changed"]:
+                                ui.notification(
+                                    "You have unsaved changes. Please save before launching or use 'Save as New'.",
+                                    type="warning",
+                                )
+                                return
+                            await self.run_session_with_keep_alive(
+                                session_name_input.value,
+                                str(
+                                    self.tmux_manager.SCRIPTS_DIR
+                                    / self.script_path_select.value
+                                ),
+                                arguments_input.value,
+                                keep_alive_switch_new.value,
+                            )
+
                         with ui.row().style(
                             "width: 100%; gap: 10px; margin-top: 10px;"
                         ):
                             ui.button(
                                 "Launch",
-                                on_click=lambda: self.run_session_with_keep_alive(
-                                    session_name_input.value,
-                                    str(
-                                        self.tmux_manager.SCRIPTS_DIR
-                                        / self.script_path_select.value
-                                    ),
-                                    arguments_input.value,
-                                    keep_alive_switch_new.value,
-                                ),
+                                on_click=launch_with_save_check,
                             )
                             ui.button(
                                 "DELETE",
@@ -409,6 +442,7 @@ class UserInterfaceManager:
         self.log_panel.refresh_log_display()
 
     def update_ui_system_info(self):
+        """Update system stats in the UI."""
         self.stats_panel.cpu_percent.text = f"{psutil.cpu_percent()}%"
         self.stats_panel.cpu_bar.value = psutil.cpu_percent() / 100
         memory = psutil.virtual_memory()
@@ -457,6 +491,7 @@ class UserInterfaceManager:
     async def run_session_with_keep_alive(
         self, session_name, script_path, arguments, keep_alive
     ):
+        """Launch a tmux session with or without keep-alive."""
         script_path_obj = Path(script_path)
         if not script_path_obj.is_file():
             msg = f"Script path does not exist: {script_path}"
@@ -508,6 +543,7 @@ class UserInterfaceManager:
             ui.notification(msg, type="negative")
 
     def update_script_preview(self, e):
+        """Update the script preview editor when a new script is selected."""
         selected = e.args
         script_files = [
             f.name for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh") if f.is_file()
@@ -533,6 +569,7 @@ class UserInterfaceManager:
             self.script_preview_editor.value = "# Script not found."
 
     def confirm_delete_script(self):
+        """Show a confirmation dialog and delete the selected script if confirmed."""
         selected_script = self.script_path_select.value
         if not selected_script or selected_script == "No scripts found":
             msg = "No script selected to delete."
@@ -556,7 +593,7 @@ class UserInterfaceManager:
                 msg = f"Failed to delete: {e}"
                 logger.error(msg)
                 ui.notification(msg, type="negative")
-            confirm_dialog.close()  # <-- Use the correct dialog instance here
+            confirm_dialog.close()
 
         with ui.dialog() as confirm_dialog, ui.card():
             ui.label(f"Are you sure you want to delete '{selected_script}'?")
@@ -568,3 +605,105 @@ class UserInterfaceManager:
             f"Delete confirmation opened for '{selected_script}'", type="info"
         )
         confirm_dialog.open()
+
+    def save_current_script(self, script_edited):
+        """Save the current script in the editor to its file."""
+        selected_script = self.script_path_select.value
+        if not selected_script or selected_script == "No scripts found":
+            ui.notification("No script selected to save.", type="warning")
+            return
+        script_path = self.tmux_manager.SCRIPTS_DIR / selected_script
+        try:
+            with script_path.open("w") as f:
+                f.write(self.script_preview_editor.value)
+            os.chmod(script_path, 0o755)
+            script_edited["changed"] = False
+            ui.notification(f"Saved changes to {selected_script}", type="positive")
+        except Exception as e:
+            ui.notification(f"Failed to save: {e}", type="negative")
+
+    def save_as_new_dialog(self):
+        """Open a dialog to save the current script as a new file."""
+        with ui.dialog() as name_dialog, ui.card():
+            name_input = ui.input(label="New Script Name (max 15 chars)").style(
+                "width: 100%;"
+            )
+            error_label = ui.label("").style("color: red;")
+
+            def do_save_as_new():
+                name = name_input.value.strip().replace(" ", "_")[:15]
+                if not name or len(name) > 15:
+                    error_label.text = "Please enter a name up to 15 characters."
+                    return
+                new_script_path = self.tmux_manager.SCRIPTS_DIR / f"{name}.sh"
+                if new_script_path.exists():
+                    error_label.text = "A script with this name already exists."
+                    return
+                try:
+                    with new_script_path.open("w") as f:
+                        f.write(self.script_preview_editor.value)
+                    os.chmod(new_script_path, 0o755)
+                    self.refresh_script_list()
+                    self.script_path_select.value = f"{name}.sh"
+                    ui.notification(f"Script saved as {name}.sh", type="positive")
+                    name_dialog.close()
+                except Exception as e:
+                    error_label.text = f"Failed to save: {e}"
+
+            ui.button("Cancel", on_click=name_dialog.close)
+            ui.button("Save", on_click=do_save_as_new)
+        name_dialog.open()
+
+    async def run_session_with_keep_alive(
+        self, session_name, script_path, arguments, keep_alive
+    ):
+        """Launch a tmux session with or without keep-alive."""
+        script_path_obj = Path(script_path)
+        if not script_path_obj.is_file():
+            msg = f"Script path does not exist: {script_path}"
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
+            return
+        try:
+            with script_path_obj.open("r") as script_file:
+                script_lines = script_file.readlines()
+                if (
+                    not script_lines
+                    or not script_lines[0].startswith("#!")
+                    or "bash" not in script_lines[0]
+                ):
+                    msg = f"Script is not a bash script: {script_path}"
+                    logger.warning(msg)
+                    ui.notification(msg, type="negative")
+                    return
+            tail_line = "tail -f /dev/null\n"
+            comment_line = "# Keeps the session alive\n"
+            if keep_alive:
+                if tail_line not in script_lines:
+                    with script_path_obj.open("a") as script_file:
+                        script_file.write("\n" + comment_line)
+                        script_file.write(tail_line)
+            else:
+                new_lines = []
+                skip_next = False
+                for line in script_lines:
+                    if line == comment_line:
+                        skip_next = True
+                        continue
+                    if skip_next and line == tail_line:
+                        skip_next = False
+                        continue
+                    if line == tail_line:
+                        continue
+                    new_lines.append(line)
+                with script_path_obj.open("w") as script_file:
+                    script_file.writelines(new_lines)
+            self.tmux_manager.start_tmux_session(
+                session_name,
+                f"{script_path} {arguments}".strip(),
+                logger,
+            )
+        except PermissionError:
+            msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
