@@ -42,10 +42,10 @@
 **Check some pre-defined templates**  
 *(soon users will be able to save their own)*  
 <img src="images/example_template.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-
+  
 **Change settings**
 <img src="images/settings.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-
+  
 **View your script's logs**
 <img src="images/view_logs.png" alt="Custom Template" title="Custom Template" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
