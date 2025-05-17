@@ -38,7 +38,7 @@ class SystemStatsPanel:
                     f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
                 )
             self.cpu_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"]
+                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
             )
             ui.label("Memory Usage").style(
                 f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
@@ -49,7 +49,7 @@ class SystemStatsPanel:
                     f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
                 )
             self.memory_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"]
+                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
             )
             self.memory_used = ui.label("0 GB Used").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
@@ -66,7 +66,7 @@ class SystemStatsPanel:
                     f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
                 )
             self.disk_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"]
+                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
             )
             self.disk_used = ui.label("0 GB Used").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
