@@ -243,6 +243,7 @@ class UserInterfaceManager:
         self.new_script_panel = NewScriptPanel(tmux_manager, self)
         self.log_panel = LogPanel()
         self.script_path_select = None  # Reference to the script select component
+        self.ignore_next_edit = False
 
     def refresh_script_list(self):
         script_files = [
@@ -351,7 +352,10 @@ class UserInterfaceManager:
                         script_edited = {"changed": False}
 
                         def on_script_edit(e):
-                            script_edited["changed"] = True
+                            if not self.ignore_next_edit:
+                                script_edited["changed"] = True
+                            else:
+                                self.ignore_next_edit = False  # Reset after ignoring
 
                         self.script_preview_editor = (
                             ui.codemirror(
@@ -564,8 +568,10 @@ class UserInterfaceManager:
         script_path = self.tmux_manager.SCRIPTS_DIR / selected
         if script_path.is_file():
             with open(script_path, "r") as f:
+                self.ignore_next_edit = True  # Ignore the next edit event
                 self.script_preview_editor.value = f.read()
         else:
+            self.ignore_next_edit = True
             self.script_preview_editor.value = "# Script not found."
 
     def confirm_delete_script(self):
