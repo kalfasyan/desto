@@ -44,7 +44,7 @@ class SystemStatsPanel:
                 f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
             )
             with ui.row().style("align-items: center"):
-                ui.icon("memory", size="1.2rem")
+                ui.icon("developer_board", size="1.2rem")
                 self.memory_percent = ui.label("0%").style(
                     f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
                 )
@@ -57,11 +57,11 @@ class SystemStatsPanel:
             self.memory_available = ui.label("0 GB Available").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
             )
-            ui.label("Disk Usage (Root)").style(
+            ui.label("Disk Usage").style(
                 f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
             )
             with ui.row().style("align-items: center"):
-                ui.icon("hard_drive", size="1.2rem")
+                ui.icon("storage", size="1.2rem")
                 self.disk_percent = ui.label("0%").style(
                     f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
                 )
@@ -228,7 +228,7 @@ class TemplatePanel:
         self.template_session_name_input = ui.input(
             label="Session Name",
             value=TEMPLATES[self.selected_key]["default_session_name"],
-        ).style("width: 100%; margin-top: 10px;")
+        ).style("width: 100%; margin-top: 10px; color: #75a8db;")
 
         # 2. Arguments
         self.args_input = (
@@ -400,6 +400,7 @@ class UserInterfaceManager:
             ui.label("desto").style(
                 f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;"
             )
+            ui.icon("preview", size="2.1rem").style("margin-left: 20px;")
             ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props(
                 "flat color=white"
             ).style("margin-left: auto;")
@@ -424,8 +425,8 @@ class UserInterfaceManager:
 
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
             with ui.tabs().classes("w-full") as tabs:
-                scripts_tab = ui.tab("Scripts")
-                templates_tab = ui.tab("Templates")
+                scripts_tab = ui.tab("Scripts", icon="rocket_launch")
+                templates_tab = ui.tab("Templates", icon="menu_book")
             with ui.tab_panels(tabs, value=scripts_tab).classes("w-full"):
                 with ui.tab_panel(scripts_tab):
                     with ui.card().style(
@@ -435,7 +436,7 @@ class UserInterfaceManager:
                             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                         )
                         session_name_input = ui.input(label="Session Name").style(
-                            "width: 100%;"
+                            "width: 100%; color: #75a8db;"
                         )
                         script_files = [
                             f.name
