@@ -21,6 +21,46 @@
 💎 **Responsive UI**: Clean, modern interface built with [NiceGUI](https://nicegui.io/).
 
 💾 **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
+  
+
+## How It Works
+
+<div align="left">
+
+**Dashboard Overview**
+
+<img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+  
+---
+**Launch your scripts as `tmux` sessions**  
+  
+1. Set a `tmux` session name
+2. Select one of your scripts
+3. (OPTIONAL) edit and save your changes
+4. Click "Launch"!
+
+<img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+
+---
+**Write new scripts and save them**
+  
+If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
+  
+<img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+  
+---
+**Change settings**  
+  
+More settings to be added! 
+  
+<img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+  
+---
+**View your script's logs**  
+  
+<img src="images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+
+</div>
 
 
 ## Requirements
@@ -75,45 +115,6 @@ Check [`pyproject.toml`](pyproject.toml)
 4. **Open in your browser**  
    After starting, visit [http://localhost:8088](http://localhost:8088) (or the address shown in your terminal).
 
-
-## Functionality
-
-<div align="left">
-
-**Dashboard Overview**
-
-<img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
-  
----
-**Launch your scripts as `tmux` sessions**  
-    
-1. Set a `tmux` session name
-2. Select one of your scripts
-3. (OPTIONAL) edit and save your changes
-4. Click "Launch"!
-
-<img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-
----
-**Write new scripts and save them**
-  
-If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
-  
-<img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-  
----
-**Change settings**  
-  
-More settings to be added! 
-  
-<img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-  
----
-**View your script's logs**  
-  
-<img src="images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-
-</div>
 
 ---
 
