@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto) ![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-blueviolet) ![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat) [![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml)
 
-**desto** is a modern, intuitive dashboard for managing and monitoring your `tmux` sessions. It provides a user-friendly web interface to start, view, and kill `tmux` sessions, monitor system stats, run custom or predefined scripts, and view live logs—all from your browser.
+**desto** lets you run and manage your bash scripts in `tmux` sessions through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.
 
 ---
 
