@@ -3,6 +3,8 @@ import psutil
 from nicegui import ui
 from pathlib import Path
 import os
+import getpass
+import socket
 
 
 class SystemStatsPanel:
@@ -163,7 +165,7 @@ class NewScriptPanel:
     def save_custom_script(self):
         name = self.custom_template_name_input.value.strip()
         if not name or len(name) > 15:
-            ui.notification("Please enter a name up to 15 characters.", type="warning")
+            ui.notification("Please enter a name up to 15 characters.", type="info")
             return
         safe_name = name.strip().replace(" ", "_")[:15]
         code = self.custom_code["value"]
@@ -412,13 +414,13 @@ class UserInterfaceManager:
                                 )
                                 return
                             await self.run_session_with_keep_alive(
-                                session_name_input.value,
+                                self.session_name_input.value,
                                 str(
                                     self.tmux_manager.SCRIPTS_DIR
                                     / self.script_path_select.value
                                 ),
-                                arguments_input.value,
-                                keep_alive_switch_new.value,
+                                self.arguments_input.value,
+                                self.keep_alive_switch_new.value,
                             )
 
                         with ui.row().style(
@@ -562,10 +564,8 @@ class UserInterfaceManager:
             with ui.row():
                 ui.button("Cancel", on_click=confirm_dialog.close)
                 ui.button("Delete", color="red", on_click=do_delete)
-        logger.debug(f"Opened delete confirmation dialog for: {selected_script}")
-        ui.notification(
-            f"Delete confirmation opened for '{selected_script}'", type="info"
-        )
+        msg = f"Opened delete confirmation dialog for: {selected_script}"
+        logger.debug(msg)
         confirm_dialog.open()
 
     def save_current_script(self, script_edited):
@@ -660,15 +660,89 @@ class UserInterfaceManager:
                     new_lines.append(line)
                 with script_path_obj.open("w") as script_file:
                     script_file.writelines(new_lines)
+            log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+            info_block = self.get_log_info_block(script_path, session_name)
+            tail_cmd = (
+                f" tail -f /dev/null >> '{log_file_path}' 2>&1;" if keep_alive else ""
+            )
+            cmd = (
+                f'bash -c "'
+                f"echo -e '{info_block}' > '{log_file_path}'; "
+                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1;"
+                f"{tail_cmd}"
+                f'"'
+            )
             self.tmux_manager.start_tmux_session(
                 session_name,
-                f"{script_path} {arguments}".strip(),
+                cmd,
                 logger,
             )
         except PermissionError:
             msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
             logger.warning(msg)
             ui.notification(msg, type="negative")
+
+    def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog):
+        from datetime import datetime
+
+        date_val = date_input.value
+        time_val = time_input.value
+        session_name = (
+            self.session_name_input.value.strip()
+            if hasattr(self, "session_name_input")
+            else ""
+        )
+        arguments = (
+            self.arguments_input.value if hasattr(self, "arguments_input") else "."
+        )
+        keep_alive = (
+            self.keep_alive_switch_new.value
+            if hasattr(self, "keep_alive_switch_new")
+            else False
+        )
+
+        if not date_val or not time_val or not session_name:
+            error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
+            return
+        try:
+            scheduled_dt = datetime.strptime(f"{date_val} {time_val}", "%Y-%m-%d %H:%M")
+            now = datetime.now()
+            delta = (scheduled_dt - now).total_seconds()
+            if delta < 0:
+                error_label.text = "Scheduled time is in the past."
+                return
+
+            script_file_path = (
+                self.tmux_manager.SCRIPTS_DIR / self.script_path_select.value
+            )
+            log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+            info_block = self.get_log_info_block(
+                script_file_path, session_name, scheduled_dt
+            )
+            tail_cmd = (
+                f" tail -f /dev/null >> '{log_file_path}' 2>&1;" if keep_alive else ""
+            )
+            cmd = (
+                f'bash -c "'
+                f"echo -e '{info_block}' > '{log_file_path}'; "
+                f"sleep {int(delta)}; "
+                f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1;"
+                f"{tail_cmd}"
+                f'"'
+            )
+
+            self.tmux_manager.start_tmux_session(
+                session_name,
+                cmd,
+                logger,
+            )
+            ui.notification(
+                f"Script scheduled for {scheduled_dt} as session '{session_name}'",
+                type="info",
+            )
+            schedule_dialog.close()
+        except Exception as e:
+            error_label.text = f"Invalid date/time: {e}"
 
     def schedule_launch(self):
         """Open a dialog to schedule the script launch at a specific date and time."""
@@ -682,69 +756,29 @@ class UserInterfaceManager:
             time_input = ui.time(value=datetime.now().strftime("%H:%M"))
             error_label = ui.label("").style("color: red;")
 
-            def confirm_schedule():
-                date_val = date_input.value
-                time_val = time_input.value
-                session_name = (
-                    self.session_name_input.value.strip()
-                    if hasattr(self, "session_name_input")
-                    else ""
-                )
-                arguments = (
-                    self.arguments_input.value
-                    if hasattr(self, "arguments_input")
-                    else "."
-                )
-                keep_alive = (
-                    self.keep_alive_switch_new.value
-                    if hasattr(self, "keep_alive_switch_new")
-                    else False
-                )
-
-                if not date_val or not time_val or not session_name:
-                    error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
-                    return
-                try:
-                    scheduled_dt = datetime.strptime(
-                        f"{date_val} {time_val}", "%Y-%m-%d %H:%M"
-                    )
-                    now = datetime.now()
-                    delta = (scheduled_dt - now).total_seconds()
-                    if delta < 0:
-                        error_label.text = "Scheduled time is in the past."
-                        return
-
-                    script_file_path = (
-                        self.tmux_manager.SCRIPTS_DIR / self.script_path_select.value
-                    )
-                    log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-                    scheduled_line = (
-                        f"# Scheduled for: {scheduled_dt.strftime('%Y-%m-%d %H:%M')}\n"
-                    )
-
-                    # Compose the command: write scheduled line to log, sleep, then run script, append output to log
-                    cmd = (
-                        f"echo '{scheduled_line.strip()}' > '{log_file_path}'; "
-                        f"sleep {int(delta)}; "
-                        f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1"
-                    )
-                    if keep_alive:
-                        cmd += " ; tail -f /dev/null >> '{log_file_path}' 2>&1"
-
-                    self.tmux_manager.start_tmux_session(
-                        session_name,
-                        cmd,
-                        logger,
-                    )
-                    ui.notification(
-                        f"Script scheduled for {scheduled_dt} as session '{session_name}'",
-                        type="positive",
-                    )
-                    schedule_dialog.close()
-                except Exception as e:
-                    error_label.text = f"Invalid date/time: {e}"
-
             with ui.row():
                 ui.button("Cancel", on_click=schedule_dialog.close)
-                ui.button("Schedule", on_click=confirm_schedule)
+                ui.button(
+                    "Schedule",
+                    on_click=lambda: self.confirm_schedule(
+                        date_input, time_input, error_label, schedule_dialog
+                    ),
+                )
         schedule_dialog.open()
+
+    def get_log_info_block(self, script_file_path, session_name, scheduled_dt=None):
+        username = getpass.getuser()
+        hostname = socket.gethostname()
+        script_name = Path(script_file_path).name
+        cwd = os.getcwd()
+        now_str = scheduled_dt.strftime("%Y-%m-%d %H:%M") if scheduled_dt else ""
+        info_lines = [
+            f"# Script: {script_name}",
+            f"# Session: {session_name}",
+            f"# User: {username}@{hostname}",
+            f"# Working Directory: {cwd}",
+        ]
+        if now_str:
+            info_lines.append(f"# Scheduled for: {now_str}")
+        info_lines.append("")  # Blank line
+        return "\\n".join(info_lines)
