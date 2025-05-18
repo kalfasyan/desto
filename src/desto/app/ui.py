@@ -320,7 +320,7 @@ class UserInterfaceManager:
                         ui.label("Launch Script").style(
                             "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
                         )
-                        session_name_input = ui.input(label="Session Name").style(
+                        self.session_name_input = ui.input(label="Session Name").style(
                             "width: 100%; color: #75a8db;"
                         )
                         script_files = [
@@ -337,7 +337,7 @@ class UserInterfaceManager:
                             if script_files
                             else "No scripts found",
                         ).style("width: 100%;")
-                        arguments_input = ui.input(
+                        self.arguments_input = ui.input(
                             label="Arguments",
                             value=".",
                         ).style("width: 100%;")
@@ -399,7 +399,7 @@ class UserInterfaceManager:
                             )
 
                         # Keep Alive switch
-                        keep_alive_switch_new = ui.switch("Keep Alive").style(
+                        self.keep_alive_switch_new = ui.switch("Keep Alive").style(
                             "margin-top: 10px;"
                         )
 
@@ -427,6 +427,11 @@ class UserInterfaceManager:
                             ui.button(
                                 "Launch",
                                 on_click=launch_with_save_check,
+                            )
+                            ui.button(
+                                "Schedule Launch",
+                                icon="history",
+                                on_click=lambda: self.schedule_launch(),
                             )
                             ui.button(
                                 "DELETE",
@@ -664,3 +669,82 @@ class UserInterfaceManager:
             msg = f"Permission denied: Unable to modify the script at {script_path} to add or remove 'keep alive' functionality."
             logger.warning(msg)
             ui.notification(msg, type="negative")
+
+    def schedule_launch(self):
+        """Open a dialog to schedule the script launch at a specific date and time."""
+        from datetime import datetime
+
+        with ui.dialog() as schedule_dialog, ui.card():
+            ui.label("Schedule Script Launch").style(
+                "font-size: 1.2em; font-weight: bold;"
+            )
+            date_input = ui.date(value=datetime.now().strftime("%Y-%m-%d"))
+            time_input = ui.time(value=datetime.now().strftime("%H:%M"))
+            error_label = ui.label("").style("color: red;")
+
+            def confirm_schedule():
+                date_val = date_input.value
+                time_val = time_input.value
+                session_name = (
+                    self.session_name_input.value.strip()
+                    if hasattr(self, "session_name_input")
+                    else ""
+                )
+                arguments = (
+                    self.arguments_input.value
+                    if hasattr(self, "arguments_input")
+                    else "."
+                )
+                keep_alive = (
+                    self.keep_alive_switch_new.value
+                    if hasattr(self, "keep_alive_switch_new")
+                    else False
+                )
+
+                if not date_val or not time_val or not session_name:
+                    error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
+                    return
+                try:
+                    scheduled_dt = datetime.strptime(
+                        f"{date_val} {time_val}", "%Y-%m-%d %H:%M"
+                    )
+                    now = datetime.now()
+                    delta = (scheduled_dt - now).total_seconds()
+                    if delta < 0:
+                        error_label.text = "Scheduled time is in the past."
+                        return
+
+                    script_file_path = (
+                        self.tmux_manager.SCRIPTS_DIR / self.script_path_select.value
+                    )
+                    log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+                    scheduled_line = (
+                        f"# Scheduled for: {scheduled_dt.strftime('%Y-%m-%d %H:%M')}\n"
+                    )
+
+                    # Compose the command: write scheduled line to log, sleep, then run script, append output to log
+                    cmd = (
+                        f"echo '{scheduled_line.strip()}' > '{log_file_path}'; "
+                        f"sleep {int(delta)}; "
+                        f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1"
+                    )
+                    if keep_alive:
+                        cmd += " ; tail -f /dev/null >> '{log_file_path}' 2>&1"
+
+                    self.tmux_manager.start_tmux_session(
+                        session_name,
+                        cmd,
+                        logger,
+                    )
+                    ui.notification(
+                        f"Script scheduled for {scheduled_dt} as session '{session_name}'",
+                        type="positive",
+                    )
+                    schedule_dialog.close()
+                except Exception as e:
+                    error_label.text = f"Invalid date/time: {e}"
+
+            with ui.row():
+                ui.button("Cancel", on_click=schedule_dialog.close)
+                ui.button("Schedule", on_click=confirm_schedule)
+        schedule_dialog.open()
