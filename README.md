@@ -42,11 +42,14 @@ Your scripts show up automatically—no setup needed. Ready to launch? Just:
 🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
 
 ---
-**✍️ Write new scripts and save them**
-  
+<details>
+<summary><strong>✍️ Write new scripts and save them</strong></summary>
+
 If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
-  
+
 <img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+
+</details>
   
 ---
 <details>
