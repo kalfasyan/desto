@@ -8,20 +8,11 @@
 
 ## Features
 
-🚀 **Session Management**: Start, view, and kill `tmux` sessions with a single click.
-
-📊 **System Monitoring**: Real-time CPU, memory, and disk usage stats in the sidebar.
-
-📝 **Templates & Custom Scripts**: View predefined templates (like recursive pattern search) or write your own bash scripts directly in the browser.
-
-🔄 **Keep Alive Option**: Optionally keep sessions running after your script finishes.
-
-📜 **Live Log Viewer**: View live logs for each session in a scrollable, syntax-highlighted interface.
-
-💎 **Responsive UI**: Clean, modern interface built with [NiceGUI](https://nicegui.io/).
-
-💾 **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
-  
+- **One-click session control:** Start, monitor, and stop `tmux` sessions from your browser.
+- **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
+- **Script management:** Use your existing scripts or write new ones directly in the dashboard.
+- **Live log viewer:** Watch script output in real time.
+- **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
 
 ## ⚡ Quick Start
 
