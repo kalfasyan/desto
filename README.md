@@ -23,42 +23,56 @@
 💾 **Persistent Logs & Scripts**: All logs and scripts are stored in dedicated folders for easy access and reproducibility.
   
 
-## How It Works
+## ⚡ Quick Start
 
 <div align="left">
 
-**Dashboard Overview**
+<details>
+<summary><strong>👀 Dashboard Overview</strong></summary>
 
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+
+</details>
   
 ---
-**Launch your scripts as `tmux` sessions**  
+**🚀 Launch your scripts as `tmux` sessions**  
   
-1. Set a `tmux` session name
+When you start `desto`, it creates `desto_scripts/` and `desto_logs/` folders in your current directory. Want to use your own locations? Just change these in the settings, or set the `DESTO_SCRIPTS_DIR` and `DESTO_LOGS_DIR` environment variables.
+
+Your scripts show up automatically—no setup needed. Ready to launch? Just:
+
+1. Name your `tmux` session
 2. Select one of your scripts
 3. (OPTIONAL) edit and save your changes
-4. Click "Launch"!
+4. Click "Launch"! 🎬
 
 <img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+  
+🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
 
 ---
-**Write new scripts and save them**
+**✍️ Write new scripts and save them**
   
 If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
   
 <img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
   
 ---
-**Change settings**  
-  
+<details>
+<summary><strong>⚙️ Change settings</strong></summary>
+
 More settings to be added! 
-  
+
 <img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+</details>
   
 ---
-**View your script's logs**  
-  
+<details>
+<summary><strong>📜 View your script's logs</strong></summary>
+
 <img src="images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+
+</details>
 
 </div>
 
@@ -95,17 +109,29 @@ Check [`pyproject.toml`](pyproject.toml)
    <details>
    <summary>Installation Steps</summary>
 
-   - With [uv](https://github.com/astral-sh/uv):
-     ```bash
-     uv add desto
-     ```
-   - With pip:
-     ```bash
-     pip install desto
-     # or
-     uv pip install desto
-     ```
-   </details>
+    - With [uv](https://github.com/astral-sh/uv), simply run:
+      ```bash
+      uv add desto
+      ```
+      This will install desto in your project ✅
+      Or if you don't have a project yet, you can set up everything with [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
+
+      1. [Install `uv`](https://docs.astral.sh/uv/getting-started/installation/) by following the instructions on the official site.
+      2. Create and set up your project:
+
+          ```bash
+          mkdir myproject && cd myproject
+          uv init
+          uv venv
+          source .venv/bin/activate
+          uv add desto
+          ```
+          Done!
+    - With pip:
+      ```bash
+      pip install desto
+      ```
+    </details>
 
 3. **Run the Application**  
    ```bash
