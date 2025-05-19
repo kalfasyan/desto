@@ -252,6 +252,7 @@ class UserInterfaceManager:
         self.log_panel = LogPanel()
         self.script_path_select = None  # Reference to the script select component
         self.ignore_next_edit = False
+        self.chain_queue = []  # List of (script_path, arguments)
 
     def refresh_script_list(self):
         script_files = [
@@ -388,16 +389,18 @@ class UserInterfaceManager:
                         # Save/Save as New Buttons
                         with ui.row().style("gap: 10px; margin-top: 10px;"):
                             ui.button(
-                                "Save Changes",
+                                "Save",
                                 on_click=lambda: self.save_current_script(
                                     script_edited
                                 ),
                                 color="primary",
+                                icon="save",
                             )
                             ui.button(
-                                "Save as New",
+                                "Save as",
                                 on_click=self.save_as_new_dialog,
                                 color="secondary",
+                                icon="save",
                             )
 
                         # Keep Alive switch
@@ -413,32 +416,52 @@ class UserInterfaceManager:
                                     type="warning",
                                 )
                                 return
-                            await self.run_session_with_keep_alive(
-                                self.session_name_input.value,
-                                str(
-                                    self.tmux_manager.SCRIPTS_DIR
-                                    / self.script_path_select.value
-                                ),
-                                self.arguments_input.value,
-                                self.keep_alive_switch_new.value,
-                            )
+                            # If there are scripts in the chain queue, launch the chain
+                            if self.chain_queue:
+                                await self.run_chain_queue(
+                                    self.session_name_input.value,
+                                    self.arguments_input.value,
+                                    self.keep_alive_switch_new.value,
+                                )
+                                self.chain_queue.clear()
+                            else:
+                                await self.run_session_with_keep_alive(
+                                    self.session_name_input.value,
+                                    str(
+                                        self.tmux_manager.SCRIPTS_DIR
+                                        / self.script_path_select.value
+                                    ),
+                                    self.arguments_input.value,
+                                    self.keep_alive_switch_new.value,
+                                )
 
                         with ui.row().style(
                             "width: 100%; gap: 10px; margin-top: 10px;"
                         ):
                             ui.button(
                                 "Launch",
-                                on_click=launch_with_save_check,
+                                on_click=lambda: self.launch_with_save_check(
+                                    script_edited
+                                ),
+                                icon="rocket_launch",
                             )
                             ui.button(
-                                "Schedule Launch",
+                                "Schedule",
+                                color="secondary",
                                 icon="history",
                                 on_click=lambda: self.schedule_launch(),
+                            )
+                            ui.button(
+                                "Chain Script",
+                                color="secondary",
+                                on_click=self.chain_current_script,
+                                icon="add_link",
                             )
                             ui.button(
                                 "DELETE",
                                 color="red",
                                 on_click=lambda: self.confirm_delete_script(),
+                                icon="delete",
                             )
 
                         self.script_path_select.on(
@@ -449,6 +472,10 @@ class UserInterfaceManager:
                         "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
                     ):
                         self.new_script_panel.build()
+            ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
+            self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
+            self.refresh_chain_queue_display()
+
             self.log_panel.build()
 
     def update_log_messages(self, message, number_of_lines=20):
@@ -782,3 +809,123 @@ class UserInterfaceManager:
             info_lines.append(f"# Scheduled for: {now_str}")
         info_lines.append("")  # Blank line
         return "\\n".join(info_lines)
+
+    def chain_current_script(self):
+        script_name = self.script_path_select.value
+        arguments = self.arguments_input.value
+        if not script_name or script_name == "No scripts found":
+            ui.notification("No script selected to chain.", type="warning")
+            return
+        script_path = self.tmux_manager.SCRIPTS_DIR / script_name
+        self.remove_tail_line(script_path)
+        self.chain_queue.append((str(script_path), arguments))
+        ui.notification(f"Added {script_name} to chain.", type="positive")
+        self.refresh_chain_queue_display()
+
+    async def run_chain_queue(self, session_name, arguments, keep_alive):
+        if not self.chain_queue:
+            ui.notification("Chain queue is empty.", type="warning")
+            return
+
+        session_name = session_name.strip() or f"chain_{os.getpid()}"
+        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+        info_block = self.get_log_info_block(self.chain_queue[0][0], session_name)
+
+        # Remove tail from all scripts in the chain (cleanup)
+        for script, _ in self.chain_queue:
+            self.remove_tail_line(script)
+
+        # Build chained command with separator before each script
+        chained_cmds = []
+        for idx, (script, args) in enumerate(self.chain_queue):
+            separator = f"echo -e '\\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
+            if keep_alive and idx == len(self.chain_queue) - 1:
+                # For the last script, add tail -f /dev/null after execution
+                run_script = f"(bash '{script}' {args}; tail -f /dev/null) >> '{log_file_path}' 2>&1"
+            else:
+                run_script = f"bash '{script}' {args} >> '{log_file_path}' 2>&1"
+            chained_cmds.append(f"{separator} && {run_script}")
+
+        # Write info block only if log file does not exist, else append a blank line
+        if not log_file_path.exists():
+            info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
+        else:
+            info_cmd = f"echo '' >> '{log_file_path}'"
+
+        cmd = f'bash -c "{info_cmd}; {" && ".join(chained_cmds)}"'
+        self.tmux_manager.start_tmux_session(session_name, cmd, logger)
+        ui.notification(f"Started chained session '{session_name}'.", type="positive")
+        self.chain_queue.clear()
+        self.refresh_chain_queue_display()
+
+    def remove_tail_line(self, script_path):
+        try:
+            with open(script_path, "r") as f:
+                lines = f.readlines()
+            # Remove trailing empty lines
+            while lines and lines[-1].strip() == "":
+                lines.pop()
+            # Remove tail and comment if present
+            if lines and lines[-1].strip() == "tail -f /dev/null":
+                lines.pop()
+                if lines and lines[-1].strip() == "# Keeps the session alive":
+                    lines.pop()
+            with open(script_path, "w") as f:
+                f.writelines(lines)
+        except Exception as e:
+            logger.warning(f"Could not remove tail from {script_path}: {e}")
+
+    def refresh_chain_queue_display(self):
+        """Refresh the display of the chain queue."""
+        self.chain_queue_display.clear()
+        if not self.chain_queue:
+            with self.chain_queue_display:
+                ui.label("Chain queue is empty.")
+        else:
+            for script_path, arguments in self.chain_queue:
+                script_name = Path(script_path).name
+                with self.chain_queue_display:
+                    with ui.row().classes("items-center").style("width: 100%;"):
+                        ui.label(f"{script_name}").style("flex-grow: 1;")
+                        ui.label(f"Args: {arguments}").style("flex-grow: 1;")
+                        ui.button(
+                            "Remove",
+                            on_click=lambda _,
+                            sp=script_path: self.remove_from_chain_queue(sp),
+                            color="red",
+                        )
+
+    def remove_from_chain_queue(self, script_path):
+        """Remove a script from the chain queue."""
+        original_length = len(self.chain_queue)
+        self.chain_queue = [
+            (sp, args) for sp, args in self.chain_queue if sp != script_path
+        ]
+        if len(self.chain_queue) != original_length:
+            ui.notification("Removed script from chain queue.", type="positive")
+        else:
+            ui.notification("Script not found in chain queue.", type="warning")
+        self.refresh_chain_queue_display()
+
+    async def launch_with_save_check(self, script_edited):
+        if script_edited["changed"]:
+            ui.notification(
+                "You have unsaved changes. Please save before launching or use 'Save as New'.",
+                type="warning",
+            )
+            return
+        # If there are scripts in the chain queue, launch the chain
+        if self.chain_queue:
+            await self.run_chain_queue(
+                self.session_name_input.value,
+                self.arguments_input.value,
+                self.keep_alive_switch_new.value,
+            )
+            self.chain_queue.clear()
+        else:
+            await self.run_session_with_keep_alive(
+                self.session_name_input.value,
+                str(self.tmux_manager.SCRIPTS_DIR / self.script_path_select.value),
+                self.arguments_input.value,
+                self.keep_alive_switch_new.value,
+            )

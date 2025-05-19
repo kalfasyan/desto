@@ -143,7 +143,20 @@ class TmuxManager:
             return
 
         quoted_log_file = shlex.quote(str(log_file))
-        full_command_for_tmux = f"{command} > {quoted_log_file} 2>&1"
+        append_mode = log_file.exists()
+        # If appending, add a separator before the new output
+        if append_mode:
+            try:
+                with log_file.open("a") as f:
+                    f.write("\n---- NEW SCRIPT -----\n")
+            except Exception as e:
+                msg = f"Failed to write separator to log file '{log_file}': {e}"
+                logger.error(msg)
+                ui.notification(msg, type="negative")
+                return
+
+        redir = ">>" if append_mode else ">"
+        full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1"
 
         try:
             subprocess.run(
