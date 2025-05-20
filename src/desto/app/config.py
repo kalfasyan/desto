@@ -19,11 +19,11 @@ class UISettings:
 
     @dataclass
     class Labels:
-        title_font_size: str = "1.3em"
+        title_font_size: str = "1.7em"
         title_font_weight: str = "bold"
-        subtitle_font_size: str = "1em"
+        subtitle_font_size: str = "1.5em"
         subtitle_font_weight: str = "500"
-        info_font_size: str = "0.9em"
+        info_font_size: str = "1.1em"
         info_color: str = "#666"
         margin_top: str = "8px"
         margin_bottom: str = "4px"

@@ -317,20 +317,24 @@ class UserInterfaceManager:
             "Settings", on_click=lambda: right_drawer.toggle(), icon="settings"
         ).props("flat color=blue").style("margin-right: auto;")
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-            with ui.splitter(value=25).classes("w-full") as splitter:  # removed h-96
+            with (
+                ui.splitter(value=25)
+                .classes("w-full")
+                .style("gap:0; padding:0; margin:0;") as splitter
+            ):
                 with splitter.before:
-                    with ui.tabs().props("vertical").classes("w-full") as tabs:
+                    with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
                 with splitter.after:
                     with (
                         ui.tab_panels(tabs, value=scripts_tab)
                         .props("vertical")
-                        .classes("w-full")  # removed h-full
+                        .classes("w-full")
                     ):
                         with ui.tab_panel(scripts_tab):
                             with ui.card().style(
-                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"
                             ):
                                 # Place Session Name, Script, and Arguments side by side
                                 with ui.row().style(
@@ -485,7 +489,7 @@ class UserInterfaceManager:
 
                         with ui.tab_panel(new_script_tab):
                             with ui.card().style(
-                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"
                             ):
                                 self.new_script_panel.build()
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
