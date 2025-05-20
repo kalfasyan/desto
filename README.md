@@ -1,12 +1,15 @@
-# desto
+<p align="center">
+  <img src="images/logo.png" alt="desto Logo" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
+</p>  
+
+
+**desto** lets you run and manage your bash scripts in `tmux` sessions through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.  
 
 [![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto) ![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-blueviolet) ![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat) [![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml)
 
-**desto** lets you run and manage your bash scripts in `tmux` sessions through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.
-
 ---
 
-## Features
+The key features are:  
 
 - **One-click session control:** Start, monitor, and stop `tmux` sessions from your browser.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
@@ -14,16 +17,17 @@
 - **Live log viewer:** Watch script output in real time.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
 
+  
 ## ⚡ Quick Start
 
+
+  
 <div align="left">
 
-<details>
-<summary><strong>👀 Dashboard Overview</strong></summary>
+<strong>👀 Dashboard Overview</strong>
 
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
-</details>
   
 ---
 **🚀 Launch your scripts as `tmux` sessions**  
