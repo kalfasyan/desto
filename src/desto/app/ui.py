@@ -135,9 +135,6 @@ class NewScriptPanel:
         self.custom_template_name_input = None
 
     def build(self):
-        ui.label("New Script").style(
-            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
-        )
         code_editor = (
             ui.codemirror(
                 self.custom_code["value"],
@@ -320,161 +317,177 @@ class UserInterfaceManager:
             "Settings", on_click=lambda: right_drawer.toggle(), icon="settings"
         ).props("flat color=blue").style("margin-right: auto;")
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-            with ui.tabs().classes("w-full") as tabs:
-                scripts_tab = ui.tab("Scripts", icon="rocket_launch")
-                new_script_tab = ui.tab("New Script", icon="add")
-
-            with ui.tab_panels(tabs, value=scripts_tab).classes("w-full"):
-                with ui.tab_panel(scripts_tab):
-                    with ui.card().style(
-                        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+            with ui.splitter(value=25).classes("w-full") as splitter:  # removed h-96
+                with splitter.before:
+                    with ui.tabs().props("vertical").classes("w-full") as tabs:
+                        scripts_tab = ui.tab("Scripts", icon="terminal")
+                        new_script_tab = ui.tab("New Script", icon="add")
+                with splitter.after:
+                    with (
+                        ui.tab_panels(tabs, value=scripts_tab)
+                        .props("vertical")
+                        .classes("w-full")  # removed h-full
                     ):
-                        ui.label("Launch Script").style(
-                            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
-                        )
-                        self.session_name_input = ui.input(label="Session Name").style(
-                            "width: 100%; color: #75a8db;"
-                        )
-                        script_files = self.get_script_files()
-                        self.script_path_select = ui.select(
-                            options=script_files
-                            if script_files
-                            else ["No scripts found"],
-                            label="Script",
-                            value=script_files[0]
-                            if script_files
-                            else "No scripts found",
-                        ).style("width: 100%;")
-                        self.arguments_input = ui.input(
-                            label="Arguments",
-                            value=".",
-                        ).style("width: 100%;")
+                        with ui.tab_panel(scripts_tab):
+                            with ui.card().style(
+                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                            ):
+                                # Place Session Name, Script, and Arguments side by side
+                                with ui.row().style(
+                                    "width: 100%; gap: 10px; margin-bottom: 10px;"
+                                ):
+                                    self.session_name_input = ui.input(
+                                        label="Session Name"
+                                    ).style("width: 30%; color: #75a8db;")
+                                    script_files = self.get_script_files()
+                                    self.script_path_select = ui.select(
+                                        options=script_files
+                                        if script_files
+                                        else ["No scripts found"],
+                                        label="Script",
+                                        value=script_files[0]
+                                        if script_files
+                                        else "No scripts found",
+                                    ).style("width: 35%;")
+                                    self.script_path_select.on(
+                                        "update:model-value", self.update_script_preview
+                                    )
+                                    self.arguments_input = ui.input(
+                                        label="Arguments",
+                                        value=".",
+                                    ).style("width: 35%;")
 
-                        script_preview_content = ""
-                        if (
-                            script_files
-                            and (
-                                self.tmux_manager.SCRIPTS_DIR / script_files[0]
-                            ).is_file()
-                        ):
-                            with open(
-                                self.tmux_manager.SCRIPTS_DIR / script_files[0], "r"
-                            ) as f:
-                                script_preview_content = f.read()
+                                script_preview_content = ""
+                                if (
+                                    script_files
+                                    and (
+                                        self.tmux_manager.SCRIPTS_DIR / script_files[0]
+                                    ).is_file()
+                                ):
+                                    with open(
+                                        self.tmux_manager.SCRIPTS_DIR / script_files[0],
+                                        "r",
+                                    ) as f:
+                                        script_preview_content = f.read()
 
-                        # Track if the script was edited
-                        script_edited = {"changed": False}
+                                # Track if the script was edited
+                                script_edited = {"changed": False}
 
-                        def on_script_edit(e):
-                            if not self.ignore_next_edit:
-                                script_edited["changed"] = True
-                            else:
-                                self.ignore_next_edit = False  # Reset after ignoring
+                                def on_script_edit(e):
+                                    if not self.ignore_next_edit:
+                                        script_edited["changed"] = True
+                                    else:
+                                        self.ignore_next_edit = (
+                                            False  # Reset after ignoring
+                                        )
 
-                        self.script_preview_editor = (
-                            ui.codemirror(
-                                script_preview_content,
-                                language="bash",
-                                theme="vscodeLight",
-                                line_wrapping=True,
-                                highlight_whitespace=True,
-                                indent="    ",
-                                on_change=on_script_edit,
-                            )
-                            .style("width: 100%; margin-top: 10px;")
-                            .classes("h-48")
-                        )
+                                # Place code editor and theme selection side by side
+                                with ui.row().style(
+                                    "width: 100%; gap: 10px; margin-bottom: 10px;"
+                                ):
+                                    self.script_preview_editor = (
+                                        ui.codemirror(
+                                            script_preview_content,
+                                            language="bash",
+                                            theme="vscodeLight",
+                                            line_wrapping=True,
+                                            highlight_whitespace=True,
+                                            indent="    ",
+                                            on_change=on_script_edit,
+                                        )
+                                        .style(
+                                            "width: 80%; min-width: 300px; margin-top: 0px;"
+                                        )
+                                        .classes("h-48")
+                                    )
+                                    ui.select(
+                                        self.script_preview_editor.supported_themes,
+                                        label="Theme",
+                                    ).classes("w-32").bind_value(
+                                        self.script_preview_editor, "theme"
+                                    )
 
-                        ui.select(
-                            self.script_preview_editor.supported_themes, label="Theme"
-                        ).classes("w-32").bind_value(
-                            self.script_preview_editor, "theme"
-                        )
+                                # Save/Save as/Delete Buttons
+                                with ui.row().style("gap: 10px; margin-top: 10px;"):
+                                    ui.button(
+                                        "Save",
+                                        on_click=lambda: self.save_current_script(
+                                            script_edited
+                                        ),
+                                        color="primary",
+                                        icon="save",
+                                    )
+                                    ui.button(
+                                        "Save as",
+                                        on_click=self.save_as_new_dialog,
+                                        color="secondary",
+                                        icon="save",
+                                    )
+                                    ui.button(
+                                        "DELETE",
+                                        color="red",
+                                        on_click=lambda: self.confirm_delete_script(),
+                                        icon="delete",
+                                    )
 
-                        # Save/Save as New Buttons
-                        with ui.row().style("gap: 10px; margin-top: 10px;"):
-                            ui.button(
-                                "Save",
-                                on_click=lambda: self.save_current_script(
-                                    script_edited
-                                ),
-                                color="primary",
-                                icon="save",
-                            )
-                            ui.button(
-                                "Save as",
-                                on_click=self.save_as_new_dialog,
-                                color="secondary",
-                                icon="save",
-                            )
+                                # Keep Alive switch
+                                self.keep_alive_switch_new = ui.switch(
+                                    "Keep Alive"
+                                ).style("margin-top: 10px;")
 
-                        # Keep Alive switch
-                        self.keep_alive_switch_new = ui.switch("Keep Alive").style(
-                            "margin-top: 10px;"
-                        )
+                                # Launch logic: warn if unsaved changes
+                                async def launch_with_save_check():
+                                    if script_edited["changed"]:
+                                        ui.notification(
+                                            "You have unsaved changes. Please save before launching or use 'Save as New'.",
+                                            type="warning",
+                                        )
+                                        return
+                                    # If there are scripts in the chain queue, launch the chain
+                                    if self.chain_queue:
+                                        await self.run_chain_queue(
+                                            self.session_name_input.value,
+                                            self.arguments_input.value,
+                                            self.keep_alive_switch_new.value,
+                                        )
+                                        self.chain_queue.clear()
+                                    else:
+                                        await self.run_session_with_keep_alive(
+                                            self.session_name_input.value,
+                                            str(
+                                                self.tmux_manager.SCRIPTS_DIR
+                                                / self.script_path_select.value
+                                            ),
+                                            self.arguments_input.value,
+                                            self.keep_alive_switch_new.value,
+                                        )
 
-                        # Launch logic: warn if unsaved changes
-                        async def launch_with_save_check():
-                            if script_edited["changed"]:
-                                ui.notification(
-                                    "You have unsaved changes. Please save before launching or use 'Save as New'.",
-                                    type="warning",
-                                )
-                                return
-                            # If there are scripts in the chain queue, launch the chain
-                            if self.chain_queue:
-                                await self.run_chain_queue(
-                                    self.session_name_input.value,
-                                    self.arguments_input.value,
-                                    self.keep_alive_switch_new.value,
-                                )
-                                self.chain_queue.clear()
-                            else:
-                                await self.run_session_with_keep_alive(
-                                    self.session_name_input.value,
-                                    str(
-                                        self.tmux_manager.SCRIPTS_DIR
-                                        / self.script_path_select.value
-                                    ),
-                                    self.arguments_input.value,
-                                    self.keep_alive_switch_new.value,
-                                )
+                                with ui.row().style(
+                                    "width: 100%; gap: 10px; margin-top: 10px;"
+                                ):
+                                    ui.button(
+                                        "Launch",
+                                        on_click=launch_with_save_check,  # Pass the async function directly
+                                        icon="rocket_launch",
+                                    )
+                                    ui.button(
+                                        "Schedule",
+                                        color="secondary",
+                                        icon="history",
+                                        on_click=lambda: self.schedule_launch(),
+                                    )
+                                    ui.button(
+                                        "Chain Script",
+                                        color="secondary",
+                                        on_click=self.chain_current_script,
+                                        icon="add_link",
+                                    )
 
-                        with ui.row().style(
-                            "width: 100%; gap: 10px; margin-top: 10px;"
-                        ):
-                            ui.button(
-                                "Launch",
-                                on_click=launch_with_save_check,  # Pass the async function directly
-                                icon="rocket_launch",
-                            )
-                            ui.button(
-                                "Schedule",
-                                color="secondary",
-                                icon="history",
-                                on_click=lambda: self.schedule_launch(),
-                            )
-                            ui.button(
-                                "Chain Script",
-                                color="secondary",
-                                on_click=self.chain_current_script,
-                                icon="add_link",
-                            )
-                            ui.button(
-                                "DELETE",
-                                color="red",
-                                on_click=lambda: self.confirm_delete_script(),
-                                icon="delete",
-                            )
-
-                        self.script_path_select.on(
-                            "update:model-value", self.update_script_preview
-                        )
-                with ui.tab_panel(new_script_tab):
-                    with ui.card().style(
-                        "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
-                    ):
-                        self.new_script_panel.build()
+                        with ui.tab_panel(new_script_tab):
+                            with ui.card().style(
+                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
+                            ):
+                                self.new_script_panel.build()
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
