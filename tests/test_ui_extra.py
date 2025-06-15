@@ -1,8 +1,5 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from desto.app.ui import UserInterfaceManager
-from pathlib import Path
-import os
 
 
 def make_ui_manager(tmp_path):
