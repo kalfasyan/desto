@@ -101,13 +101,13 @@ class TmuxManager:
         if result.returncode == 0:
             msg = f"Session '{session_name}' killed successfully."
             self.logger.success(msg)
-            ui.notification(msg, type="positive")
+            self.ui.notification(msg, type="positive")
             if session_name in self.sessions:
                 del self.sessions[session_name]
         else:
             msg = f"Failed to kill session '{session_name}': {result.stderr}"
             self.logger.warning(msg)
-            ui.notification(msg, type="negative")
+            self.ui.notification(msg, type="negative")
 
     def clear_sessions_container(self):
         """
