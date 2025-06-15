@@ -13,8 +13,10 @@ The key features are:
 
 - **One-click session control:** Start, monitor, and stop `tmux` sessions from your browser.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
-- **Script management:** Use your existing scripts or write new ones directly in the dashboard.
-- **Live log viewer:** Watch script output in real time.
+- **Script management:** Use your existing scripts, write new ones, edit, save, or delete them directly in the dashboard.
+- **Script chaining:** Queue multiple scripts to run sequentially in a single session.
+- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
+- **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
 
   
