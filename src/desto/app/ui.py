@@ -6,6 +6,7 @@ import os
 import getpass
 import socket
 import re
+import shlex
 
 
 class SystemStatsPanel:
@@ -678,8 +679,8 @@ class UserInterfaceManager:
             ui.notification(msg, type="negative")
             return
         try:
-            with script_path_obj.open("r") as script_file:
-                script_lines = script_file.readlines()
+            # Just check if the file can be opened for reading
+            script_path_obj.open("r").close()
 
             log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
             info_block = self.get_log_info_block(script_path, session_name)
@@ -771,17 +772,14 @@ class UserInterfaceManager:
             ui.notification(msg, type="negative")
             return
         try:
-            with script_path_obj.open("r") as script_file:
-                script_lines = script_file.readlines()
-                if (
-                    not script_lines
-                    or not script_lines[0].startswith("#!")
-                    or "bash" not in script_lines[0]
-                ):
-                    msg = f"Script is not a bash script: {script_path}"
-                    logger.warning(msg)
-                    ui.notification(msg, type="negative")
-                    return
+            if (
+                not script_path_obj.read_text().startswith("#!")
+                or "bash" not in script_path_obj.read_text().splitlines()[0]
+            ):
+                msg = f"Script is not a bash script: {script_path}"
+                logger.warning(msg)
+                ui.notification(msg, type="negative")
+                return
             # If there are scripts in the chain queue, launch the chain
             if self.chain_queue:
                 await self.run_chain_queue(session_name, arguments, keep_alive)
@@ -817,6 +815,7 @@ class UserInterfaceManager:
 
     def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog):
         from datetime import datetime
+        import shutil
 
         date_val = date_input.value
         time_val = time_input.value
@@ -845,6 +844,14 @@ class UserInterfaceManager:
                 error_label.text = "Scheduled time is in the past."
                 return
 
+            # Check if 'at' command is available
+            if not shutil.which("at"):
+                error_label.text = "'at' command is not available on this system. Please install 'at' to use scheduling."
+                return
+
+            # Format time for 'at' (e.g., 'HH:MM YYYY-MM-DD')
+            at_time_str = scheduled_dt.strftime("%H:%M %Y-%m-%d")
+
             # If chain queue is not empty, schedule the chain
             if self.chain_queue:
                 log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
@@ -862,26 +869,30 @@ class UserInterfaceManager:
                     info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
                 else:
                     info_cmd = f"echo '' >> '{log_file_path}'"
-                # Prepend sleep for scheduling
-                cmd = (
-                    f'bash -c "'
-                    f"{info_cmd}; "
-                    f"sleep {int(delta)}; "
-                    f"{' && '.join(chained_cmds)}"
-                    f'"'
+                # The full command to run in tmux
+                tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)}"
+                tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+                # Schedule with 'at'
+                at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
+                import subprocess
+
+                result = subprocess.run(
+                    at_shell_cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
                 )
-                self.tmux_manager.start_tmux_session(
-                    session_name,
-                    cmd,
-                    logger,
-                )
-                ui.notification(
-                    f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
-                    type="info",
-                )
-                self.chain_queue.clear()
-                self.refresh_chain_queue_display()
-                schedule_dialog.close()
+                if result.returncode == 0:
+                    ui.notification(
+                        f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
+                        type="info",
+                    )
+                    self.chain_queue.clear()
+                    self.refresh_chain_queue_display()
+                    schedule_dialog.close()
+                else:
+                    error_label.text = f"Failed to schedule: {result.stderr}"
                 return
 
             # Otherwise, schedule a single script as before
@@ -895,24 +906,30 @@ class UserInterfaceManager:
             tail_cmd = (
                 f" tail -f /dev/null >> '{log_file_path}' 2>&1;" if keep_alive else ""
             )
-            cmd = (
-                f'bash -c "'
+            tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"sleep {int(delta)}; "
                 f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1;"
                 f"{tail_cmd}"
-                f'"'
             )
-            self.tmux_manager.start_tmux_session(
-                session_name,
-                cmd,
-                logger,
+            tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+            at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
+            import subprocess
+
+            result = subprocess.run(
+                at_shell_cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
-            ui.notification(
-                f"Script scheduled for {scheduled_dt} as session '{session_name}'",
-                type="info",
-            )
-            schedule_dialog.close()
+            if result.returncode == 0:
+                ui.notification(
+                    f"Script scheduled for {scheduled_dt} as session '{session_name}'",
+                    type="info",
+                )
+                schedule_dialog.close()
+            else:
+                error_label.text = f"Failed to schedule: {result.stderr}"
         except Exception as e:
             error_label.text = f"Invalid date/time: {e}"
 
