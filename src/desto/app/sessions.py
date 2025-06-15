@@ -128,10 +128,11 @@ class TmuxManager:
     def get_script_file(self, script_name):
         return self.SCRIPTS_DIR / script_name
 
-    def start_tmux_session(self, session_name, command, logger):
+    def start_tmux_session(self, session_name, command, logger, keep_alive=False):
         """
         Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
+        Only appends 'tail -f /dev/null' if keep_alive is True.
         """
         log_file = self.get_log_file(session_name)
         try:
@@ -156,7 +157,11 @@ class TmuxManager:
                 return
 
         redir = ">>" if append_mode else ">"
-        full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1"
+        # Only append tail -f /dev/null if keep_alive is True
+        if keep_alive:
+            full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1; tail -f /dev/null {redir} {quoted_log_file} 2>&1"
+        else:
+            full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1"
 
         try:
             subprocess.run(

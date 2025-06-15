@@ -296,6 +296,8 @@ class UserInterfaceManager:
             ).style("margin-left: auto;")
         with ui.left_drawer().style(
             f"width: {self.ui_settings['sidebar']['width']}; "
+            f"min-width: {self.ui_settings['sidebar']['width']}; "
+            f"max-width: {self.ui_settings['sidebar']['width']}; "
             f"padding: {self.ui_settings['sidebar']['padding']}; "
             f"background-color: {self.ui_settings['sidebar']['background_color']}; "
             f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
@@ -678,15 +680,7 @@ class UserInterfaceManager:
         try:
             with script_path_obj.open("r") as script_file:
                 script_lines = script_file.readlines()
-                if (
-                    not script_lines
-                    or not script_lines[0].startswith("#!")
-                    or "bash" not in script_lines[0]
-                ):
-                    msg = f"Script is not a bash script: {script_path}"
-                    logger.warning(msg)
-                    ui.notification(msg, type="negative")
-                    return
+
             log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
             info_block = self.get_log_info_block(script_path, session_name)
             tail_cmd = " ; tail -f /dev/null" if keep_alive else ""
@@ -703,6 +697,8 @@ class UserInterfaceManager:
             )
         except PermissionError:
             msg = f"Permission denied: Unable to launch the script at {script_path}."
+            logger.warning(msg)
+            ui.notification(msg, type="negative")
 
     async def run_chain_queue(self, session_name, arguments, keep_alive):
         if not self.chain_queue:

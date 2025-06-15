@@ -11,8 +11,8 @@ class UISettings:
 
     @dataclass
     class Sidebar:
-        width: str = "280px"
-        padding: str = "10px"
+        width: str = "180px"  # was 280px
+        padding: str = "4px"  # was 10px
         background_color: str = "#F0F0F0"
         border_radius: str = "6px"
         gap: str = "8px"
