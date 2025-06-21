@@ -671,36 +671,27 @@ class UserInterfaceManager:
     async def run_session_with_keep_alive(
         self, session_name, script_path, arguments, keep_alive
     ):
-        """Launch a tmux session with or without keep-alive."""
-        script_path_obj = Path(script_path)
-        if not script_path_obj.is_file():
-            msg = f"Script path does not exist: {script_path}"
-            logger.warning(msg)
-            ui.notification(msg, type="negative")
-            return
-        try:
-            # Just check if the file can be opened for reading
-            script_path_obj.open("r").close()
-
-            log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-            info_block = self.get_log_info_block(script_path, session_name)
-            tail_cmd = " ; tail -f /dev/null" if keep_alive else ""
-            cmd = (
-                f'bash -c "'
+        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+        info_block = self.get_log_info_block(script_path, session_name)
+        finished_marker_cmd = (
+            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+        )
+        if keep_alive:
+            tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
                 f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1; "
-                f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-                f'{tail_cmd};"'
+                f"{finished_marker_cmd}; "
+                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
             )
-            self.tmux_manager.start_tmux_session(
-                session_name,
-                cmd,
-                logger,
+        else:
+            tmux_cmd = (
+                f"echo -e '{info_block}' > '{log_file_path}'; "
+                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"{finished_marker_cmd}"
             )
-        except PermissionError:
-            msg = f"Permission denied: Unable to launch the script at {script_path}."
-            logger.warning(msg)
-            ui.notification(msg, type="negative")
+
+        self.tmux_manager.start_tmux_session(session_name, tmux_cmd, logger)
+        ui.notification(f"Started session '{session_name}'.", type="positive")
 
     async def run_chain_queue(self, session_name, arguments, keep_alive):
         if not self.chain_queue:
@@ -711,24 +702,34 @@ class UserInterfaceManager:
         log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
         info_block = self.get_log_info_block(self.chain_queue[0][0], session_name)
 
-        # Build chained command with separator before each script
         chained_cmds = []
         for idx, (script, args) in enumerate(self.chain_queue):
             separator = f"echo -e '\\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
             run_script = f"bash '{script}' {args} >> '{log_file_path}' 2>&1"
-            if keep_alive and idx == len(self.chain_queue) - 1:
-                run_script = (
-                    f"{run_script} ; tail -f /dev/null >> '{log_file_path}' 2>&1"
-                )
             chained_cmds.append(f"{separator} && {run_script}")
 
-        # Write info block only if log file does not exist, else append a blank line
         if not log_file_path.exists():
             info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
         else:
             info_cmd = f"echo '' >> '{log_file_path}'"
 
-        cmd = f'bash -c "{info_cmd}; {" && ".join(chained_cmds)}"'
+        finished_marker_cmd = (
+            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+        )
+
+        # If keep_alive, run tail after marker
+        if keep_alive:
+            cmd = (
+                f'bash -c "{info_cmd}; '
+                f"{' && '.join(chained_cmds)} && {finished_marker_cmd}; "
+                f"tail -f /dev/null >> '{log_file_path}' 2>&1\""
+            )
+        else:
+            cmd = (
+                f'bash -c "{info_cmd}; '
+                f'{" && ".join(chained_cmds)} && {finished_marker_cmd}"'
+            )
+
         self.tmux_manager.start_tmux_session(session_name, cmd, logger)
         ui.notification(f"Started chained session '{session_name}'.", type="positive")
         self.chain_queue.clear()
@@ -765,32 +766,31 @@ class UserInterfaceManager:
     async def run_session_with_save_check(
         self, session_name, script_path, arguments, keep_alive
     ):
-        """Launch a tmux session with or without keep-alive after checking for unsaved changes."""
-        script_path_obj = Path(script_path)
-        if not script_path_obj.is_file():
-            msg = f"Script path does not exist: {script_path}"
-            logger.warning(msg)
-            ui.notification(msg, type="negative")
-            return
-        try:
-            if (
-                not script_path_obj.read_text().startswith("#!")
-                or "bash" not in script_path_obj.read_text().splitlines()[0]
-            ):
-                msg = f"Script is not a bash script: {script_path}"
-                logger.warning(msg)
-                ui.notification(msg, type="negative")
-                return
-            # If there are scripts in the chain queue, launch the chain
-            if self.chain_queue:
-                await self.run_chain_queue(session_name, arguments, keep_alive)
-            else:
-                await self.run_session_with_keep_alive(
-                    session_name, script_path, arguments, keep_alive
-                )
-        except Exception as e:
-            logger.exception("Error running session with save check")
-            ui.notification(f"Error: {e}", type="negative")
+        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
+        info_block = self.get_log_info_block(script_path, session_name)
+        finished_marker_cmd = (
+            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+        )
+        if keep_alive:
+            cmd = (
+                f'bash -c "'
+                f"echo -e '{info_block}' > '{log_file_path}'; "
+                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1 && "
+                f"{finished_marker_cmd}; "
+                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
+                f'"'
+            )
+        else:
+            cmd = (
+                f'bash -c "'
+                f"echo -e '{info_block}' > '{log_file_path}'; "
+                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1 && "
+                f"{finished_marker_cmd}"
+                f'"'
+            )
+
+        self.tmux_manager.start_tmux_session(session_name, cmd, logger)
+        ui.notification(f"Scheduled session '{session_name}' started.", type="positive")
 
     def schedule_launch(self):
         """Open a dialog to schedule the script launch at a specific date and time."""
@@ -907,10 +907,14 @@ class UserInterfaceManager:
             tail_cmd = (
                 f" tail -f /dev/null >> '{log_file_path}' 2>&1;" if keep_alive else ""
             )
+            finished_marker_cmd = (
+                f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+            )
             tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1;"
-                f"{tail_cmd}"
+                f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"{finished_marker_cmd}; "
+                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
             )
             tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
             at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"

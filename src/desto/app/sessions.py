@@ -273,6 +273,19 @@ class TmuxManager:
 
         dialog.open()
 
+    def get_script_run_time(self, created_time, session_name):
+        """
+        Returns the elapsed time for a session.
+        If the .finished marker exists, uses its mtime as the end time.
+        Otherwise, uses the current time.
+        """
+        finished_marker = self.LOG_DIR / f"{session_name}.finished"
+        if finished_marker.exists():
+            end_time = finished_marker.stat().st_mtime
+        else:
+            end_time = time.time()
+        return int(end_time - created_time)
+
     def add_sessions_table(self, sessions_status, ui):
         """
         Adds the sessions table to the UI.
@@ -292,12 +305,11 @@ class TmuxManager:
         now = time.time()
         for session_name, session in sessions_status.items():
             created_time = session["created"]
-            elapsed_seconds = int(now - created_time)
+            elapsed_seconds = self.get_script_run_time(created_time, session_name)
             hours, remainder = divmod(elapsed_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
 
-            # Check for finished marker
             finished_marker = self.LOG_DIR / f"{session_name}.finished"
             status = "Finished" if finished_marker.exists() else "Running"
 
