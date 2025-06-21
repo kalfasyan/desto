@@ -40,6 +40,14 @@ class TmuxManager:
 
     def start_session(self, session_name, command):
         """Start a new tmux session with the given command."""
+        # Clean up finished marker before starting
+        finished_marker = self.LOG_DIR / f"{session_name}.finished"
+        if finished_marker.exists():
+            try:
+                finished_marker.unlink()
+            except Exception as e:
+                self.logger.warning(f"Could not remove marker: {e}")
+
         if session_name in self.sessions:
             raise ValueError(f"Session '{session_name}' already exists.")
 
@@ -91,7 +99,7 @@ class TmuxManager:
         """Kill a tmux session by name."""
         msg = f"Attempting to kill session: '{session_name}'"
         self.logger.info(msg)
-        escaped_session_name = shlex.quote(session_name)  # Escape the session name
+        escaped_session_name = shlex.quote(session_name)
         result = subprocess.run(
             ["tmux", "kill-session", "-t", escaped_session_name],
             stdout=subprocess.PIPE,
@@ -104,6 +112,13 @@ class TmuxManager:
             self.ui.notification(msg, type="positive")
             if session_name in self.sessions:
                 del self.sessions[session_name]
+            # Clean up finished marker
+            finished_marker = self.LOG_DIR / f"{session_name}.finished"
+            if finished_marker.exists():
+                try:
+                    finished_marker.unlink()
+                except Exception as e:
+                    self.logger.warning(f"Could not remove marker: {e}")
         else:
             msg = f"Failed to kill session '{session_name}': {result.stderr}"
             self.logger.warning(msg)
@@ -134,6 +149,14 @@ class TmuxManager:
         Shows notifications for success or failure.
         Only appends 'tail -f /dev/null' if keep_alive is True.
         """
+        # Clean up finished marker before starting
+        finished_marker = self.LOG_DIR / f"{session_name}.finished"
+        if finished_marker.exists():
+            try:
+                finished_marker.unlink()
+            except Exception as e:
+                self.logger.warning(f"Could not remove marker: {e}")
+
         log_file = self.get_log_file(session_name)
         try:
             log_file.parent.mkdir(exist_ok=True)
@@ -208,10 +231,13 @@ class TmuxManager:
         """
         try:
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
-            msg = f"Tmux session '{session_name}' killed successfully."
-            self.logger.success(msg)
-            ui.notification(msg, type="positive")
-            self.update_sessions_status()
+            # Clean up finished marker
+            finished_marker = self.LOG_DIR / f"{session_name}.finished"
+            if finished_marker.exists():
+                try:
+                    finished_marker.unlink()
+                except Exception as e:
+                    self.logger.warning(f"Could not remove marker: {e}")
         except subprocess.CalledProcessError as e:
             msg = f"Failed to kill tmux session '{session_name}': {e}"
             self.logger.warning(msg)
@@ -258,18 +284,22 @@ class TmuxManager:
             ui.label("Session ID").style(header_style)
             ui.label("Name").style(header_style)
             ui.label("Created").style(header_style)
-            ui.label("Elapsed").style(header_style)  # New column
+            ui.label("Elapsed").style(header_style)
             ui.label("Attached").style(header_style)
+            ui.label("Status").style(header_style)  # NEW COLUMN
             ui.label("Actions").style(header_style)
 
         now = time.time()
         for session_name, session in sessions_status.items():
             created_time = session["created"]
             elapsed_seconds = int(now - created_time)
-            # Format elapsed as H:MM:SS
             hours, remainder = divmod(elapsed_seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
+
+            # Check for finished marker
+            finished_marker = self.LOG_DIR / f"{session_name}.finished"
+            status = "Finished" if finished_marker.exists() else "Running"
 
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
@@ -277,8 +307,9 @@ class TmuxManager:
                 ui.label(
                     datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")
                 ).style(cell_style)
-                ui.label(elapsed_str).style(cell_style)  # Elapsed column
+                ui.label(elapsed_str).style(cell_style)
                 ui.label("Yes" if session["attached"] else "No").style(cell_style)
+                ui.label(status).style(cell_style)  # NEW STATUS COLUMN
                 ui.button(
                     "Kill",
                     on_click=lambda s=session_name: self.confirm_kill_session(s),

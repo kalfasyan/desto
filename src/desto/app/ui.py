@@ -688,8 +688,9 @@ class UserInterfaceManager:
             cmd = (
                 f'bash -c "'
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1{tail_cmd};"
-                f'"'
+                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+                f'{tail_cmd};"'
             )
             self.tmux_manager.start_tmux_session(
                 session_name,
