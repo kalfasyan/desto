@@ -302,7 +302,6 @@ class TmuxManager:
             ui.label("Status").style(header_style)  # NEW COLUMN
             ui.label("Actions").style(header_style)
 
-        now = time.time()
         for session_name, session in sessions_status.items():
             created_time = session["created"]
             elapsed_seconds = self.get_script_run_time(created_time, session_name)
