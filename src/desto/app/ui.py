@@ -904,9 +904,6 @@ class UserInterfaceManager:
             info_block = self.get_log_info_block(
                 script_file_path, session_name, scheduled_dt
             )
-            tail_cmd = (
-                f" tail -f /dev/null >> '{log_file_path}' 2>&1;" if keep_alive else ""
-            )
             finished_marker_cmd = (
                 f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
             )
