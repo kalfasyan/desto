@@ -863,15 +863,20 @@ class UserInterfaceManager:
                 for idx, (script, args) in enumerate(self.chain_queue):
                     separator = f"echo -e '\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
                     run_script = f"bash '{script}' {args} >> '{log_file_path}' 2>&1"
-                    if keep_alive and idx == len(self.chain_queue) - 1:
-                        run_script = f"{run_script} ; tail -f /dev/null >> '{log_file_path}' 2>&1"
                     chained_cmds.append(f"{separator} && {run_script}")
                 if not log_file_path.exists():
                     info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
                 else:
                     info_cmd = f"echo '' >> '{log_file_path}'"
+                
+                finished_marker_cmd = (
+                    f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+                )
                 # The full command to run in tmux
-                tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)}"
+                if keep_alive:
+                    tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}; tail -f /dev/null >> '{log_file_path}' 2>&1"
+                else:
+                    tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}"
                 tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
                 # Schedule with 'at'
                 at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
