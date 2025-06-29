@@ -33,6 +33,13 @@ class UISettings:
         size: str = "sm"
 
     @dataclass
+    class CPUCores:
+        max_columns: int = 4  # Number of columns to display cores in
+        show_percentage: bool = True
+        bar_height: str = "6px"
+        core_label_size: str = "0.9em"
+
+    @dataclass
     class Separator:
         margin_top: str = "12px"
         margin_bottom: str = "8px"
@@ -50,6 +57,7 @@ class UISettings:
     sidebar: Sidebar = field(default_factory=Sidebar)
     labels: Labels = field(default_factory=Labels)
     progress_bar: ProgressBar = field(default_factory=ProgressBar)
+    cpu_cores: CPUCores = field(default_factory=CPUCores)
     separator: Separator = field(default_factory=Separator)
     main_content: MainContent = field(default_factory=MainContent)
 

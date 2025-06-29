@@ -14,6 +14,10 @@ class SystemStatsPanel:
         self.ui_settings = ui_settings
         self.cpu_percent = None
         self.cpu_bar = None
+        self.show_cpu_cores = None
+        self.cpu_cores_container = None
+        self.cpu_core_labels = []
+        self.cpu_core_bars = []
         self.memory_percent = None
         self.memory_bar = None
         self.memory_available = None
@@ -43,6 +47,22 @@ class SystemStatsPanel:
             self.cpu_bar = ui.linear_progress(
                 value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
             )
+
+            # CPU Cores toggle and container
+            self.show_cpu_cores = ui.switch("Show CPU Cores", value=False).style(
+                "margin-top: 8px;"
+            )
+            self.cpu_cores_container = ui.column().style("margin-top: 8px;")
+
+            def toggle_cpu_cores_visibility(e):
+                self.cpu_cores_container.visible = e.args[0]
+                if e.args[0] and not self.cpu_core_labels:
+                    # Initialize CPU cores display if not already done
+                    self._initialize_cpu_cores()
+
+            self.show_cpu_cores.on("update:model-value", toggle_cpu_cores_visibility)
+            self.cpu_cores_container.visible = self.show_cpu_cores.value
+
             ui.label("Memory Usage").style(
                 f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
             )
@@ -83,6 +103,38 @@ class SystemStatsPanel:
             self.tmux_mem = ui.label("tmux MEM: N/A").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;"
             )
+
+    def _initialize_cpu_cores(self):
+        """Initialize the CPU cores display."""
+        cpu_count = psutil.cpu_count()
+        max_cols = self.ui_settings.get("cpu_cores", {}).get("max_columns", 4)
+
+        with self.cpu_cores_container:
+            ui.label("CPU Cores").style(
+                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;"
+            )
+
+            # Create cores in rows based on max_columns
+            for i in range(0, cpu_count, max_cols):
+                with ui.row().style("gap: 12px; margin-bottom: 4px;"):
+                    for core_idx in range(i, min(i + max_cols, cpu_count)):
+                        with ui.column().style("align-items: center; min-width: 60px;"):
+                            core_label = ui.label(f"Core {core_idx}").style(
+                                f"font-size: {self.ui_settings.get('cpu_cores', {}).get('core_label_size', '0.9em')}; "
+                                "text-align: center; margin-bottom: 2px;"
+                            )
+                            core_percent = ui.label("0%").style(
+                                f"font-size: {self.ui_settings.get('cpu_cores', {}).get('core_label_size', '0.9em')}; "
+                                "text-align: center; margin-bottom: 2px;"
+                            )
+                            core_bar = ui.linear_progress(
+                                value=0, size="xs", show_value=False
+                            ).style(
+                                f"height: {self.ui_settings.get('cpu_cores', {}).get('bar_height', '6px')};"
+                            )
+
+                            self.cpu_core_labels.append((core_label, core_percent))
+                            self.cpu_core_bars.append(core_bar)
 
 
 class SettingsPanel:
@@ -511,6 +563,26 @@ class UserInterfaceManager:
         """Update system stats in the UI."""
         self.stats_panel.cpu_percent.text = f"{psutil.cpu_percent()}%"
         self.stats_panel.cpu_bar.value = psutil.cpu_percent() / 100
+
+        # Update CPU cores if they're visible and initialized
+        if (
+            self.stats_panel.show_cpu_cores.value
+            and self.stats_panel.cpu_core_labels
+            and self.stats_panel.cpu_core_bars
+        ):
+            try:
+                core_percentages = psutil.cpu_percent(percpu=True)
+                for i, (core_percent, core_bar) in enumerate(
+                    zip(core_percentages, self.stats_panel.cpu_core_bars)
+                ):
+                    if i < len(self.stats_panel.cpu_core_labels):
+                        _, percent_label = self.stats_panel.cpu_core_labels[i]
+                        percent_label.text = f"{core_percent:.1f}%"
+                        core_bar.value = core_percent / 100
+            except Exception:
+                # If there's an error getting per-core data, just skip the update
+                pass
+
         memory = psutil.virtual_memory()
         self.stats_panel.memory_percent.text = f"{memory.percent}%"
         self.stats_panel.memory_bar.value = memory.percent / 100
@@ -868,7 +940,7 @@ class UserInterfaceManager:
                     info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
                 else:
                     info_cmd = f"echo '' >> '{log_file_path}'"
-                
+
                 finished_marker_cmd = (
                     f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
                 )
