@@ -3,7 +3,7 @@
 </p>  
 
 
-**desto** lets you run and manage your bash scripts in the background (inside `tmux` sessions) through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.  
+**desto** lets you run and manage your bash and Python scripts in the background (inside `tmux` sessions) through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.  
 
 [![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto) ![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-blueviolet) ![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat) [![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml)
 
@@ -12,6 +12,7 @@
 The key features are:  
 
 - **One-click session control:** Start, monitor, and stop `tmux` sessions from your browser.
+- **🐚 Bash & 🐍 Python support:** Run both bash (`.sh`) and Python (`.py`) scripts seamlessly.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
 - **Script management:** Use your existing scripts, write new ones, edit, save, or delete them directly in the dashboard.
 - **Script chaining:** Queue multiple scripts to run sequentially in a single session.
@@ -36,7 +37,7 @@ The key features are:
   
 When you start `desto`, it creates `desto_scripts/` and `desto_logs/` folders in your current directory. Want to use your own locations? Just change these in the settings, or set the `DESTO_SCRIPTS_DIR` and `DESTO_LOGS_DIR` environment variables.
 
-Your scripts show up automatically—no setup needed. Ready to launch? Just:
+Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py` (Python) scripts are supported with automatic detection and appropriate execution. Ready to launch? Just:
 
 1. Name your `tmux` session
 2. Select one of your scripts
@@ -51,7 +52,7 @@ Your scripts show up automatically—no setup needed. Ready to launch? Just:
 <details>
 <summary><strong>✍️ Write new scripts and save them</strong></summary>
 
-If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :)
+If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :) Choose between bash and Python templates with syntax highlighting and smart defaults.
 
 <img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
@@ -166,4 +167,4 @@ This work is licensed under a
 
 ---
 
-**desto** makes handling tmux sessions approachable for everyone—no terminal gymnastics required!
+**desto** makes handling tmux sessions and running scripts approachable for everyone—no terminal gymnastics required!
