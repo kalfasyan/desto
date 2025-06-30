@@ -45,6 +45,13 @@ class UISettings:
         margin_bottom: str = "8px"
 
     @dataclass
+    class ScriptSettings:
+        supported_extensions: list = field(default_factory=lambda: [".sh", ".py"])
+        default_script_type: str = "bash"
+        python_executable: str = "python3"
+        show_script_type_icons: bool = True
+
+    @dataclass
     class MainContent:
         font_size: str = "1.8em"
         font_weight: str = "600"
@@ -59,6 +66,7 @@ class UISettings:
     progress_bar: ProgressBar = field(default_factory=ProgressBar)
     cpu_cores: CPUCores = field(default_factory=CPUCores)
     separator: Separator = field(default_factory=Separator)
+    script_settings: ScriptSettings = field(default_factory=ScriptSettings)
     main_content: MainContent = field(default_factory=MainContent)
 
     def __post_init__(self): ...

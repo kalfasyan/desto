@@ -184,11 +184,23 @@ class NewScriptPanel:
     def __init__(self, tmux_manager, ui_manager=None):
         self.tmux_manager = tmux_manager
         self.ui_manager = ui_manager
-        self.custom_code = {"value": "#!/bin/bash\n"}
+        self.script_type = {"value": "bash"}
+        self.custom_code = {
+            "value": "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
+        }
         self.custom_template_name_input = None
+        self.code_editor = None
 
     def build(self):
-        code_editor = (
+        # Script type selector
+        ui.select(
+            ["bash", "python"],
+            label="Script Type",
+            value="bash",
+            on_change=self.on_script_type_change,
+        ).style("width: 100%; margin-bottom: 10px;")
+
+        self.code_editor = (
             ui.codemirror(
                 self.custom_code["value"],
                 language="bash",
@@ -200,9 +212,9 @@ class NewScriptPanel:
             )
             .classes("h-48")
         )
-        ui.select(code_editor.supported_themes, label="Theme").classes(
+        ui.select(self.code_editor.supported_themes, label="Theme").classes(
             "w-32"
-        ).bind_value(code_editor, "theme")
+        ).bind_value(self.code_editor, "theme")
         self.custom_template_name_input = ui.input(
             label="Save Script As... (max 15 chars)",
             placeholder="MyScript",
@@ -213,6 +225,24 @@ class NewScriptPanel:
             on_click=self.save_custom_script,
         ).style("width: 28%; margin-bottom: 8px;")
 
+    def on_script_type_change(self, e):
+        """Handle script type selection change."""
+        script_type = e.value
+        self.script_type["value"] = script_type
+
+        if script_type == "python":
+            self.custom_code["value"] = (
+                "#!/usr/bin/env python3\n\n# Your Python code here\nprint('Hello from desto!')\n"
+            )
+            self.code_editor.language = "python"
+        else:  # bash
+            self.custom_code["value"] = (
+                "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
+            )
+            self.code_editor.language = "bash"
+
+        self.code_editor.value = self.custom_code["value"]
+
     def save_custom_script(self):
         name = self.custom_template_name_input.value.strip()
         if not name or len(name) > 15:
@@ -220,10 +250,21 @@ class NewScriptPanel:
             return
         safe_name = name.strip().replace(" ", "_")[:15]
         code = self.custom_code["value"]
-        if not code.startswith("#!"):
-            code = "#!/bin/bash\n" + code
+        script_type = self.script_type["value"]
 
-        script_path = self.tmux_manager.get_script_file(f"{safe_name}.sh")
+        # Determine file extension and default shebang
+        if script_type == "python":
+            extension = ".py"
+            default_shebang = "#!/usr/bin/env python3\n"
+        else:  # bash
+            extension = ".sh"
+            default_shebang = "#!/bin/bash\n"
+
+        # Add shebang if missing
+        if not code.startswith("#!"):
+            code = default_shebang + code
+
+        script_path = self.tmux_manager.get_script_file(f"{safe_name}{extension}")
         try:
             with script_path.open("w") as f:
                 f.write(code)
@@ -239,10 +280,11 @@ class NewScriptPanel:
         if self.ui_manager:
             self.ui_manager.refresh_script_list()
             # Select the new script in the scripts tab and update the preview
+            script_filename = f"{safe_name}{extension}"
             if hasattr(self.ui_manager, "script_path_select"):
-                self.ui_manager.script_path_select.value = f"{safe_name}.sh"
+                self.ui_manager.script_path_select.value = script_filename
                 self.ui_manager.update_script_preview(
-                    type("E", (), {"args": f"{safe_name}.sh"})()
+                    type("E", (), {"args": script_filename})()
                 )
 
         ui.notification(
@@ -306,10 +348,50 @@ class UserInterfaceManager:
         self.chain_queue = []  # List of (script_path, arguments)
 
     def get_script_files(self):
-        """Return a list of .sh script filenames in the scripts directory."""
-        return [
-            f.name for f in self.tmux_manager.SCRIPTS_DIR.glob("*.sh") if f.is_file()
-        ]
+        """Return a list of script filenames in the scripts directory."""
+        script_extensions = self.ui_settings.get("script_settings", {}).get(
+            "supported_extensions", [".sh", ".py"]
+        )
+        scripts = []
+        for ext in script_extensions:
+            pattern = f"*{ext}"
+            scripts.extend(
+                [
+                    f.name
+                    for f in self.tmux_manager.SCRIPTS_DIR.glob(pattern)
+                    if f.is_file()
+                ]
+            )
+        return sorted(scripts)
+
+    def get_script_type(self, script_name):
+        """Determine script type from extension."""
+        if script_name.endswith(".py"):
+            return "python"
+        elif script_name.endswith(".sh"):
+            return "bash"
+        return "unknown"
+
+    def get_script_icon(self, script_type):
+        """Get icon for script type."""
+        icons = {"python": "🐍", "bash": "🐚", "unknown": "📄"}
+        return icons.get(script_type, "📄")
+
+    def build_execution_command(self, script_path, arguments):
+        """Build the appropriate execution command based on script type."""
+        script_name = Path(script_path).name
+        script_type = self.get_script_type(script_name)
+
+        if script_type == "python":
+            python_exec = self.ui_settings.get("script_settings", {}).get(
+                "python_executable", "python3"
+            )
+            return f"{python_exec} '{script_path}' {arguments}"
+        elif script_type == "bash":
+            return f"bash '{script_path}' {arguments}"
+        else:
+            # Fallback: try to execute directly (relies on shebang)
+            return f"'{script_path}' {arguments}"
 
     @staticmethod
     def is_valid_script_name(name):
@@ -318,16 +400,47 @@ class UserInterfaceManager:
     def refresh_script_list(self):
         script_files = self.get_script_files()
         if self.script_path_select:
-            self.script_path_select.options = (
-                script_files if script_files else ["No scripts found"]
+            # Check if icons should be shown
+            show_icons = self.ui_settings.get("script_settings", {}).get(
+                "show_script_type_icons", True
             )
-            if script_files:
-                self.script_path_select.value = script_files[0]
+
+            if show_icons and script_files:
+                # Create options with icons
+                script_options = []
+                for script_file in script_files:
+                    script_type = self.get_script_type(script_file)
+                    icon = self.get_script_icon(script_type)
+                    script_options.append(f"{icon} {script_file}")
+
+                self.script_path_select.options = script_options
+                self.script_path_select.value = (
+                    script_options[0] if script_options else "No scripts found"
+                )
             else:
-                self.script_path_select.value = "No scripts found"
+                # Use plain filenames
+                self.script_path_select.options = (
+                    script_files if script_files else ["No scripts found"]
+                )
+                self.script_path_select.value = (
+                    script_files[0] if script_files else "No scripts found"
+                )
+
+            if not script_files:
                 msg = f"No script files found in {self.tmux_manager.SCRIPTS_DIR}. Select a different directory or add scripts."
                 logger.warning(msg)
                 ui.notification(msg, type="warning")
+
+    def extract_script_filename(self, display_value):
+        """Extract the actual filename from the display value (which might include an icon)."""
+        if not display_value or display_value == "No scripts found":
+            return display_value
+
+        # If the value starts with an emoji (icon), extract the filename part
+        if display_value and len(display_value) > 2 and display_value[1] == " ":
+            return display_value[2:]  # Skip the icon and space
+
+        return display_value  # Return as-is if no icon
 
     def build_ui(self):
         with (
@@ -515,7 +628,9 @@ class UserInterfaceManager:
                                             self.session_name_input.value,
                                             str(
                                                 self.tmux_manager.SCRIPTS_DIR
-                                                / self.script_path_select.value
+                                                / self.extract_script_filename(
+                                                    self.script_path_select.value
+                                                )
                                             ),
                                             self.arguments_input.value,
                                             self.keep_alive_switch_new.value,
@@ -660,12 +775,21 @@ class UserInterfaceManager:
                 selected = script_files[selected]
             else:
                 selected = ""
-        # Now selected should be a string (filename)
-        script_path = self.tmux_manager.SCRIPTS_DIR / selected
+        # Now selected should be a string (filename or display text)
+        actual_filename = self.extract_script_filename(selected)
+        script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
         if script_path.is_file():
             with open(script_path, "r") as f:
+                content = f.read()
                 self.ignore_next_edit = True  # Ignore the next edit event
-                self.script_preview_editor.value = f.read()
+                self.script_preview_editor.value = content
+
+                # Update syntax highlighting based on script type
+                script_type = self.get_script_type(actual_filename)
+                if script_type == "python":
+                    self.script_preview_editor.language = "python"
+                elif script_type == "bash":
+                    self.script_preview_editor.language = "bash"
         else:
             self.ignore_next_edit = True
             self.script_preview_editor.value = "# Script not found."
@@ -679,12 +803,14 @@ class UserInterfaceManager:
             ui.notification(msg, type="warning")
             return
 
+        actual_filename = self.extract_script_filename(selected_script)
+
         def do_delete():
-            script_path = self.tmux_manager.SCRIPTS_DIR / selected_script
+            script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
             try:
                 logger.info(f"Attempting to delete script: {script_path}")
                 script_path.unlink()
-                msg = f"Deleted script: {selected_script}"
+                msg = f"Deleted script: {actual_filename}"
                 logger.info(msg)
                 ui.notification(msg, type="positive")
                 self.refresh_script_list()
@@ -698,11 +824,11 @@ class UserInterfaceManager:
             confirm_dialog.close()
 
         with ui.dialog() as confirm_dialog, ui.card():
-            ui.label(f"Are you sure you want to delete '{selected_script}'?")
+            ui.label(f"Are you sure you want to delete '{actual_filename}'?")
             with ui.row():
                 ui.button("Cancel", on_click=confirm_dialog.close)
                 ui.button("Delete", color="red", on_click=do_delete)
-        msg = f"Opened delete confirmation dialog for: {selected_script}"
+        msg = f"Opened delete confirmation dialog for: {actual_filename}"
         logger.debug(msg)
         confirm_dialog.open()
 
@@ -712,13 +838,14 @@ class UserInterfaceManager:
         if not selected_script or selected_script == "No scripts found":
             ui.notification("No script selected to save.", type="warning")
             return
-        script_path = self.tmux_manager.SCRIPTS_DIR / selected_script
+        actual_filename = self.extract_script_filename(selected_script)
+        script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
         try:
             with script_path.open("w") as f:
                 f.write(self.script_preview_editor.value)
             os.chmod(script_path, 0o755)
             script_edited["changed"] = False
-            ui.notification(f"Saved changes to {selected_script}", type="positive")
+            ui.notification(f"Saved changes to {actual_filename}", type="positive")
         except Exception as e:
             logger.exception("Failed to save current script")
             ui.notification(f"Failed to save: {e}", type="negative")
@@ -766,17 +893,18 @@ class UserInterfaceManager:
         finished_marker_cmd = (
             f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
         )
+        exec_cmd = self.build_execution_command(script_path, arguments)
         if keep_alive:
             tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
                 f"{finished_marker_cmd}; "
                 f"tail -f /dev/null >> '{log_file_path}' 2>&1"
             )
         else:
             tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
                 f"{finished_marker_cmd}"
             )
 
@@ -795,7 +923,8 @@ class UserInterfaceManager:
         chained_cmds = []
         for idx, (script, args) in enumerate(self.chain_queue):
             separator = f"echo -e '\\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
-            run_script = f"bash '{script}' {args} >> '{log_file_path}' 2>&1"
+            exec_cmd = self.build_execution_command(script, args)
+            run_script = f"{exec_cmd} >> '{log_file_path}' 2>&1"
             chained_cmds.append(f"{separator} && {run_script}")
 
         if not log_file_path.exists():
@@ -831,9 +960,10 @@ class UserInterfaceManager:
         if not script_name or script_name == "No scripts found":
             ui.notification("No script selected to chain.", type="warning")
             return
-        script_path = self.tmux_manager.SCRIPTS_DIR / script_name
+        actual_filename = self.extract_script_filename(script_name)
+        script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
         self.chain_queue.append((str(script_path), arguments))
-        ui.notification(f"Added {script_name} to chain.", type="positive")
+        ui.notification(f"Added {actual_filename} to chain.", type="positive")
         self.refresh_chain_queue_display()
 
     def get_log_info_block(self, script_file_path, session_name, scheduled_dt=None):
@@ -861,11 +991,12 @@ class UserInterfaceManager:
         finished_marker_cmd = (
             f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
         )
+        exec_cmd = self.build_execution_command(script_path, arguments)
         if keep_alive:
             cmd = (
                 f'bash -c "'
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1 && "
+                f"{exec_cmd} >> '{log_file_path}' 2>&1 && "
                 f"{finished_marker_cmd}; "
                 f"tail -f /dev/null >> '{log_file_path}' 2>&1"
                 f'"'
@@ -874,7 +1005,7 @@ class UserInterfaceManager:
             cmd = (
                 f'bash -c "'
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_path}' {arguments} >> '{log_file_path}' 2>&1 && "
+                f"{exec_cmd} >> '{log_file_path}' 2>&1 && "
                 f"{finished_marker_cmd}"
                 f'"'
             )
@@ -952,7 +1083,8 @@ class UserInterfaceManager:
                 chained_cmds = []
                 for idx, (script, args) in enumerate(self.chain_queue):
                     separator = f"echo -e '\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
-                    run_script = f"bash '{script}' {args} >> '{log_file_path}' 2>&1"
+                    exec_cmd = self.build_execution_command(script, args)
+                    run_script = f"{exec_cmd} >> '{log_file_path}' 2>&1"
                     chained_cmds.append(f"{separator} && {run_script}")
                 if not log_file_path.exists():
                     info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
@@ -992,9 +1124,10 @@ class UserInterfaceManager:
                 return
 
             # Otherwise, schedule a single script as before
-            script_file_path = (
-                self.tmux_manager.SCRIPTS_DIR / self.script_path_select.value
+            actual_filename = self.extract_script_filename(
+                self.script_path_select.value
             )
+            script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
             log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
             info_block = self.get_log_info_block(
                 script_file_path, session_name, scheduled_dt
@@ -1002,9 +1135,10 @@ class UserInterfaceManager:
             finished_marker_cmd = (
                 f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
             )
+            exec_cmd = self.build_execution_command(script_file_path, arguments)
             tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"bash '{script_file_path}' {arguments} >> '{log_file_path}' 2>&1; "
+                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
                 f"{finished_marker_cmd}; "
                 f"tail -f /dev/null >> '{log_file_path}' 2>&1"
             )

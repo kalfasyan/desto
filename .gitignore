@@ -177,3 +177,7 @@ desto_logs/
 desto_scripts/
 desto_log/
 .vscode/
+
+*.txt
+*.json
+output/
