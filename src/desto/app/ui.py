@@ -551,6 +551,14 @@ class UserInterfaceManager:
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
 
+            # Clear Chain Queue button
+            ui.button(
+                "Clear Chain Queue",
+                color="orange",
+                icon="clear_all",
+                on_click=self.clear_chain_queue,
+            ).style("width: 200px; margin-top: 10px; margin-bottom: 5px;")
+
             # Clear All Jobs button
             ui.button(
                 "Clear All Jobs",
@@ -1034,3 +1042,17 @@ class UserInterfaceManager:
             else:
                 for idx, (script, args) in enumerate(self.chain_queue, 1):
                     ui.label(f"{idx}. {Path(script).name} {args}")
+
+    def clear_chain_queue(self):
+        """Clear all items from the chain queue."""
+        if not self.chain_queue:
+            ui.notification("Chain queue is already empty.", type="info")
+            return
+
+        queue_count = len(self.chain_queue)
+        self.chain_queue.clear()
+        self.refresh_chain_queue_display()
+        ui.notification(
+            f"Cleared {queue_count} item(s) from chain queue.", type="positive"
+        )
+        logger.info(f"Chain queue cleared - removed {queue_count} items")
