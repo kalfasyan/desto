@@ -36,7 +36,7 @@ class SystemStatsPanel:
                 f"font-weight: {self.ui_settings['labels']['title_font_weight']}; "
                 "margin-bottom: 10px;"
             )
-            ui.label("CPU Usage").style(
+            ui.label("CPU Usage (Average)").style(
                 f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
             )
             with ui.row().style("align-items: center"):
@@ -551,6 +551,14 @@ class UserInterfaceManager:
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
 
+            # Clear All Jobs button
+            ui.button(
+                "Clear All Jobs",
+                color="red",
+                icon="delete_forever",
+                on_click=self.tmux_manager.confirm_kill_all_sessions,
+            ).style("width: 200px; margin-top: 15px; margin-bottom: 15px;")
+
             self.log_panel.build()
 
     def update_log_messages(self, message, number_of_lines=20):
@@ -561,8 +569,10 @@ class UserInterfaceManager:
 
     def update_ui_system_info(self):
         """Update system stats in the UI."""
-        self.stats_panel.cpu_percent.text = f"{psutil.cpu_percent()}%"
-        self.stats_panel.cpu_bar.value = psutil.cpu_percent() / 100
+        # Get CPU percentage once to avoid inconsistent readings
+        cpu_percent = psutil.cpu_percent(interval=None)  # Non-blocking call
+        self.stats_panel.cpu_percent.text = f"{cpu_percent:.1f}%"
+        self.stats_panel.cpu_bar.value = cpu_percent / 100
 
         # Update CPU cores if they're visible and initialized
         if (
@@ -571,7 +581,7 @@ class UserInterfaceManager:
             and self.stats_panel.cpu_core_bars
         ):
             try:
-                core_percentages = psutil.cpu_percent(percpu=True)
+                core_percentages = psutil.cpu_percent(percpu=True, interval=None)
                 for i, (core_percent, core_bar) in enumerate(
                     zip(core_percentages, self.stats_panel.cpu_core_bars)
                 ):

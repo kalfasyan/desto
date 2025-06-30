@@ -362,3 +362,267 @@ class TmuxManager:
                 ],
             ).props("color=primary")
         dialog.open()
+
+    def kill_all_sessions(self):
+        """
+        Kill all active tmux sessions and clean up their finished markers.
+        Returns a tuple: (success_count, total_count, error_messages)
+        """
+        sessions_status = self.check_sessions()
+        total_count = len(sessions_status)
+        success_count = 0
+        error_messages = []
+
+        if total_count == 0:
+            msg = "No active tmux sessions found."
+            self.logger.info(msg)
+            self.ui.notification(msg, type="info")
+            return (0, 0, [])
+
+        for session_name in sessions_status.keys():
+            try:
+                subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
+                success_count += 1
+
+                # Clean up finished marker
+                finished_marker = self.LOG_DIR / f"{session_name}.finished"
+                if finished_marker.exists():
+                    try:
+                        finished_marker.unlink()
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Could not remove marker for {session_name}: {e}"
+                        )
+
+                self.logger.info(f"Successfully killed session: {session_name}")
+
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Failed to kill session '{session_name}': {e}"
+                error_messages.append(error_msg)
+                self.logger.warning(error_msg)
+            except Exception as e:
+                error_msg = (
+                    f"Unexpected error killing session '{session_name}': {str(e)}"
+                )
+                error_messages.append(error_msg)
+                self.logger.error(error_msg)
+
+        return (success_count, total_count, error_messages)
+
+    def confirm_kill_all_sessions(self):
+        """
+        Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates.
+        """
+        if self.pause_updates:
+            self.pause_updates()  # Pause the global timer
+
+        sessions_status = self.check_sessions()
+        session_count = len(sessions_status)
+
+        # Get scheduled jobs
+        scheduled_jobs = self.get_scheduled_jobs()
+        job_count = len(scheduled_jobs)
+
+        if session_count == 0 and job_count == 0:
+            msg = "No active sessions or scheduled jobs to clear."
+            self.logger.info(msg)
+            self.ui.notification(msg, type="info")
+            if self.resume_updates:
+                self.resume_updates()
+            return
+
+        # Check for running vs finished sessions
+        running_sessions = []
+        finished_sessions = []
+
+        for session_name in sessions_status.keys():
+            finished_marker = self.LOG_DIR / f"{session_name}.finished"
+            if finished_marker.exists():
+                finished_sessions.append(session_name)
+            else:
+                running_sessions.append(session_name)
+
+        running_count = len(running_sessions)
+        finished_count = len(finished_sessions)
+
+        def do_kill_all():
+            session_success, session_total, job_success, job_total, error_messages = (
+                self.kill_all_sessions_and_jobs()
+            )
+
+            results = []
+            if session_total > 0:
+                if session_success == session_total:
+                    results.append(f"Successfully cleared all {session_total} sessions")
+                else:
+                    results.append(
+                        f"Cleared {session_success}/{session_total} sessions"
+                    )
+
+            if job_total > 0:
+                if job_success == job_total:
+                    results.append(
+                        f"Successfully cancelled all {job_total} scheduled jobs"
+                    )
+                else:
+                    results.append(
+                        f"Cancelled {job_success}/{job_total} scheduled jobs"
+                    )
+
+            if not results:
+                results.append("No items to clear")
+
+            msg = ". ".join(results) + "."
+
+            if error_messages:
+                msg += (
+                    f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
+                )
+                self.logger.warning(msg)
+                self.ui.notification(msg, type="warning")
+            else:
+                self.logger.success(msg)
+                self.ui.notification(msg, type="positive")
+
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        def cancel_kill_all():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
+            self.ui.label("⚠️ Clear All Jobs").style(
+                "font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
+
+            # Build warning text
+            warning_parts = []
+            if session_count > 0:
+                if running_count > 0 and finished_count > 0:
+                    warning_parts.append(
+                        f"{session_count} sessions ({running_count} running, {finished_count} finished)"
+                    )
+                elif running_count > 0:
+                    warning_parts.append(f"{running_count} RUNNING sessions")
+                else:
+                    warning_parts.append(f"{finished_count} finished sessions")
+
+            if job_count > 0:
+                warning_parts.append(f"{job_count} scheduled jobs")
+
+            warning_text = "This will clear:\n• " + "\n• ".join(warning_parts)
+            if running_count > 0:
+                warning_text += "\n\n⚠️ This may interrupt active processes!"
+
+            self.ui.label(warning_text).style(
+                "margin-bottom: 15px; white-space: pre-line;"
+            )
+
+            # Show running sessions
+            if running_count > 0:
+                self.ui.label("Running sessions:").style(
+                    "font-weight: bold; margin-bottom: 5px;"
+                )
+                for session in running_sessions[:5]:  # Show max 5 sessions
+                    self.ui.label(f"• {session}").style(
+                        "margin-left: 10px; color: #d32f2f;"
+                    )
+                if len(running_sessions) > 5:
+                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style(
+                        "margin-left: 10px; color: #666;"
+                    )
+
+            # Show scheduled jobs
+            if job_count > 0:
+                self.ui.label("Scheduled jobs:").style(
+                    "font-weight: bold; margin-bottom: 5px; margin-top: 10px;"
+                )
+                for job in scheduled_jobs[:5]:  # Show max 5 jobs
+                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style(
+                        "margin-left: 10px; color: #ff9800;"
+                    )
+                if len(scheduled_jobs) > 5:
+                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style(
+                        "margin-left: 10px; color: #666;"
+                    )
+
+            with self.ui.row().style("margin-top: 20px; gap: 10px;"):
+                self.ui.button("Cancel", on_click=cancel_kill_all).props("color=grey")
+                self.ui.button(
+                    "Clear All Jobs", color="red", on_click=do_kill_all
+                ).props("icon=delete_forever")
+
+        dialog.open()
+
+    def get_scheduled_jobs(self):
+        """
+        Get a list of scheduled jobs from the 'at' command.
+        Returns a list of dictionaries with job info.
+        """
+        try:
+            result = subprocess.run(["atq"], capture_output=True, text=True)
+            if result.returncode != 0:
+                return []
+
+            jobs = []
+            for line in result.stdout.splitlines():
+                if line.strip():
+                    # Parse atq output: job_id date time queue user
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        job_id = parts[0]
+                        # Combine date and time parts
+                        date_time = " ".join(parts[1:5])
+                        user = parts[-1]
+                        jobs.append({"id": job_id, "datetime": date_time, "user": user})
+            return jobs
+        except Exception as e:
+            self.logger.warning(f"Failed to get scheduled jobs: {e}")
+            return []
+
+    def kill_scheduled_jobs(self):
+        """
+        Kill all scheduled jobs and return summary.
+        Returns a tuple: (success_count, total_count, error_messages)
+        """
+        jobs = self.get_scheduled_jobs()
+        total_count = len(jobs)
+        success_count = 0
+        error_messages = []
+
+        if total_count == 0:
+            return (0, 0, [])
+
+        for job in jobs:
+            try:
+                subprocess.run(["atrm", job["id"]], check=True)
+                success_count += 1
+                self.logger.info(f"Successfully removed scheduled job: {job['id']}")
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Failed to remove job '{job['id']}': {e}"
+                error_messages.append(error_msg)
+                self.logger.warning(error_msg)
+            except Exception as e:
+                error_msg = f"Unexpected error removing job '{job['id']}': {str(e)}"
+                error_messages.append(error_msg)
+                self.logger.error(error_msg)
+
+        return (success_count, total_count, error_messages)
+
+    def kill_all_sessions_and_jobs(self):
+        """
+        Kill all active tmux sessions and scheduled jobs.
+        Returns a tuple: (session_success, session_total, job_success, job_total, all_error_messages)
+        """
+        # Kill tmux sessions
+        session_success, session_total, session_errors = self.kill_all_sessions()
+
+        # Kill scheduled jobs
+        job_success, job_total, job_errors = self.kill_scheduled_jobs()
+
+        all_errors = session_errors + job_errors
+
+        return (session_success, session_total, job_success, job_total, all_errors)
