@@ -1,6 +1,6 @@
 [project]
 name = "desto"
-version = "0.1.10"
+version = "0.1.11"
 description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
