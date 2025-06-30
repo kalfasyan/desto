@@ -19,6 +19,7 @@ The key features are:
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
+- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
 
   
 ## ⚡ Quick Start
@@ -141,6 +142,48 @@ Check [`pyproject.toml`](pyproject.toml)
 
 4. **Open in your browser**  
    After starting, visit [http://localhost:8088](http://localhost:8088) (or the address shown in your terminal).
+
+## 🖥️ Command Line Interface
+
+In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line.
+
+### Installation as a uv Tool
+
+```bash
+# Install desto CLI globally
+uv tool install desto
+
+# Or install from source
+cd /path/to/desto
+uv tool install . --force
+```
+
+This installs two executables:
+- `desto` - Web dashboard  
+- `desto-cli` - Command-line interface
+
+### Quick CLI Usage
+
+```bash
+# Check system status
+desto-cli doctor
+
+# List all sessions
+desto-cli sessions list
+
+# Start a new session
+desto-cli sessions start "my-task" "python my_script.py"
+
+# View session logs
+desto-cli sessions logs "my-task"
+
+# Kill a session
+desto-cli sessions kill "my-task"
+```
+
+**📖 [Full CLI Documentation →](src/desto/cli/README.md)**
+
+The CLI provides the same functionality as the web interface but optimized for terminal use, including rich formatting, real-time log viewing, and comprehensive session management.
 
 
 ---
