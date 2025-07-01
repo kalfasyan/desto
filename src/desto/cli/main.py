@@ -54,9 +54,9 @@ except ImportError:
     Console = MockConsole
     TYPER_AVAILABLE = False
 
+from .session_manager import CLISessionManager
 from .sessions import sessions_app
 from .utils import setup_logging
-from .session_manager import CLISessionManager
 
 # Create the main CLI application
 app = typer.Typer(

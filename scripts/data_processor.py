@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
+import json
+import random
 import sys
 import time
-import random
-import json
 from datetime import datetime
 from pathlib import Path
 

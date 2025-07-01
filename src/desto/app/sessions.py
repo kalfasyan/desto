@@ -1,10 +1,11 @@
-from pathlib import Path
-import subprocess
-import shlex
-from datetime import datetime
-import time
-from nicegui import ui
 import os
+import shlex
+import subprocess
+import time
+from datetime import datetime
+from pathlib import Path
+
+from nicegui import ui
 
 
 class TmuxManager:

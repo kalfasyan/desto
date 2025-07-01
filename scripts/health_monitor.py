@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
+import json
 import sys
 import time
-import requests
-import json
 from datetime import datetime
+
+import requests
 
 
 def check_service(name, url, timeout=5):

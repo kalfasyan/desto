@@ -1,12 +1,13 @@
-from loguru import logger
-import psutil
-from nicegui import ui
-from pathlib import Path
-import os
 import getpass
-import socket
+import os
 import re
 import shlex
+import socket
+from pathlib import Path
+
+import psutil
+from loguru import logger
+from nicegui import ui
 
 
 class SystemStatsPanel:
@@ -1036,8 +1037,8 @@ class UserInterfaceManager:
         schedule_dialog.open()
 
     def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog):
-        from datetime import datetime
         import shutil
+        from datetime import datetime
 
         date_val = date_input.value
         time_val = time_input.value

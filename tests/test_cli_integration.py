@@ -89,12 +89,13 @@ class TestCLIIntegration:
 
     def test_utility_functions_integration(self):
         """Test utility functions working together."""
+        from datetime import datetime
+
         from desto.cli.utils import (
             format_duration,
             format_timestamp,
             validate_session_name,
         )
-        from datetime import datetime
 
         # Test duration formatting for realistic values
         assert format_duration(0) == "0s"
@@ -139,6 +140,7 @@ class TestCLIIntegration:
         """Test CLI commands integration (requires typer)."""
         try:
             from typer.testing import CliRunner
+
             from desto.cli.main import app
 
             runner = CliRunner()

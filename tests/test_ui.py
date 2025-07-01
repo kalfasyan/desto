@@ -1,5 +1,6 @@
-from desto.app.ui import UserInterfaceManager
 from unittest.mock import MagicMock
+
+from desto.app.ui import UserInterfaceManager
 
 
 def test_ui_manager_instantiates():

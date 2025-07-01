@@ -1,7 +1,8 @@
 from loguru import logger
 from nicegui import ui
-from desto.app.sessions import TmuxManager
+
 from desto.app.config import config as ui_settings
+from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
 
 # Global variable to store the timer instance

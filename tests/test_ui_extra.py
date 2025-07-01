@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+
 from desto.app.ui import UserInterfaceManager
 
 

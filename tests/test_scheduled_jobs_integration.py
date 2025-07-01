@@ -1,8 +1,10 @@
-import pytest
+import shutil
 import subprocess
 import time
-import shutil
 from unittest.mock import MagicMock
+
+import pytest
+
 from desto.app.sessions import TmuxManager
 
 

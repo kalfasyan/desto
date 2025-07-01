@@ -3,15 +3,15 @@
 import os
 import shlex
 import subprocess
+
+# Import subprocess again under a different name for exception handling
+# This avoids issues when subprocess is mocked in tests
+import subprocess as real_subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
-
-# Import subprocess again under a different name for exception handling
-# This avoids issues when subprocess is mocked in tests
-import subprocess as real_subprocess
 
 
 class CLISessionManager:

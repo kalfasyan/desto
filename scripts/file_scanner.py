@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import sys
-import os
-import time
 import hashlib
-from pathlib import Path
+import os
+import sys
+import time
 from datetime import datetime
+from pathlib import Path
 
 
 def calculate_file_hash(file_path, algorithm="md5"):

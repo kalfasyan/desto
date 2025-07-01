@@ -1,7 +1,9 @@
-import pytest
-from unittest.mock import patch, MagicMock, call
-from desto.app.sessions import TmuxManager
 import subprocess
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
+from desto.app.sessions import TmuxManager
 
 
 @pytest.fixture
