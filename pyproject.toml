@@ -33,7 +33,7 @@ build-backend = "hatchling.build"
 path = "src/desto/_version.py"
 
 [tool.ruff]
-line-length = 88
+line-length = 150  # Increased to handle long UI strings and f-strings
 target-version = "py311"
 
 [tool.ruff.lint]

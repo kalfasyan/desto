@@ -503,7 +503,8 @@ class UserInterfaceManager:
                     ):
                         with ui.tab_panel(scripts_tab):
                             with ui.card().style(
-                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"
+                                "background-color: #fff; color: #000; padding: 20px; "
+                                "border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"
                             ):
                                 # Place Session Name, Script, and Arguments side by side
                                 with ui.row().style(
