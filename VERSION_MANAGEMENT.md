@@ -9,6 +9,18 @@ This project uses a centralized version management system with fully automated p
 - **Package version**: Dynamically determined at build time
 - **Publishing**: Fully automated via GitHub Actions (no MFA issues!)
 
+## 🛠️ Development Setup
+
+To work on the project locally:
+
+```bash
+# Install with dev dependencies (includes ruff for linting)
+make dev-install
+
+# Or manually:
+uv sync --extra dev
+```
+
 ## Quick Commands (Automated)
 
 ```bash
@@ -88,10 +100,11 @@ If you prefer to do it manually:
 ## 🐛 Troubleshooting
 
 If publishing fails:
-1. Check GitHub Actions logs at [https://github.com/kalfasyan/desto/actions](https://github.com/kalfasyan/desto/actions)
-2. Verify PyPI trusted publishing is configured correctly
-3. Ensure the repository name and owner match exactly
-4. Make sure workflow has `id-token: write` permissions (already configured)
+1. **"Failed to spawn: ruff"**: Run `uv sync --extra dev` to install dev dependencies
+2. Check GitHub Actions logs at [https://github.com/kalfasyan/desto/actions](https://github.com/kalfasyan/desto/actions)
+3. Verify PyPI trusted publishing is configured correctly
+4. Ensure the repository name and owner match exactly
+5. Make sure workflow has `id-token: write` permissions (already configured)
 
 ## Tools
 

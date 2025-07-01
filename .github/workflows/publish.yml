@@ -25,7 +25,7 @@ jobs:
           
       - name: Install dependencies and run tests
         run: |
-          uv sync
+          uv sync --extra dev
           uv run pytest tests/
           uv run ruff check .
           

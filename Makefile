@@ -27,10 +27,10 @@ release-major:  ## Bump major version and create release
 
 # Development
 test:  ## Run tests
-	uv run pytest tests/
+	uv run --extra dev pytest tests/
 
 lint:  ## Run linting
-	uv run ruff check .
+	uv run --extra dev ruff check .
 
 build:  ## Build package
 	uv build
@@ -39,8 +39,8 @@ clean:  ## Clean build artifacts
 	rm -rf dist/ build/ *.egg-info/
 
 # Quick development tasks
-dev-install:  ## Install package in development mode
-	uv pip install -e .
+dev-install:  ## Install package in development mode with dev dependencies
+	uv sync --extra dev
 
 publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
 	@echo "⚠️  Note: Publishing is normally automated via GitHub Actions"
@@ -52,8 +52,8 @@ publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
 
 # Show current version
 version:  ## Show current version
-	@python -c "from src.desto._version import __version__; print(f'Current version: {__version__}')"
+	@python -c "import sys; sys.path.insert(0, 'src'); from desto._version import __version__; print(f'Current version: {__version__}')"
 
 # Check release status
 check-release:  ## Check if current version is published
-	@python -c "import requests; from src.desto._version import __version__; r=requests.get(f'https://pypi.org/pypi/desto/{__version__}/json'); print(f'✅ Version {__version__} is published' if r.status_code==200 else f'❌ Version {__version__} not found on PyPI')"
+	@python -c "import sys, requests; sys.path.insert(0, 'src'); from desto._version import __version__; r=requests.get(f'https://pypi.org/pypi/desto/{__version__}/json'); print(f'✅ Version {__version__} is published' if r.status_code==200 else f'❌ Version {__version__} not found on PyPI')"

@@ -16,6 +16,11 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+]
+
 [project.scripts]
 desto = "desto.app.dashboard:main"
 desto-cli = "desto.cli.cli:cli_main"
@@ -26,3 +31,20 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "src/desto/_version.py"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
