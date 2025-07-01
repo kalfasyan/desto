@@ -73,27 +73,6 @@ desto-cli sessions status [name]           # Show session status
 - Verbose output modes
 - System requirements checking
 
-## Testing the CLI
-
-Use the included test script to try the functionality:
-
-```bash
-# List sessions
-python cli_test.py list
-
-# Start a session
-python cli_test.py start "test-session" "echo 'Hello World'; sleep 5"
-
-# View logs
-python cli_test.py logs test-session
-
-# Kill session
-python cli_test.py kill test-session
-
-# Show status
-python cli_test.py status
-```
-
 ## Future Enhancements
 
 The modular architecture makes it easy to add:
