@@ -2,6 +2,6 @@
 
 from .main import app
 from .session_manager import CLISessionManager
+from .._version import __version__
 
-__version__ = "0.1.0"
-__all__ = ["app", "CLISessionManager"]
+__all__ = ["app", "CLISessionManager", "__version__"]

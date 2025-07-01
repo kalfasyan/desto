@@ -1,6 +1,6 @@
 [project]
 name = "desto"
-version = "0.1.14"
+dynamic = ["version"]
 description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,3 +23,6 @@ desto-cli = "desto.cli.cli:cli_main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/desto/_version.py"

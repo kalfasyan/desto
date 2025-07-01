@@ -3,10 +3,6 @@
 from unittest.mock import Mock, patch
 
 import pytest
-import sys
-import logging
-import shutil
-import subprocess
 
 # Import only if typer is available, otherwise skip tests
 try:
