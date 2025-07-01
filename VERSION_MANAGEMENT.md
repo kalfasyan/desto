@@ -101,10 +101,11 @@ If you prefer to do it manually:
 
 If publishing fails:
 1. **"Failed to spawn: ruff"**: Run `uv sync --extra dev` to install dev dependencies
-2. Check GitHub Actions logs at [https://github.com/kalfasyan/desto/actions](https://github.com/kalfasyan/desto/actions)
-3. Verify PyPI trusted publishing is configured correctly
-4. Ensure the repository name and owner match exactly
-5. Make sure workflow has `id-token: write` permissions (already configured)
+2. **Empty "v" tag created**: Fixed in release script with better error checking
+3. Check GitHub Actions logs at [https://github.com/kalfasyan/desto/actions](https://github.com/kalfasyan/desto/actions)
+4. Verify PyPI trusted publishing is configured correctly
+5. Ensure the repository name and owner match exactly
+6. Make sure workflow has `id-token: write` permissions (already configured)
 
 ## Tools
 
