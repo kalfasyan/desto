@@ -37,22 +37,14 @@ class SystemStatsPanel:
                 f"font-weight: {self.ui_settings['labels']['title_font_weight']}; "
                 "margin-bottom: 10px;"
             )
-            ui.label("CPU Usage (Average)").style(
-                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
-            )
+            ui.label("CPU Usage (Average)").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("memory", size="1.2rem")
-                self.cpu_percent = ui.label("0%").style(
-                    f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
-                )
-            self.cpu_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
-            )
+                self.cpu_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
+            self.cpu_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
 
             # CPU Cores toggle and container
-            self.show_cpu_cores = ui.switch("Show CPU Cores", value=False).style(
-                "margin-top: 8px;"
-            )
+            self.show_cpu_cores = ui.switch("Show CPU Cores", value=False).style("margin-top: 8px;")
             self.cpu_cores_container = ui.column().style("margin-top: 8px;")
 
             def toggle_cpu_cores_visibility(e):
@@ -64,34 +56,22 @@ class SystemStatsPanel:
             self.show_cpu_cores.on("update:model-value", toggle_cpu_cores_visibility)
             self.cpu_cores_container.visible = self.show_cpu_cores.value
 
-            ui.label("Memory Usage").style(
-                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
-            )
+            ui.label("Memory Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("developer_board", size="1.2rem")
-                self.memory_percent = ui.label("0%").style(
-                    f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
-                )
-            self.memory_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
-            )
+                self.memory_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
+            self.memory_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
             self.memory_used = ui.label("0 GB Used").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
             )
             self.memory_available = ui.label("0 GB Available").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
             )
-            ui.label("Disk Usage").style(
-                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;"
-            )
+            ui.label("Disk Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("storage", size="1.2rem")
-                self.disk_percent = ui.label("0%").style(
-                    f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;"
-                )
-            self.disk_bar = ui.linear_progress(
-                value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False
-            )
+                self.disk_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
+            self.disk_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
             self.disk_used = ui.label("0 GB Used").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
             )
@@ -101,9 +81,7 @@ class SystemStatsPanel:
             self.tmux_cpu = ui.label("tmux CPU: N/A").style(
                 f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;"
             )
-            self.tmux_mem = ui.label("tmux MEM: N/A").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;"
-            )
+            self.tmux_mem = ui.label("tmux MEM: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;")
 
     def _initialize_cpu_cores(self):
         """Initialize the CPU cores display."""
@@ -111,9 +89,7 @@ class SystemStatsPanel:
         max_cols = self.ui_settings.get("cpu_cores", {}).get("max_columns", 4)
 
         with self.cpu_cores_container:
-            ui.label("CPU Cores").style(
-                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;"
-            )
+            ui.label("CPU Cores").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;")
 
             # Create cores in rows based on max_columns
             for i in range(0, cpu_count, max_cols):
@@ -128,9 +104,7 @@ class SystemStatsPanel:
                                 f"font-size: {self.ui_settings.get('cpu_cores', {}).get('core_label_size', '0.9em')}; "
                                 "text-align: center; margin-bottom: 2px;"
                             )
-                            core_bar = ui.linear_progress(
-                                value=0, size="xs", show_value=False
-                            ).style(
+                            core_bar = ui.linear_progress(value=0, size="xs", show_value=False).style(
                                 f"height: {self.ui_settings.get('cpu_cores', {}).get('bar_height', '6px')};"
                             )
 
@@ -146,9 +120,7 @@ class SettingsPanel:
         self.logs_dir_input = None
 
     def build(self):
-        ui.label("Settings").style(
-            "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
-        )
+        ui.label("Settings").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
         self.scripts_dir_input = ui.input(
             label="Scripts Directory",
             value=str(self.tmux_manager.SCRIPTS_DIR),
@@ -157,9 +129,7 @@ class SettingsPanel:
             label="Logs Directory",
             value=str(self.tmux_manager.LOG_DIR),
         ).style("width: 100%; margin-bottom: 10px;")
-        ui.button("Save", on_click=self.save_settings).style(
-            "width: 100%; margin-top: 10px;"
-        )
+        ui.button("Save", on_click=self.save_settings).style("width: 100%; margin-top: 10px;")
 
     def save_settings(self):
         scripts_dir = Path(self.scripts_dir_input.value).expanduser()
@@ -186,9 +156,7 @@ class NewScriptPanel:
         self.tmux_manager = tmux_manager
         self.ui_manager = ui_manager
         self.script_type = {"value": "bash"}
-        self.custom_code = {
-            "value": "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
-        }
+        self.custom_code = {"value": "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"}
         self.custom_template_name_input = None
         self.code_editor = None
 
@@ -208,14 +176,10 @@ class NewScriptPanel:
                 theme="vscodeLight",
                 on_change=lambda e: self.custom_code.update({"value": e.value}),
             )
-            .style(
-                "width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;"
-            )
+            .style("width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;")
             .classes("h-48")
         )
-        ui.select(self.code_editor.supported_themes, label="Theme").classes(
-            "w-32"
-        ).bind_value(self.code_editor, "theme")
+        ui.select(self.code_editor.supported_themes, label="Theme").classes("w-32").bind_value(self.code_editor, "theme")
         self.custom_template_name_input = ui.input(
             label="Save Script As... (max 15 chars)",
             placeholder="MyScript",
@@ -232,14 +196,10 @@ class NewScriptPanel:
         self.script_type["value"] = script_type
 
         if script_type == "python":
-            self.custom_code["value"] = (
-                "#!/usr/bin/env python3\n\n# Your Python code here\nprint('Hello from desto!')\n"
-            )
+            self.custom_code["value"] = "#!/usr/bin/env python3\n\n# Your Python code here\nprint('Hello from desto!')\n"
             self.code_editor.language = "python"
         else:  # bash
-            self.custom_code["value"] = (
-                "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
-            )
+            self.custom_code["value"] = "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
             self.code_editor.language = "bash"
 
         self.code_editor.value = self.custom_code["value"]
@@ -284,13 +244,9 @@ class NewScriptPanel:
             script_filename = f"{safe_name}{extension}"
             if hasattr(self.ui_manager, "script_path_select"):
                 self.ui_manager.script_path_select.value = script_filename
-                self.ui_manager.update_script_preview(
-                    type("E", (), {"args": script_filename})()
-                )
+                self.ui_manager.update_script_preview(type("E", (), {"args": script_filename})())
 
-        ui.notification(
-            f"Script '{name}' saved and available in Scripts.", type="positive"
-        )
+        ui.notification(f"Script '{name}' saved and available in Scripts.", type="positive")
 
 
 class LogPanel:
@@ -300,18 +256,12 @@ class LogPanel:
 
     def build(self):
         show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")
-        log_card = ui.card().style(
-            "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;"
-        )
+        log_card = ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;")
         with log_card:
-            ui.label("Log Messages").style(
-                "font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;"
-            )
+            ui.label("Log Messages").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
             self.log_display = (
                 ui.textarea("")
-                .style(
-                    "width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;"
-                )
+                .style("width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;")
                 .props("readonly")
             )
 
@@ -321,9 +271,7 @@ class LogPanel:
             else:
                 log_card.style("opacity: 0; pointer-events: none;")
 
-        show_logs.on(
-            "update:model-value", lambda e: toggle_log_card_visibility(e.args[0])
-        )
+        show_logs.on("update:model-value", lambda e: toggle_log_card_visibility(e.args[0]))
         log_card.visible = show_logs.value
 
     def update_log_messages(self, message, number_of_lines=20):
@@ -350,19 +298,11 @@ class UserInterfaceManager:
 
     def get_script_files(self):
         """Return a list of script filenames in the scripts directory."""
-        script_extensions = self.ui_settings.get("script_settings", {}).get(
-            "supported_extensions", [".sh", ".py"]
-        )
+        script_extensions = self.ui_settings.get("script_settings", {}).get("supported_extensions", [".sh", ".py"])
         scripts = []
         for ext in script_extensions:
             pattern = f"*{ext}"
-            scripts.extend(
-                [
-                    f.name
-                    for f in self.tmux_manager.SCRIPTS_DIR.glob(pattern)
-                    if f.is_file()
-                ]
-            )
+            scripts.extend([f.name for f in self.tmux_manager.SCRIPTS_DIR.glob(pattern) if f.is_file()])
         return sorted(scripts)
 
     def get_script_type(self, script_name):
@@ -384,9 +324,7 @@ class UserInterfaceManager:
         script_type = self.get_script_type(script_name)
 
         if script_type == "python":
-            python_exec = self.ui_settings.get("script_settings", {}).get(
-                "python_executable", "python3"
-            )
+            python_exec = self.ui_settings.get("script_settings", {}).get("python_executable", "python3")
             return f"{python_exec} '{script_path}' {arguments}"
         elif script_type == "bash":
             return f"bash '{script_path}' {arguments}"
@@ -402,9 +340,7 @@ class UserInterfaceManager:
         script_files = self.get_script_files()
         if self.script_path_select:
             # Check if icons should be shown
-            show_icons = self.ui_settings.get("script_settings", {}).get(
-                "show_script_type_icons", True
-            )
+            show_icons = self.ui_settings.get("script_settings", {}).get("show_script_type_icons", True)
 
             if show_icons and script_files:
                 # Create options with icons
@@ -415,17 +351,11 @@ class UserInterfaceManager:
                     script_options.append(f"{icon} {script_file}")
 
                 self.script_path_select.options = script_options
-                self.script_path_select.value = (
-                    script_options[0] if script_options else "No scripts found"
-                )
+                self.script_path_select.value = script_options[0] if script_options else "No scripts found"
             else:
                 # Use plain filenames
-                self.script_path_select.options = (
-                    script_files if script_files else ["No scripts found"]
-                )
-                self.script_path_select.value = (
-                    script_files[0] if script_files else "No scripts found"
-                )
+                self.script_path_select.options = script_files if script_files else ["No scripts found"]
+                self.script_path_select.value = script_files[0] if script_files else "No scripts found"
 
             if not script_files:
                 msg = f"No script files found in {self.tmux_manager.SCRIPTS_DIR}. Select a different directory or add scripts."
@@ -446,21 +376,12 @@ class UserInterfaceManager:
     def build_ui(self):
         with (
             ui.header(elevated=True)
-            .style(
-                f"background-color: {self.ui_settings['header']['background_color']}; "
-                f"color: {self.ui_settings['header']['color']};"
-            )
+            .style(f"background-color: {self.ui_settings['header']['background_color']}; color: {self.ui_settings['header']['color']};")
             .classes(replace="row items-center justify-between")
         ):
-            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props(
-                "flat color=white"
-            )
-            ui.label("desto").style(
-                f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;"
-            )
-            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props(
-                "flat color=white"
-            ).style("margin-left: auto;")
+            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props("flat color=white")
+            ui.label("desto").style(f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;")
+            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=white").style("margin-left: auto;")
         with ui.left_drawer().style(
             f"width: {self.ui_settings['sidebar']['width']}; "
             f"min-width: {self.ui_settings['sidebar']['width']}; "
@@ -482,62 +403,37 @@ class UserInterfaceManager:
             self.settings_panel = SettingsPanel(self.tmux_manager, self)
             self.settings_panel.build()
 
-        ui.button(
-            "Settings", on_click=lambda: right_drawer.toggle(), icon="settings"
-        ).props("flat color=blue").style("margin-right: auto;")
+        ui.button("Settings", on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=blue").style("margin-right: auto;")
         with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-            with (
-                ui.splitter(value=25)
-                .classes("w-full")
-                .style("gap:0; padding:0; margin:0;") as splitter
-            ):
+            with ui.splitter(value=25).classes("w-full").style("gap:0; padding:0; margin:0;") as splitter:
                 with splitter.before:
                     with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
                 with splitter.after:
-                    with (
-                        ui.tab_panels(tabs, value=scripts_tab)
-                        .props("vertical")
-                        .classes("w-full")
-                    ):
+                    with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
                         with ui.tab_panel(scripts_tab):
                             with ui.card().style(
                                 "background-color: #fff; color: #000; padding: 20px; "
                                 "border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"
                             ):
                                 # Place Session Name, Script, and Arguments side by side
-                                with ui.row().style(
-                                    "width: 100%; gap: 10px; margin-bottom: 10px;"
-                                ):
-                                    self.session_name_input = ui.input(
-                                        label="Session Name"
-                                    ).style("width: 30%; color: #75a8db;")
+                                with ui.row().style("width: 100%; gap: 10px; margin-bottom: 10px;"):
+                                    self.session_name_input = ui.input(label="Session Name").style("width: 30%; color: #75a8db;")
                                     script_files = self.get_script_files()
                                     self.script_path_select = ui.select(
-                                        options=script_files
-                                        if script_files
-                                        else ["No scripts found"],
+                                        options=script_files if script_files else ["No scripts found"],
                                         label="Script",
-                                        value=script_files[0]
-                                        if script_files
-                                        else "No scripts found",
+                                        value=script_files[0] if script_files else "No scripts found",
                                     ).style("width: 35%;")
-                                    self.script_path_select.on(
-                                        "update:model-value", self.update_script_preview
-                                    )
+                                    self.script_path_select.on("update:model-value", self.update_script_preview)
                                     self.arguments_input = ui.input(
                                         label="Arguments",
                                         value=".",
                                     ).style("width: 35%;")
 
                                 script_preview_content = ""
-                                if (
-                                    script_files
-                                    and (
-                                        self.tmux_manager.SCRIPTS_DIR / script_files[0]
-                                    ).is_file()
-                                ):
+                                if script_files and (self.tmux_manager.SCRIPTS_DIR / script_files[0]).is_file():
                                     with open(
                                         self.tmux_manager.SCRIPTS_DIR / script_files[0],
                                         "r",
@@ -551,14 +447,10 @@ class UserInterfaceManager:
                                     if not self.ignore_next_edit:
                                         script_edited["changed"] = True
                                     else:
-                                        self.ignore_next_edit = (
-                                            False  # Reset after ignoring
-                                        )
+                                        self.ignore_next_edit = False  # Reset after ignoring
 
                                 # Place code editor and theme selection side by side
-                                with ui.row().style(
-                                    "width: 100%; gap: 10px; margin-bottom: 10px;"
-                                ):
+                                with ui.row().style("width: 100%; gap: 10px; margin-bottom: 10px;"):
                                     self.script_preview_editor = (
                                         ui.codemirror(
                                             script_preview_content,
@@ -569,25 +461,19 @@ class UserInterfaceManager:
                                             indent="    ",
                                             on_change=on_script_edit,
                                         )
-                                        .style(
-                                            "width: 80%; min-width: 300px; margin-top: 0px;"
-                                        )
+                                        .style("width: 80%; min-width: 300px; margin-top: 0px;")
                                         .classes("h-48")
                                     )
                                     ui.select(
                                         self.script_preview_editor.supported_themes,
                                         label="Theme",
-                                    ).classes("w-32").bind_value(
-                                        self.script_preview_editor, "theme"
-                                    )
+                                    ).classes("w-32").bind_value(self.script_preview_editor, "theme")
 
                                 # Save/Save as/Delete Buttons
                                 with ui.row().style("gap: 10px; margin-top: 10px;"):
                                     ui.button(
                                         "Save",
-                                        on_click=lambda: self.save_current_script(
-                                            script_edited
-                                        ),
+                                        on_click=lambda: self.save_current_script(script_edited),
                                         color="primary",
                                         icon="save",
                                     )
@@ -605,9 +491,7 @@ class UserInterfaceManager:
                                     )
 
                                 # Keep Alive switch
-                                self.keep_alive_switch_new = ui.switch(
-                                    "Keep Alive"
-                                ).style("margin-top: 10px;")
+                                self.keep_alive_switch_new = ui.switch("Keep Alive").style("margin-top: 10px;")
 
                                 # Launch logic: warn if unsaved changes
                                 async def launch_with_save_check():
@@ -628,19 +512,12 @@ class UserInterfaceManager:
                                     else:
                                         await self.run_session_with_keep_alive(
                                             self.session_name_input.value,
-                                            str(
-                                                self.tmux_manager.SCRIPTS_DIR
-                                                / self.extract_script_filename(
-                                                    self.script_path_select.value
-                                                )
-                                            ),
+                                            str(self.tmux_manager.SCRIPTS_DIR / self.extract_script_filename(self.script_path_select.value)),
                                             self.arguments_input.value,
                                             self.keep_alive_switch_new.value,
                                         )
 
-                                with ui.row().style(
-                                    "width: 100%; gap: 10px; margin-top: 10px;"
-                                ):
+                                with ui.row().style("width: 100%; gap: 10px; margin-top: 10px;"):
                                     ui.button(
                                         "Launch",
                                         on_click=launch_with_save_check,  # Pass the async function directly
@@ -700,16 +577,10 @@ class UserInterfaceManager:
         self.stats_panel.cpu_bar.value = cpu_percent / 100
 
         # Update CPU cores if they're visible and initialized
-        if (
-            self.stats_panel.show_cpu_cores.value
-            and self.stats_panel.cpu_core_labels
-            and self.stats_panel.cpu_core_bars
-        ):
+        if self.stats_panel.show_cpu_cores.value and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
             try:
                 core_percentages = psutil.cpu_percent(percpu=True, interval=None)
-                for i, (core_percent, core_bar) in enumerate(
-                    zip(core_percentages, self.stats_panel.cpu_core_bars)
-                ):
+                for i, (core_percent, core_bar) in enumerate(zip(core_percentages, self.stats_panel.cpu_core_bars)):
                     if i < len(self.stats_panel.cpu_core_labels):
                         _, percent_label = self.stats_panel.cpu_core_labels[i]
                         percent_label.text = f"{core_percent:.1f}%"
@@ -721,12 +592,8 @@ class UserInterfaceManager:
         memory = psutil.virtual_memory()
         self.stats_panel.memory_percent.text = f"{memory.percent}%"
         self.stats_panel.memory_bar.value = memory.percent / 100
-        self.stats_panel.memory_available.text = (
-            f"{round(memory.available / (1024**3), 2)} GB Available"
-        )
-        self.stats_panel.memory_used.text = (
-            f"{round(memory.used / (1024**3), 2)} GB Used"
-        )
+        self.stats_panel.memory_available.text = f"{round(memory.available / (1024**3), 2)} GB Available"
+        self.stats_panel.memory_used.text = f"{round(memory.used / (1024**3), 2)} GB Used"
         disk = psutil.disk_usage("/")
         self.stats_panel.disk_percent.text = f"{disk.percent}%"
         self.stats_panel.disk_bar.value = disk.percent / 100
@@ -738,9 +605,7 @@ class UserInterfaceManager:
         try:
             tmux_procs = [
                 p
-                for p in psutil.process_iter(
-                    ["name", "ppid", "cpu_percent", "memory_info", "cmdline"]
-                )
+                for p in psutil.process_iter(["name", "ppid", "cpu_percent", "memory_info", "cmdline"])
                 if p.info["name"] == "tmux" or "tmux" in p.info["name"]
             ]
             if tmux_procs:
@@ -816,9 +681,7 @@ class UserInterfaceManager:
                 logger.info(msg)
                 ui.notification(msg, type="positive")
                 self.refresh_script_list()
-                self.update_script_preview(
-                    type("E", (), {"args": self.script_path_select.value})()
-                )
+                self.update_script_preview(type("E", (), {"args": self.script_path_select.value})())
             except Exception as e:
                 msg = f"Failed to delete: {e}"
                 logger.error(msg)
@@ -855,17 +718,13 @@ class UserInterfaceManager:
     def save_as_new_dialog(self):
         """Open a dialog to save the current script as a new file."""
         with ui.dialog() as name_dialog, ui.card():
-            name_input = ui.input(label="New Script Name (max 15 chars)").style(
-                "width: 100%;"
-            )
+            name_input = ui.input(label="New Script Name (max 15 chars)").style("width: 100%;")
             error_label = ui.label("").style("color: red;")
 
             def do_save_as_new():
                 name = name_input.value.strip().replace(" ", "_")[:15]
                 if not self.is_valid_script_name(name):
-                    error_label.text = (
-                        "Name must be 1-15 characters, letters, numbers, _ or -."
-                    )
+                    error_label.text = "Name must be 1-15 characters, letters, numbers, _ or -."
                     return
                 new_script_path = self.tmux_manager.SCRIPTS_DIR / f"{name}.sh"
                 if new_script_path.exists():
@@ -887,14 +746,10 @@ class UserInterfaceManager:
             ui.button("Save", on_click=do_save_as_new)
         name_dialog.open()
 
-    async def run_session_with_keep_alive(
-        self, session_name, script_path, arguments, keep_alive
-    ):
+    async def run_session_with_keep_alive(self, session_name, script_path, arguments, keep_alive):
         log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
         info_block = self.get_log_info_block(script_path, session_name)
-        finished_marker_cmd = (
-            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-        )
+        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
         exec_cmd = self.build_execution_command(script_path, arguments)
         if keep_alive:
             tmux_cmd = (
@@ -904,11 +759,7 @@ class UserInterfaceManager:
                 f"tail -f /dev/null >> '{log_file_path}' 2>&1"
             )
         else:
-            tmux_cmd = (
-                f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
-                f"{finished_marker_cmd}"
-            )
+            tmux_cmd = f"echo -e '{info_block}' > '{log_file_path}'; {exec_cmd} >> '{log_file_path}' 2>&1; {finished_marker_cmd}"
 
         self.tmux_manager.start_tmux_session(session_name, tmux_cmd, logger)
         ui.notification(f"Started session '{session_name}'.", type="positive")
@@ -934,22 +785,13 @@ class UserInterfaceManager:
         else:
             info_cmd = f"echo '' >> '{log_file_path}'"
 
-        finished_marker_cmd = (
-            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-        )
+        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
 
         # If keep_alive, run tail after marker
         if keep_alive:
-            cmd = (
-                f'bash -c "{info_cmd}; '
-                f"{' && '.join(chained_cmds)} && {finished_marker_cmd}; "
-                f"tail -f /dev/null >> '{log_file_path}' 2>&1\""
-            )
+            cmd = f"bash -c \"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}; tail -f /dev/null >> '{log_file_path}' 2>&1\""
         else:
-            cmd = (
-                f'bash -c "{info_cmd}; '
-                f'{" && ".join(chained_cmds)} && {finished_marker_cmd}"'
-            )
+            cmd = f'bash -c "{info_cmd}; {" && ".join(chained_cmds)} && {finished_marker_cmd}"'
 
         self.tmux_manager.start_tmux_session(session_name, cmd, logger)
         ui.notification(f"Started chained session '{session_name}'.", type="positive")
@@ -985,14 +827,10 @@ class UserInterfaceManager:
         info_lines.append("")  # Blank line
         return "\\n".join(info_lines)
 
-    async def run_session_with_save_check(
-        self, session_name, script_path, arguments, keep_alive
-    ):
+    async def run_session_with_save_check(self, session_name, script_path, arguments, keep_alive):
         log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
         info_block = self.get_log_info_block(script_path, session_name)
-        finished_marker_cmd = (
-            f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-        )
+        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
         exec_cmd = self.build_execution_command(script_path, arguments)
         if keep_alive:
             cmd = (
@@ -1004,13 +842,7 @@ class UserInterfaceManager:
                 f'"'
             )
         else:
-            cmd = (
-                f'bash -c "'
-                f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"{exec_cmd} >> '{log_file_path}' 2>&1 && "
-                f"{finished_marker_cmd}"
-                f'"'
-            )
+            cmd = f"bash -c \"echo -e '{info_block}' > '{log_file_path}'; {exec_cmd} >> '{log_file_path}' 2>&1 && {finished_marker_cmd}\""
 
         self.tmux_manager.start_tmux_session(session_name, cmd, logger)
         ui.notification(f"Scheduled session '{session_name}' started.", type="positive")
@@ -1020,9 +852,7 @@ class UserInterfaceManager:
         from datetime import datetime
 
         with ui.dialog() as schedule_dialog, ui.card():
-            ui.label("Schedule Script Launch").style(
-                "font-size: 1.2em; font-weight: bold;"
-            )
+            ui.label("Schedule Script Launch").style("font-size: 1.2em; font-weight: bold;")
             date_input = ui.date(value=datetime.now().strftime("%Y-%m-%d"))
             time_input = ui.time(value=datetime.now().strftime("%H:%M"))
             error_label = ui.label("").style("color: red;")
@@ -1031,9 +861,7 @@ class UserInterfaceManager:
                 ui.button("Cancel", on_click=schedule_dialog.close)
                 ui.button(
                     "Schedule",
-                    on_click=lambda: self.confirm_schedule(
-                        date_input, time_input, error_label, schedule_dialog
-                    ),
+                    on_click=lambda: self.confirm_schedule(date_input, time_input, error_label, schedule_dialog),
                 )
         schedule_dialog.open()
 
@@ -1043,19 +871,9 @@ class UserInterfaceManager:
 
         date_val = date_input.value
         time_val = time_input.value
-        session_name = (
-            self.session_name_input.value.strip()
-            if hasattr(self, "session_name_input")
-            else ""
-        )
-        arguments = (
-            self.arguments_input.value if hasattr(self, "arguments_input") else "."
-        )
-        keep_alive = (
-            self.keep_alive_switch_new.value
-            if hasattr(self, "keep_alive_switch_new")
-            else False
-        )
+        session_name = self.session_name_input.value.strip() if hasattr(self, "session_name_input") else ""
+        arguments = self.arguments_input.value if hasattr(self, "arguments_input") else "."
+        keep_alive = self.keep_alive_switch_new.value if hasattr(self, "keep_alive_switch_new") else False
 
         if not date_val or not time_val or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
@@ -1079,9 +897,7 @@ class UserInterfaceManager:
             # If chain queue is not empty, schedule the chain
             if self.chain_queue:
                 log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-                info_block = self.get_log_info_block(
-                    self.chain_queue[0][0], session_name, scheduled_dt
-                )
+                info_block = self.get_log_info_block(self.chain_queue[0][0], session_name, scheduled_dt)
                 chained_cmds = []
                 for idx, (script, args) in enumerate(self.chain_queue):
                     separator = f"echo -e '\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
@@ -1093,9 +909,7 @@ class UserInterfaceManager:
                 else:
                     info_cmd = f"echo '' >> '{log_file_path}'"
 
-                finished_marker_cmd = (
-                    f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-                )
+                finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
                 # The full command to run in tmux
                 if keep_alive:
                     tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}; tail -f /dev/null >> '{log_file_path}' 2>&1"
@@ -1126,17 +940,11 @@ class UserInterfaceManager:
                 return
 
             # Otherwise, schedule a single script as before
-            actual_filename = self.extract_script_filename(
-                self.script_path_select.value
-            )
+            actual_filename = self.extract_script_filename(self.script_path_select.value)
             script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
             log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-            info_block = self.get_log_info_block(
-                script_file_path, session_name, scheduled_dt
-            )
-            finished_marker_cmd = (
-                f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-            )
+            info_block = self.get_log_info_block(script_file_path, session_name, scheduled_dt)
+            finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
             exec_cmd = self.build_execution_command(script_file_path, arguments)
             tmux_cmd = (
                 f"echo -e '{info_block}' > '{log_file_path}'; "
@@ -1188,7 +996,5 @@ class UserInterfaceManager:
         queue_count = len(self.chain_queue)
         self.chain_queue.clear()
         self.refresh_chain_queue_display()
-        ui.notification(
-            f"Cleared {queue_count} item(s) from chain queue.", type="positive"
-        )
+        ui.notification(f"Cleared {queue_count} item(s) from chain queue.", type="positive")
         logger.info(f"Chain queue cleared - removed {queue_count} items")
