@@ -5,15 +5,13 @@ import sys
 import time
 import traceback
 from pathlib import Path
+from desto.cli.utils import format_duration, format_timestamp
+from desto.cli.session_manager import CLISessionManager
 
 # Add the src directory to Python path for imports
 current_dir = Path(__file__).parent
 src_dir = current_dir / "src"
 sys.path.insert(0, str(src_dir))
-
-# Import only the core session manager
-from desto.cli.session_manager import CLISessionManager
-from desto.cli.utils import format_duration, format_timestamp
 
 
 def test_session_manager():
