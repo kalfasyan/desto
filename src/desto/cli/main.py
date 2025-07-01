@@ -1,5 +1,8 @@
 """Main CLI application entry point for desto."""
 
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -53,6 +56,7 @@ except ImportError:
 
 from .sessions import sessions_app
 from .utils import setup_logging
+from .session_manager import CLISessionManager
 
 # Create the main CLI application
 app = typer.Typer(
@@ -94,9 +98,6 @@ def version():
 @app.command()
 def doctor():
     """Check system requirements and configuration."""
-    import shutil
-    import subprocess
-
     console.print("[bold blue]🔍 Desto CLI System Check[/bold blue]\n")
 
     # Check tmux
@@ -113,16 +114,12 @@ def doctor():
         console.print("[red]❌ tmux: not found - please install tmux[/red]")
 
     # Check Python version
-    import sys
-
     python_version = (
         f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     )
     console.print(f"[green]✅ Python: {python_version}[/green]")
 
     # Check directories
-    from .session_manager import CLISessionManager
-
     manager = CLISessionManager()
 
     console.print("\n[bold]📁 Directory Configuration[/bold]")
