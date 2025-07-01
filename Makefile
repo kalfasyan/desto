@@ -42,9 +42,18 @@ clean:  ## Clean build artifacts
 dev-install:  ## Install package in development mode
 	uv pip install -e .
 
-publish:  ## Publish to PyPI (after manual review)
+publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
+	@echo "⚠️  Note: Publishing is normally automated via GitHub Actions"
+	@echo "🚀 To publish: git tag vX.Y.Z && git push --tags"
+	@echo "📖 See VERSION_MANAGEMENT.md for setup instructions"
+	@echo ""
+	@echo "🔄 Manual publish (not recommended):"
 	uv publish
 
 # Show current version
 version:  ## Show current version
 	@python -c "from src.desto._version import __version__; print(f'Current version: {__version__}')"
+
+# Check release status
+check-release:  ## Check if current version is published
+	@python -c "import requests; from src.desto._version import __version__; r=requests.get(f'https://pypi.org/pypi/desto/{__version__}/json'); print(f'✅ Version {__version__} is published' if r.status_code==200 else f'❌ Version {__version__} not found on PyPI')"

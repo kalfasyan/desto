@@ -1,7 +1,23 @@
 #!/bin/bash
-# Release script for desto package
+# Release script for des# Build package
+echo "📦 Building package..."
+uv build
 
-set -e
+# Git operations
+echo "📝 Committing changes..."
+git add src/desto/_version.py
+git commit -m "Bump version to $NEW_VERSION"
+
+echo "🏷️ Creating tag..."
+git tag "v$NEW_VERSION"
+
+echo "📤 Pushing to GitHub..."
+git push && git push --tags
+
+echo "✅ Release $NEW_VERSION complete!"
+echo ""
+echo "🎉 GitHub Actions will automatically publish to PyPI!"
+echo "👀 Check the progress at: https://github.com/kalfasyan/desto/actions"
 
 if [ $# -eq 0 ]; then
     echo "Usage: $0 [major|minor|patch]"
