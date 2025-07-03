@@ -853,11 +853,16 @@ class UserInterfaceManager:
 
         with ui.dialog() as schedule_dialog, ui.card():
             ui.label("Schedule Script Launch").style("font-size: 1.2em; font-weight: bold;")
-            date_input = ui.date(value=datetime.now().strftime("%Y-%m-%d"))
-            time_input = ui.time(value=datetime.now().strftime("%H:%M"))
+
+            # Date and time inputs side by side
+            with ui.row().style("gap: 16px; margin-bottom: 16px; align-items: flex-start;"):
+                date_input = ui.date(value=datetime.now().strftime("%Y-%m-%d")).style("flex: 1; min-width: 150px;")
+                time_input = ui.time(value=datetime.now().strftime("%H:%M")).style("flex: 1; min-width: 120px;")
+
             error_label = ui.label("").style("color: red;")
 
-            with ui.row():
+            # Buttons below the date/time inputs
+            with ui.row().style("gap: 8px; justify-content: flex-end;"):
                 ui.button("Cancel", on_click=schedule_dialog.close)
                 ui.button(
                     "Schedule",
