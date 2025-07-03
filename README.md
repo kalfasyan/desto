@@ -89,29 +89,32 @@ More settings to be added!
 ## Requirements
 
 - Python 3.11+
-- [tmux](https://github.com/tmux/tmux)  
+- [tmux](https://github.com/tmux/tmux)
+- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
   
 Check [`pyproject.toml`](pyproject.toml)
 
 
 ## Installation
 
-1. **Install `tmux`**  
+1. **Install `tmux` and `at`**  
    <details>
    <summary>Instructions for different package managers</summary>
 
    - **Debian/Ubuntu**  
      ```bash
-     sudo apt install tmux
+     sudo apt install tmux at
      ```
    - **Almalinux/Fedora**  
      ```bash
-     sudo dnf install tmux
+     sudo dnf install tmux at
      ```
    - **Arch Linux**  
      ```bash
-     sudo pacman -S tmux
+     sudo pacman -S tmux at
      ```
+   
+   **Note:** The `at` package is required for scheduling features. If you don't plan to use script scheduling, you can skip installing `at`.
    </details>
 
 2. **Install `desto`**  
