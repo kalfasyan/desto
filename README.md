@@ -20,17 +20,24 @@ The key features are:
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
+  
+  
+  
+<strong>🎬 Demo</strong>
 
+<img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
   
 ## ⚡ Quick Start
-
-
   
 <div align="left">
 
-<strong>👀 Dashboard Overview</strong>
+
+<details>
+<summary><strong>👀 Dashboard Overview</strong></summary>
 
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+
+</details>
 
   
 ---
