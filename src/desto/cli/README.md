@@ -11,6 +11,7 @@ src/desto/cli/
 ├── __init__.py          # Package initialization and exports
 ├── main.py              # Main CLI application with typer
 ├── sessions.py          # Session management commands
+├── scripts.py           # Script management commands
 ├── session_manager.py   # Core session management logic (UI-independent)
 └── utils.py             # Utility functions for formatting and logging
 ```
@@ -37,6 +38,7 @@ The heart of the CLI - manages tmux sessions without any UI dependencies:
 ### Commands Structure
 
 ```bash
+# Session Management
 desto-cli sessions list                    # List all sessions
 desto-cli sessions start "name" "command"  # Start new session
 desto-cli sessions kill "name"             # Kill specific session  
@@ -44,6 +46,16 @@ desto-cli sessions kill --all              # Kill all sessions
 desto-cli sessions attach "name"           # Attach to session
 desto-cli sessions logs "name"             # View session logs
 desto-cli sessions status [name]           # Show session status
+
+# Script Management
+desto-cli scripts list                     # List all scripts
+desto-cli scripts list --details           # List with detailed info
+desto-cli scripts create "name" --type bash|python  # Create new script
+desto-cli scripts edit "name"              # Edit script in $EDITOR
+desto-cli scripts show "name"              # Display script content
+desto-cli scripts delete "name"            # Delete script
+desto-cli scripts copy "src" "dest"        # Copy script
+desto-cli scripts run "name" [args]        # Run script directly or in tmux
 ```
 
 ## Key Features
@@ -55,11 +67,21 @@ desto-cli sessions status [name]           # Show session status
 - Attach to running sessions
 - Track session status (running/finished)
 
-### 📊 **Rich Output**
+### � **Script Management**
+- Create scripts with templates (bash/python)
+- List scripts with icons and metadata
+- Edit scripts in preferred editor ($EDITOR)
+- Show script content with syntax highlighting
+- Copy and delete scripts
+- Run scripts directly or in tmux sessions
+- Automatic executable permission handling
+
+### �📊 **Rich Output**
 - Colorized terminal output using Rich
 - Formatted tables for session listings
 - Progress indicators and status icons
 - Human-readable timestamps and durations
+- Syntax highlighting for script content
 
 ### 📝 **Logging**
 - Automatic log file creation per session
@@ -77,7 +99,8 @@ desto-cli sessions status [name]           # Show session status
 
 The modular architecture makes it easy to add:
 
-- Script management commands
+- ~~Script management commands~~ ✅ **Implemented**
+- Chain/queue management for script sequences
 - Scheduling functionality  
 - Configuration management
 - Advanced filtering and search

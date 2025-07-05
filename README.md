@@ -178,7 +178,7 @@ This installs two executables:
 # Check system status
 desto-cli doctor
 
-# List all sessions
+# Session Management
 desto-cli sessions list
 
 # Start a new session
@@ -189,6 +189,13 @@ desto-cli sessions logs "my-task"
 
 # Kill a session
 desto-cli sessions kill "my-task"
+
+# Script Management
+desto-cli scripts list                     # List all scripts
+desto-cli scripts create "my_script" --type python  # Create new script
+desto-cli scripts edit "my_script"         # Edit script in $EDITOR  
+desto-cli scripts run "my_script"          # Run script in tmux session
+desto-cli scripts run "my_script" --direct # Run script directly
 ```
 
 **📖 [Full CLI Documentation →](src/desto/cli/README.md)**

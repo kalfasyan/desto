@@ -54,9 +54,10 @@ except ImportError:
     Console = MockConsole
     TYPER_AVAILABLE = False
 
-from .session_manager import CLISessionManager
-from .sessions import sessions_app
-from .utils import setup_logging
+from desto.cli.scripts import scripts_app
+from desto.cli.session_manager import CLISessionManager
+from desto.cli.sessions import sessions_app
+from desto.cli.utils import setup_logging
 
 # Create the main CLI application
 app = typer.Typer(
@@ -68,17 +69,16 @@ app = typer.Typer(
 # Add the sessions command group
 app.add_typer(sessions_app, name="sessions")
 
+# Add the scripts command group
+app.add_typer(scripts_app, name="scripts")
+
 console = Console()
 
 
 @app.callback()
 def main(
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Enable verbose output"
-    ),
-    log_file: Optional[Path] = typer.Option(
-        None, "--log-file", help="Write logs to file"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    log_file: Optional[Path] = typer.Option(None, "--log-file", help="Write logs to file"),
 ):
     """Desto CLI - Manage tmux sessions and scripts from the command line."""
     level = "DEBUG" if verbose else "INFO"
@@ -90,9 +90,7 @@ def version():
     """Show version information."""
     from . import __version__
 
-    console.print(
-        f"[bold blue]desto-cli[/bold blue] version [green]{__version__}[/green]"
-    )
+    console.print(f"[bold blue]desto-cli[/bold blue] version [green]{__version__}[/green]")
 
 
 @app.command()
@@ -107,16 +105,12 @@ def doctor():
             version = result.stdout.strip() if result.returncode == 0 else "unknown"
             console.print(f"[green]✅ tmux: {version}[/green]")
         except Exception:
-            console.print(
-                "[yellow]⚠️  tmux: installed but version check failed[/yellow]"
-            )
+            console.print("[yellow]⚠️  tmux: installed but version check failed[/yellow]")
     else:
         console.print("[red]❌ tmux: not found - please install tmux[/red]")
 
     # Check Python version
-    python_version = (
-        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    )
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     console.print(f"[green]✅ Python: {python_version}[/green]")
 
     # Check directories
@@ -127,27 +121,16 @@ def doctor():
     console.print(f"Logs: {manager.log_dir}")
 
     if manager.scripts_dir.exists():
-        scripts_count = len(
-            list(manager.scripts_dir.glob("*.sh"))
-            + list(manager.scripts_dir.glob("*.py"))
-        )
-        console.print(
-            f"[green]✅ Scripts directory exists ({scripts_count} scripts found)[/green]"
-        )
+        scripts_count = len(list(manager.scripts_dir.glob("*.sh")) + list(manager.scripts_dir.glob("*.py")))
+        console.print(f"[green]✅ Scripts directory exists ({scripts_count} scripts found)[/green]")
     else:
-        console.print(
-            "[yellow]⚠️  Scripts directory does not exist (will be created when needed)[/yellow]"
-        )
+        console.print("[yellow]⚠️  Scripts directory does not exist (will be created when needed)[/yellow]")
 
     if manager.log_dir.exists():
         logs_count = len(list(manager.log_dir.glob("*.log")))
-        console.print(
-            f"[green]✅ Logs directory exists ({logs_count} log files found)[/green]"
-        )
+        console.print(f"[green]✅ Logs directory exists ({logs_count} log files found)[/green]")
     else:
-        console.print(
-            "[yellow]⚠️  Logs directory does not exist (will be created when needed)[/yellow]"
-        )
+        console.print("[yellow]⚠️  Logs directory does not exist (will be created when needed)[/yellow]")
 
     # Check active sessions
     sessions = manager.list_sessions()
