@@ -55,5 +55,5 @@ make docker-test
 
 Copy these scripts to your own scripts directory and modify them as needed:
 ```bash
-cp docker-examples/* /path/to/your/scripts/
+cp desto_scripts/* /path/to/your/scripts/
 ```

@@ -27,9 +27,9 @@ The key features are:
 
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
   
-## ⚡ Quick Start
+# ⚡ Quick Start
 
-### 🐳 Docker Quick Start (Recommended)
+### 🐳 Quick Start with Docker  
 
 The easiest way to get started with desto is using Docker Compose:
 
@@ -46,26 +46,21 @@ docker-compose up -d
 ```
 
 **🌐 Access the dashboard at: http://localhost:8088**
-
-This method:
-- ✅ Requires no system dependencies (no tmux/at installation needed)
-- ✅ Provides example scripts ready to test
-- ✅ Includes persistent storage for scripts and logs
-- ✅ Works consistently across all platforms
-
+  
 **Other Docker options:**
 ```bash
-# Using the automated setup script
-./docker-start.sh
-
-# Or using Docker directly
-make docker-build
-make docker-run
+# Using Docker directly
+docker build -t desto:latest .
+docker run -d -p 8088:8088 \
+  -v $(PWD)/desto_scripts:/app/scripts \
+  -v $(PWD)/desto_logs:/app/logs \
+  --name desto-dashboard \
+  desto:latest
 ```
 
 ---
 
-## ✨ `desto` Overview
+# ✨ `desto` Overview
 
 <div align="left">
 
@@ -118,63 +113,50 @@ More settings to be added!
 
 ---   
 
-## 🛠️ Installation  
+# 🛠️ Installation  
 
 
-## 🐳 Docker Installation (Recommended)
+## 🐳 Docker Installation (only dashboard)
 
-Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.  
+Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started. With docker-compose, you can set up everything in one command, including example scripts and persistent storage for your scripts and logs. You can make changes to the YAML configuration (`docker-compose.yml`) to customize the setup, such as changing ports or directories.  
 
-### Quick Start (Easy Way)
+### Using `docker-compose`
+
+Here are the steps to quickly set up and run **desto** using Docker (as mentioned above):
 
 ```bash
-# Get the code
 git clone https://github.com/kalfasyan/desto.git
 cd desto
-
-# Set up example scripts to test with
 make docker-setup-examples
-
-# Start desto (this does everything automatically)
-docker-compose up -d
-
-# Open in browser: http://localhost:8088
-```
-
-### Using Your Own Scripts
-
-**Option 1: Copy scripts to the default directory**
-```bash
-# Create the scripts directory (if not already created)
-mkdir -p docker-scripts
-
-# Copy your scripts to the docker-scripts directory
-cp /path/to/your/scripts/* docker-scripts/
-
-# Make bash scripts executable
-chmod +x docker-scripts/*.sh
-
-# Start desto
 docker-compose up -d
 ```
 
-**Option 2: Mount your existing scripts directory**
+Then open [http://localhost:8088](http://localhost:8088) in your browser.
 
-Edit the `docker-compose.yml` file to point to your existing scripts directory:
+
+#### To Use Your Own Scripts & Logs 
+
+The easiest and most flexible way to use your own scripts and logs is to edit the `docker-compose.yml` file and mount your local directories:
 
 ```yaml
-# docker-compose.yml
 services:
   desto:
     build: .
     ports:
       - "8088:8088"
     volumes:
-      - ./path/to/your/scripts:/app/scripts  # Change this path
-      - ./docker-logs:/app/logs
+      - ./desto_scripts:/app/scripts  # Your scripts directory
+      - ./desto_logs:/app/logs        # Your logs directory
     environment:
       - DESTO_SCRIPTS_DIR=/app/scripts
       - DESTO_LOGS_DIR=/app/logs
+```
+
+Place your scripts in `desto_scripts/` and logs will be saved in `desto_logs/`.
+
+Make sure your bash scripts are executable:
+```bash
+chmod +x desto_scripts/*.sh
 ```
 
 
@@ -195,62 +177,22 @@ docker-compose build --no-cache
 docker-compose up -d
 ```
 
+
 ### Docker Examples
 
-The repository includes example scripts in `docker-examples/` to test the Docker setup:
+The repository includes example scripts in `desto_scripts/` for testing the Docker setup:
 
 - `demo-script.sh` - Basic bash script demo
-- `demo-script.py` - Python script demo  
+- `demo-script.py` - Python script demo
 - `long-running-demo.sh` - Long-running process demo
 
-**Copy examples to your scripts directory:**
+These examples are automatically set up in `desto_scripts/` when you run:
 ```bash
-# Create scripts directory and copy examples (done automatically by make docker-setup-examples)
-mkdir -p docker-scripts
-cp docker-examples/* docker-scripts/
-chmod +x docker-scripts/*.sh
+make docker-setup-examples
 ```
 
-### Docker Configuration
+This creates the `desto_scripts/` directory with the example scripts ready to use.
 
-The Docker setup includes:
-
-- **Automatic dependency management** using `uv`
-- **Volume mounting** for persistent scripts and logs
-- **Health checks** for container monitoring
-- **Environment variables** for configuration
-
-**Environment Variables:**
-- `DESTO_SCRIPTS_DIR=/app/scripts` - Scripts directory
-- `DESTO_LOGS_DIR=/app/logs` - Logs directory
-
-**Common Scenarios:**
-
-1. **Development setup with live script editing:**
-   ```yaml
-   volumes:
-     - ./my-dev-scripts:/app/scripts:rw  # Read-write access
-     - ./logs:/app/logs
-   ```
-
-2. **Production setup with read-only scripts:**
-   ```yaml
-   volumes:
-     - ./production-scripts:/app/scripts:ro  # Read-only access
-     - ./logs:/app/logs
-   ```
-
-3. **Custom port and directories:**
-   ```yaml
-   services:
-     desto:
-       build: .
-       ports:
-         - "3000:8088"  # Custom port
-       volumes:
-         - /home/user/my-scripts:/app/scripts
-         - /var/log/desto:/app/logs
-   ```
 
 
 ## 🔧 Traditional Installation

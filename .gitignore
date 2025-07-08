@@ -173,13 +173,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-desto_logs/
-desto_scripts/
-desto_log/
 .vscode/
 
 *.txt
 *.json
 output/
-docker-logs/
-docker-scripts/
+*.finished

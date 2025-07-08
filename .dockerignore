@@ -49,7 +49,7 @@ dist/
 .eggs/
 
 # Local directories that might be created
-docker-scripts/
-docker-logs/
+desto_scripts/
+desto_logs/
 my-scripts/
 my-logs/

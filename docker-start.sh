@@ -22,16 +22,15 @@ fi
 
 # Create directories for scripts and logs
 echo "📁 Creating directories..."
-mkdir -p docker-scripts docker-logs
+mkdir -p desto_scripts desto_logs
 
 # Copy example scripts
 echo "📋 Copying example scripts..."
-if [ -d "docker-examples" ]; then
-    cp docker-examples/* docker-scripts/ 2>/dev/null || true
-    chmod +x docker-scripts/*.sh 2>/dev/null || true
-    echo "✅ Example scripts copied to docker-scripts/"
+if [ -d "desto_scripts" ] && [ "$(ls -A desto_scripts)" ]; then
+    chmod +x desto_scripts/*.sh 2>/dev/null || true
+    echo "✅ Scripts directory ready: desto_scripts/"
 else
-    echo "⚠️  docker-examples directory not found, creating empty scripts directory"
+    echo "⚠️  No scripts found in desto_scripts/, creating empty directory"
 fi
 
 # Build Docker image
@@ -57,8 +56,8 @@ if docker-compose ps | grep -q "Up"; then
     echo "  docker-compose down             # Stop services"
     echo "  docker-compose restart desto    # Restart services"
     echo ""
-    echo "📁 Your scripts directory: $(pwd)/docker-scripts"
-    echo "📁 Your logs directory: $(pwd)/docker-logs"
+    echo "📁 Your scripts directory: $(pwd)/desto_scripts"
+    echo "📁 Your logs directory: $(pwd)/desto_logs"
 else
     echo "❌ Failed to start services"
     echo "Check the logs with: docker-compose logs desto"

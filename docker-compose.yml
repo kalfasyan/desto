@@ -7,8 +7,8 @@ services:
       - "8088:8088"
     volumes:
       # Mount host directories for scripts and logs
-      - ./docker-scripts:/app/scripts
-      - ./docker-logs:/app/logs
+      - ./desto_scripts:/app/scripts
+      - ./desto_logs:/app/logs
     environment:
       - DESTO_SCRIPTS_DIR=/app/scripts
       - DESTO_LOGS_DIR=/app/logs

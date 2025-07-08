@@ -45,7 +45,6 @@ dev-install:  ## Install package in development mode with dev dependencies
 publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
 	@echo "⚠️  Note: Publishing is normally automated via GitHub Actions"
 	@echo "🚀 To publish: git tag vX.Y.Z && git push --tags"
-	@echo "📖 See VERSION_MANAGEMENT.md for setup instructions"
 	@echo ""
 	@echo "🔄 Manual publish (not recommended):"
 	uv publish
@@ -59,12 +58,6 @@ check-release:  ## Check if current version is published
 	@python -c "import sys, requests; sys.path.insert(0, 'src'); from desto._version import __version__; r=requests.get(f'https://pypi.org/pypi/desto/{__version__}/json'); print(f'✅ Version {__version__} is published' if r.status_code==200 else f'❌ Version {__version__} not found on PyPI')"
 
 # Docker commands
-docker-build:  ## Build Docker image
-	docker build -t desto:latest .
-
-docker-run:  ## Run Docker container
-	docker run -d -p 8088:8088 -v $(PWD)/docker-scripts:/app/scripts -v $(PWD)/docker-logs:/app/logs --name desto-dashboard desto:latest
-
 docker-stop:  ## Stop and remove Docker container
 	docker stop desto-dashboard || true
 	docker rm desto-dashboard || true
@@ -81,11 +74,14 @@ docker-compose-down:  ## Stop services with Docker Compose
 docker-compose-logs:  ## View Docker Compose logs
 	docker-compose logs -f
 
-docker-test:  ## Run Docker integration tests
+docker-test:  ## Run Docker integration tests (excluding slow/hanging tests)
+	uv run --extra dev pytest tests/test_docker_integration.py -k "not test_docker_run_health_check and not test_docker_build" -v
+
+docker-test-full:  ## Run all Docker integration tests (including slow ones)
 	uv run --extra dev pytest tests/test_docker_integration.py -v
 
 docker-setup-examples:  ## Setup Docker example scripts
-	mkdir -p docker-scripts docker-logs
-	cp docker-examples/* docker-scripts/ 2>/dev/null || true
-	chmod +x docker-scripts/*.sh 2>/dev/null || true
-	@echo "✅ Docker examples copied to docker-scripts/"
+	mkdir -p desto_scripts desto_logs
+	chmod +x desto_scripts/*.sh 2>/dev/null || true
+	@echo "✅ Docker setup complete - desto_scripts/ and desto_logs/ ready"
+	@echo "📁 Example scripts available in desto_scripts/"

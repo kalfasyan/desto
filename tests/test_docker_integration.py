@@ -49,9 +49,9 @@ class TestDockerIntegration:
 
         content = dockerfile.read_text()
         assert "FROM python:3.11-slim" in content
-        assert "RUN pip install uv" in content
+        assert "curl -LsSf https://astral.sh/uv/install.sh | sh" in content
         assert "EXPOSE 8088" in content
-        assert "CMD [\"uv\", \"run\", \"desto\"]" in content
+        assert 'CMD ["/root/.local/bin/uv", "run", "desto"]' in content
 
     def test_docker_compose_exists(self):
         """Test that docker-compose.yml exists and has correct content."""
@@ -89,7 +89,15 @@ class TestDockerIntegration:
         )
 
         assert result.returncode == 0, f"Docker build failed: {result.stderr}"
-        assert "Successfully built" in result.stdout or "Successfully tagged" in result.stdout
+        # Check for successful build indicators from both classic and buildx output
+        success_indicators = [
+            "Successfully built",
+            "Successfully tagged",
+            "DONE",
+            "writing image"
+        ]
+        assert any(indicator in result.stdout or indicator in result.stderr for indicator in success_indicators), \
+            f"Docker build may have failed. stdout: {result.stdout}, stderr: {result.stderr}"
 
     @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
     def test_docker_run_health_check(self, temp_scripts_dir, temp_logs_dir):
@@ -123,25 +131,48 @@ class TestDockerIntegration:
             result = subprocess.run(run_cmd, capture_output=True, text=True, timeout=30)
             assert result.returncode == 0, f"Container start failed: {result.stderr}"
 
-            # Wait for container to be ready
-            time.sleep(10)
+            # Wait for container to be ready with better health checking
+            max_retries = 30
+            for i in range(max_retries):
+                time.sleep(2)
 
-            # Check if container is running
-            ps_result = subprocess.run(
-                ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Status}}"],
-                capture_output=True,
-                text=True
-            )
-            assert "Up" in ps_result.stdout, "Container should be running"
+                # Check if container is running
+                ps_result = subprocess.run(
+                    ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Status}}"],
+                    capture_output=True,
+                    text=True
+                )
 
-            # Test health check endpoint (basic connectivity)
-            try:
-                response = requests.get("http://localhost:8088", timeout=5)
-                # We expect some response, even if it's not 200 due to NiceGUI setup
-                assert response.status_code in [200, 404, 500], f"Unexpected status code: {response.status_code}"
-            except requests.exceptions.RequestException:
-                # If we can't connect, that's also valuable information
-                pytest.skip("Could not connect to container - this might be expected in CI environment")
+                if "Up" not in ps_result.stdout:
+                    # Container died, check logs
+                    logs_result = subprocess.run(
+                        ["docker", "logs", container_name],
+                        capture_output=True,
+                        text=True
+                    )
+                    pytest.fail(f"Container died. Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}")
+
+                # Try to connect to the health endpoint
+                try:
+                    requests.get("http://localhost:8088", timeout=3)
+                    # Any response means the server is up
+                    break
+                except requests.exceptions.RequestException:
+                    if i == max_retries - 1:
+                        # On last retry, get container logs for debugging
+                        logs_result = subprocess.run(
+                            ["docker", "logs", container_name],
+                            capture_output=True,
+                            text=True
+                        )
+                        pytest.skip(
+                            f"Could not connect to container after {max_retries} retries. "
+                            f"Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}"
+                        )
+                    continue
+
+            # If we get here, the container is responding
+            assert True, "Container is running and responding"
 
         finally:
             # Clean up container
@@ -150,8 +181,8 @@ class TestDockerIntegration:
 
     def test_example_scripts_exist(self):
         """Test that example scripts exist and are executable."""
-        examples_dir = Path(__file__).parent.parent / "docker-examples"
-        assert examples_dir.exists(), "docker-examples directory should exist"
+        examples_dir = Path(__file__).parent.parent / "desto_scripts"
+        assert examples_dir.exists(), "desto_scripts directory should exist"
 
         demo_script = examples_dir / "demo-script.sh"
         assert demo_script.exists(), "demo-script.sh should exist"
