@@ -3,8 +3,7 @@ tests/
 test_*.py
 *_test.py
 
-# Documentation
-README.md
+# Documentation (exclude images but keep README.md for build)
 docs/
 images/
 

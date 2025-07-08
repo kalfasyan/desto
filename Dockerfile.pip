@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    tmux \
+    at \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+# Install the package using pip
+RUN pip install -e .
+
+# Create directories for scripts and logs
+RUN mkdir -p /app/scripts /app/logs
+
+# Set environment variables
+ENV DESTO_SCRIPTS_DIR=/app/scripts
+ENV DESTO_LOGS_DIR=/app/logs
+
+# Expose web dashboard port
+EXPOSE 8088
+
+# Start the dashboard
+CMD ["python", "-m", "desto.app.dashboard"]
