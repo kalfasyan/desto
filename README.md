@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" alt="desto Logo" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
+  <img src="images/logo.png" alt="desto Logo" title="desto Logo" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
 </p>  
 
 
@@ -27,22 +27,51 @@ The key features are:
 
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
   
-## ⚡ Quick Start
-  
-<div align="left">
+# ⚡ Quick Start
 
+### 🐳 Quick Start with Docker  
+
+The easiest way to get started with desto is using Docker:
+
+```bash
+# Clone the repository
+git clone https://github.com/kalfasyan/desto.git
+cd desto
+
+# Set up example scripts (optional - for testing)
+make docker-setup-examples
+
+# Build Docker image
+docker build -t desto:latest .
+
+# Use the example scripts (or your own scripts directory)
+docker run -d -p 8088:8088 \
+  -v $PWD/desto_scripts:/app/scripts \
+  -v $PWD/desto_logs:/app/logs \
+  --name desto-dashboard \
+  desto:latest
+```
+
+**🌐 Access the dashboard at: http://localhost:8088**
+
+**Make sure your bash scripts are executable:**
+```bash
+chmod +x /path/to/your/scripts/*.sh
+```
+---
+
+# ✨ `desto` Overview
+
+<div align="left">
 
 <details>
 <summary><strong>👀 Dashboard Overview</strong></summary>
 
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
-</details>
-
-  
----
-**🚀 Launch your scripts as `tmux` sessions**  
-  
+</details>  
+      
+**🚀 Launch your scripts as `tmux` sessions**    
 When you start `desto`, it creates `desto_scripts/` and `desto_logs/` folders in your current directory. Want to use your own locations? Just change these in the settings, or set the `DESTO_SCRIPTS_DIR` and `DESTO_LOGS_DIR` environment variables.
 
 Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py` (Python) scripts are supported with automatic detection and appropriate execution. Ready to launch? Just:
@@ -56,7 +85,6 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
   
 🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
 
----
 <details>
 <summary><strong>✍️ Write new scripts and save them</strong></summary>
 
@@ -66,7 +94,6 @@ If you want to compose a new script, you can do it right here, or simply just pa
 
 </details>
   
----
 <details>
 <summary><strong>⚙️ Change settings</strong></summary>
 
@@ -75,7 +102,6 @@ More settings to be added!
 <img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 </details>
   
----
 <details>
 <summary><strong>📜 View your script's logs</strong></summary>
 
@@ -83,10 +109,62 @@ More settings to be added!
 
 </details>
 
-</div>
+</div>  
+
+---   
+
+# 🛠️ Installation  
 
 
-## Requirements
+## 🐳 Docker Installation (only dashboard)
+
+Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.
+
+### Quick Docker Setup
+
+See the [Quick Start with Docker](#-quick-start-with-docker) section above for a complete guide.
+
+
+### Docker Management
+
+```bash
+# View logs
+docker logs -f desto-dashboard
+
+# Stop the container
+docker stop desto-dashboard
+
+# Remove the container
+docker rm desto-dashboard
+
+# Rebuild after changes
+docker build -t desto:latest . --no-cache
+docker run -d -p 8088:8088 \
+  -v $PWD/desto_scripts:/app/scripts \
+  -v $PWD/desto_logs:/app/logs \
+  --name desto-dashboard \
+  desto:latest
+
+# List all containers
+docker ps -a
+
+# List all images
+docker images -a
+
+# Remove all stopped containers
+docker container prune
+
+# Remove all unused images
+docker image prune -a
+
+# Remove the container and image
+docker rm -f desto-dashboard
+docker rmi desto:latest
+```
+
+## 🔧 Traditional Installation
+
+### Requirements
 
 - Python 3.11+
 - [tmux](https://github.com/tmux/tmux)
@@ -94,8 +172,7 @@ More settings to be added!
   
 Check [`pyproject.toml`](pyproject.toml)
 
-
-## Installation
+### Installation Steps
 
 1. **Install `tmux` and `at`**  
    <details>

@@ -1,0 +1,55 @@
+# Test files
+tests/
+test_*.py
+*_test.py
+
+# Documentation (exclude images but keep README.md for build)
+docs/
+images/
+
+# Development files
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build files
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local directories that might be created
+desto_scripts/
+desto_logs/
+my-scripts/
+my-logs/
