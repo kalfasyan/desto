@@ -65,22 +65,18 @@ make docker-run
 
 ---
 
-### 🔧 Traditional Installation
+## ✨ `desto` Overview
 
 <div align="left">
-
 
 <details>
 <summary><strong>👀 Dashboard Overview</strong></summary>
 
 <img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
-</details>
-
-  
----
-**🚀 Launch your scripts as `tmux` sessions**  
-  
+</details>  
+      
+**🚀 Launch your scripts as `tmux` sessions**    
 When you start `desto`, it creates `desto_scripts/` and `desto_logs/` folders in your current directory. Want to use your own locations? Just change these in the settings, or set the `DESTO_SCRIPTS_DIR` and `DESTO_LOGS_DIR` environment variables.
 
 Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py` (Python) scripts are supported with automatic detection and appropriate execution. Ready to launch? Just:
@@ -94,7 +90,6 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
   
 🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
 
----
 <details>
 <summary><strong>✍️ Write new scripts and save them</strong></summary>
 
@@ -104,7 +99,6 @@ If you want to compose a new script, you can do it right here, or simply just pa
 
 </details>
   
----
 <details>
 <summary><strong>⚙️ Change settings</strong></summary>
 
@@ -113,7 +107,6 @@ More settings to be added!
 <img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 </details>
   
----
 <details>
 <summary><strong>📜 View your script's logs</strong></summary>
 
@@ -121,52 +114,69 @@ More settings to be added!
 
 </details>
 
-</div>
+</div>  
 
+---   
 
-## Requirements
-
-- Python 3.11+
-- [tmux](https://github.com/tmux/tmux)
-- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
-  
-Check [`pyproject.toml`](pyproject.toml)
+## 🛠️ Installation  
 
 
 ## 🐳 Docker Installation (Recommended)
 
-The easiest way to run **desto** is using Docker. This eliminates the need to install system dependencies and provides a consistent environment across different platforms.
+Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.  
 
-### Quick Start with Docker
+### Quick Start (Easy Way)
 
-1. **Using Docker Compose (Recommended)**
-   ```bash
-   # Clone the repository
-   git clone https://github.com/kalfasyan/desto.git
-   cd desto
+```bash
+# Get the code
+git clone https://github.com/kalfasyan/desto.git
+cd desto
 
-   # Set up example scripts
-   make docker-setup-examples
+# Set up example scripts to test with
+make docker-setup-examples
 
-   # Start desto with Docker Compose
-   docker-compose up -d
+# Start desto (this does everything automatically)
+docker-compose up -d
 
-   # Access at: http://localhost:8088
-   ```
+# Open in browser: http://localhost:8088
+```
 
-2. **Using Docker directly**
-   ```bash
-   # Build the image
-   docker build -t desto .
+### Using Your Own Scripts
 
-   # Run the container
-   docker run -d \
-     -p 8088:8088 \
-     -v $(pwd)/docker-scripts:/app/scripts \
-     -v $(pwd)/docker-logs:/app/logs \
-     --name desto-dashboard \
-     desto
-   ```
+**Option 1: Copy scripts to the default directory**
+```bash
+# Create the scripts directory (if not already created)
+mkdir -p docker-scripts
+
+# Copy your scripts to the docker-scripts directory
+cp /path/to/your/scripts/* docker-scripts/
+
+# Make bash scripts executable
+chmod +x docker-scripts/*.sh
+
+# Start desto
+docker-compose up -d
+```
+
+**Option 2: Mount your existing scripts directory**
+
+Edit the `docker-compose.yml` file to point to your existing scripts directory:
+
+```yaml
+# docker-compose.yml
+services:
+  desto:
+    build: .
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./path/to/your/scripts:/app/scripts  # Change this path
+      - ./docker-logs:/app/logs
+    environment:
+      - DESTO_SCRIPTS_DIR=/app/scripts
+      - DESTO_LOGS_DIR=/app/logs
+```
+
 
 ### Docker Management
 
@@ -179,6 +189,10 @@ docker-compose down
 
 # Restart the service
 docker-compose restart desto
+
+# Rebuild after changes
+docker-compose build --no-cache
+docker-compose up -d
 ```
 
 ### Docker Examples
@@ -210,25 +224,46 @@ The Docker setup includes:
 - `DESTO_SCRIPTS_DIR=/app/scripts` - Scripts directory
 - `DESTO_LOGS_DIR=/app/logs` - Logs directory
 
-**Custom Configuration:**
-```yaml
-# docker-compose.yml
-services:
-  desto:
-    build: .
-    ports:
-      - "8088:8088"
-    volumes:
-      - ./my-scripts:/app/scripts
-      - ./my-logs:/app/logs
-    environment:
-      - DESTO_SCRIPTS_DIR=/app/scripts
-      - DESTO_LOGS_DIR=/app/logs
-```
+**Common Scenarios:**
 
----
+1. **Development setup with live script editing:**
+   ```yaml
+   volumes:
+     - ./my-dev-scripts:/app/scripts:rw  # Read-write access
+     - ./logs:/app/logs
+   ```
 
-## Installation
+2. **Production setup with read-only scripts:**
+   ```yaml
+   volumes:
+     - ./production-scripts:/app/scripts:ro  # Read-only access
+     - ./logs:/app/logs
+   ```
+
+3. **Custom port and directories:**
+   ```yaml
+   services:
+     desto:
+       build: .
+       ports:
+         - "3000:8088"  # Custom port
+       volumes:
+         - /home/user/my-scripts:/app/scripts
+         - /var/log/desto:/app/logs
+   ```
+
+
+## 🔧 Traditional Installation
+
+### Requirements
+
+- Python 3.11+
+- [tmux](https://github.com/tmux/tmux)
+- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
+  
+Check [`pyproject.toml`](pyproject.toml)
+
+### Installation Steps
 
 1. **Install `tmux` and `at`**  
    <details>
