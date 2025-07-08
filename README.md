@@ -65,10 +65,9 @@ make docker-run
 
 ---
 
-### 🔧 Traditional Installation
+## � Features Overview
 
 <div align="left">
-
 
 <details>
 <summary><strong>👀 Dashboard Overview</strong></summary>
@@ -123,15 +122,7 @@ More settings to be added!
 
 </div>
 
-
-## Requirements
-
-- Python 3.11+
-- [tmux](https://github.com/tmux/tmux)
-- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
-  
-Check [`pyproject.toml`](pyproject.toml)
-
+---
 
 ## 🐳 Docker Installation (Recommended)
 
@@ -228,7 +219,17 @@ services:
 
 ---
 
-## Installation
+## 🔧 Traditional Installation
+
+If you prefer to install desto without Docker, you can install it directly on your system.
+
+### Requirements
+
+- Python 3.11+
+- [tmux](https://github.com/tmux/tmux)
+- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
+
+### Installation Steps
 
 1. **Install `tmux` and `at`**  
    <details>
