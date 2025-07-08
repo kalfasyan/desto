@@ -31,28 +31,32 @@ The key features are:
 
 ### 🐳 Docker Quick Start (Recommended)
 
-Get started with desto in seconds using our automated setup script:
+The easiest way to get started with desto is using Docker Compose:
 
 ```bash
 # Clone the repository
 git clone https://github.com/kalfasyan/desto.git
 cd desto
 
-# Run the quick start script
-./docker-start.sh
+# Set up example scripts
+make docker-setup-examples
+
+# Start desto with Docker Compose
+docker-compose up -d
 ```
 
-This script will:
-- Check Docker requirements
-- Create necessary directories
-- Copy example scripts
-- Build and start the Docker container
-- Provide access instructions
+**🌐 Access the dashboard at: http://localhost:8088**
 
-**Manual Docker Setup:**
+This method:
+- ✅ Requires no system dependencies (no tmux/at installation needed)
+- ✅ Provides example scripts ready to test
+- ✅ Includes persistent storage for scripts and logs
+- ✅ Works consistently across all platforms
+
+**Other Docker options:**
 ```bash
-# Using Docker Compose
-docker-compose up -d
+# Using the automated setup script
+./docker-start.sh
 
 # Or using Docker directly
 make docker-build
@@ -141,8 +145,13 @@ The easiest way to run **desto** is using Docker. This eliminates the need to in
    git clone https://github.com/kalfasyan/desto.git
    cd desto
 
+   # Set up example scripts
+   make docker-setup-examples
+
    # Start desto with Docker Compose
    docker-compose up -d
+
+   # Access at: http://localhost:8088
    ```
 
 2. **Using Docker directly**
@@ -159,8 +168,18 @@ The easiest way to run **desto** is using Docker. This eliminates the need to in
      desto
    ```
 
-3. **Open in your browser**  
-   Visit [http://localhost:8088](http://localhost:8088) to access the dashboard.
+### Docker Management
+
+```bash
+# View logs
+docker-compose logs -f desto
+
+# Stop the service
+docker-compose down
+
+# Restart the service
+docker-compose restart desto
+```
 
 ### Docker Examples
 
@@ -172,7 +191,7 @@ The repository includes example scripts in `docker-examples/` to test the Docker
 
 **Copy examples to your scripts directory:**
 ```bash
-# Create scripts directory and copy examples
+# Create scripts directory and copy examples (done automatically by make docker-setup-examples)
 mkdir -p docker-scripts
 cp docker-examples/* docker-scripts/
 chmod +x docker-scripts/*.sh
@@ -205,22 +224,6 @@ services:
     environment:
       - DESTO_SCRIPTS_DIR=/app/scripts
       - DESTO_LOGS_DIR=/app/logs
-```
-
-### Docker Management
-
-```bash
-# View logs
-docker-compose logs -f desto
-
-# Stop the service
-docker-compose down
-
-# Restart the service
-docker-compose restart desto
-
-# Update the container
-docker-compose pull && docker-compose up -d
 ```
 
 ---
