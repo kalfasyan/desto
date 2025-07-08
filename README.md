@@ -1,5 +1,11 @@
 <p align="center">
-  <img src="images/logo.png" alt="desto Logo" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
+  <img src="images/logo.png" alt="desto Logo" ---
+
+## 📋 Features Overview
+
+<div align="left">
+
+<details>Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
 </p>  
 
 
