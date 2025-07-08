@@ -31,33 +31,33 @@ The key features are:
 
 ### 🐳 Quick Start with Docker  
 
-The easiest way to get started with desto is using Docker Compose:
+The easiest way to get started with desto is using Docker:
 
 ```bash
 # Clone the repository
 git clone https://github.com/kalfasyan/desto.git
 cd desto
 
-# Set up example scripts
+# Set up example scripts (optional - for testing)
 make docker-setup-examples
 
-# Start desto with Docker Compose
-docker-compose up -d
-```
-
-**🌐 Access the dashboard at: http://localhost:8088**
-  
-**Other Docker options:**
-```bash
-# Using Docker directly
+# Build Docker image
 docker build -t desto:latest .
+
+# Use the example scripts (or your own scripts directory)
 docker run -d -p 8088:8088 \
-  -v $(PWD)/desto_scripts:/app/scripts \
-  -v $(PWD)/desto_logs:/app/logs \
+  -v $PWD/desto_scripts:/app/scripts \
+  -v $PWD/desto_logs:/app/logs \
   --name desto-dashboard \
   desto:latest
 ```
 
+**🌐 Access the dashboard at: http://localhost:8088**
+
+**Make sure your bash scripts are executable:**
+```bash
+chmod +x /path/to/your/scripts/*.sh
+```
 ---
 
 # ✨ `desto` Overview
@@ -118,82 +118,49 @@ More settings to be added!
 
 ## 🐳 Docker Installation (only dashboard)
 
-Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started. With docker-compose, you can set up everything in one command, including example scripts and persistent storage for your scripts and logs. You can make changes to the YAML configuration (`docker-compose.yml`) to customize the setup, such as changing ports or directories.  
+Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.
 
-### Using `docker-compose`
+### Quick Docker Setup
 
-Here are the steps to quickly set up and run **desto** using Docker (as mentioned above):
-
-```bash
-git clone https://github.com/kalfasyan/desto.git
-cd desto
-make docker-setup-examples
-docker-compose up -d
-```
-
-Then open [http://localhost:8088](http://localhost:8088) in your browser.
-
-
-#### To Use Your Own Scripts & Logs 
-
-The easiest and most flexible way to use your own scripts and logs is to edit the `docker-compose.yml` file and mount your local directories:
-
-```yaml
-services:
-  desto:
-    build: .
-    ports:
-      - "8088:8088"
-    volumes:
-      - ./desto_scripts:/app/scripts  # Your scripts directory
-      - ./desto_logs:/app/logs        # Your logs directory
-    environment:
-      - DESTO_SCRIPTS_DIR=/app/scripts
-      - DESTO_LOGS_DIR=/app/logs
-```
-
-Place your scripts in `desto_scripts/` and logs will be saved in `desto_logs/`.
-
-Make sure your bash scripts are executable:
-```bash
-chmod +x desto_scripts/*.sh
-```
+See the [Quick Start with Docker](#-quick-start-with-docker) section above for a complete guide.
 
 
 ### Docker Management
 
 ```bash
 # View logs
-docker-compose logs -f desto
+docker logs -f desto-dashboard
 
-# Stop the service
-docker-compose down
+# Stop the container
+docker stop desto-dashboard
 
-# Restart the service
-docker-compose restart desto
+# Remove the container
+docker rm desto-dashboard
 
 # Rebuild after changes
-docker-compose build --no-cache
-docker-compose up -d
+docker build -t desto:latest . --no-cache
+docker run -d -p 8088:8088 \
+  -v $PWD/desto_scripts:/app/scripts \
+  -v $PWD/desto_logs:/app/logs \
+  --name desto-dashboard \
+  desto:latest
+
+# List all containers
+docker ps -a
+
+# List all images
+docker images -a
+
+# Remove all stopped containers
+docker container prune
+
+# Remove all unused images
+docker image prune -a
+
+# Remove the container and image
+docker rm -f desto-dashboard
+docker rmi desto:latest
 ```
-
-
-### Docker Examples
-
-The repository includes example scripts in `desto_scripts/` for testing the Docker setup:
-
-- `demo-script.sh` - Basic bash script demo
-- `demo-script.py` - Python script demo
-- `long-running-demo.sh` - Long-running process demo
-
-These examples are automatically set up in `desto_scripts/` when you run:
-```bash
-make docker-setup-examples
-```
-
-This creates the `desto_scripts/` directory with the example scripts ready to use.
-
-
 
 ## 🔧 Traditional Installation
 

@@ -53,17 +53,6 @@ class TestDockerIntegration:
         assert "EXPOSE 8088" in content
         assert 'CMD ["/root/.local/bin/uv", "run", "desto"]' in content
 
-    def test_docker_compose_exists(self):
-        """Test that docker-compose.yml exists and has correct content."""
-        compose_file = Path(__file__).parent.parent / "docker-compose.yml"
-        assert compose_file.exists(), "docker-compose.yml should exist"
-
-        content = compose_file.read_text()
-        assert "version: '3.8'" in content
-        assert "ports:" in content
-        assert "8088:8088" in content
-        assert "volumes:" in content
-
     def test_dockerignore_exists(self):
         """Test that .dockerignore exists and excludes test files."""
         dockerignore = Path(__file__).parent.parent / ".dockerignore"
@@ -192,19 +181,3 @@ class TestDockerIntegration:
 
         long_running = examples_dir / "long-running-demo.sh"
         assert long_running.exists(), "long-running-demo.sh should exist"
-
-    @pytest.mark.skipif(not shutil.which("docker-compose"), reason="Docker Compose not available")
-    def test_docker_compose_config(self):
-        """Test that docker-compose configuration is valid."""
-        repo_root = Path(__file__).parent.parent
-
-        result = subprocess.run(
-            ["docker-compose", "config"],
-            cwd=repo_root,
-            capture_output=True,
-            text=True
-        )
-
-        assert result.returncode == 0, f"Docker Compose config invalid: {result.stderr}"
-        assert "desto" in result.stdout
-        assert "8088" in result.stdout

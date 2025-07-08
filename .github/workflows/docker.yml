@@ -42,17 +42,6 @@ jobs:
         docker stop desto-test
         docker rm desto-test
         
-    - name: Test Docker Compose
-      run: |
-        # Test docker-compose configuration
-        docker-compose config
-        
-        # Test docker-compose up (dry run)
-        docker-compose up --no-start
-        
-        # Cleanup
-        docker-compose down
-        
     - name: Run Docker integration tests
       run: |
         # Set up Python environment for tests
@@ -62,6 +51,5 @@ jobs:
         
         # Run Docker-related tests (excluding actual docker run tests)
         uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_dockerfile_exists -v
-        uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_docker_compose_exists -v
         uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_dockerignore_exists -v
         uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_example_scripts_exist -v

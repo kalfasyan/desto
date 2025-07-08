@@ -32,7 +32,12 @@ Long-running script (30 seconds) that demonstrates:
 
 2. **Start desto with Docker:**
    ```bash
-   docker-compose up -d
+   docker build -t desto:latest .
+   docker run -d -p 8088:8088 \
+     -v $PWD/desto_scripts:/app/scripts \
+     -v $PWD/desto_logs:/app/logs \
+     --name desto-dashboard \
+     desto:latest
    ```
 
 3. **Access the dashboard:**

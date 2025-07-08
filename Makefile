@@ -65,15 +65,6 @@ docker-stop:  ## Stop and remove Docker container
 docker-logs:  ## View Docker container logs
 	docker logs -f desto-dashboard
 
-docker-compose-up:  ## Start services with Docker Compose
-	docker-compose up -d
-
-docker-compose-down:  ## Stop services with Docker Compose
-	docker-compose down
-
-docker-compose-logs:  ## View Docker Compose logs
-	docker-compose logs -f
-
 docker-test:  ## Run Docker integration tests (excluding slow/hanging tests)
 	uv run --extra dev pytest tests/test_docker_integration.py -k "not test_docker_run_health_check and not test_docker_build" -v
 
