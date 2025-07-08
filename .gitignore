@@ -181,3 +181,5 @@ desto_log/
 *.txt
 *.json
 output/
+docker-logs/
+docker-scripts/
