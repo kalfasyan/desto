@@ -28,7 +28,41 @@ The key features are:
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
   
 ## ⚡ Quick Start
-  
+
+### 🐳 Docker Quick Start (Recommended)
+
+Get started with desto in seconds using our automated setup script:
+
+```bash
+# Clone the repository
+git clone https://github.com/kalfasyan/desto.git
+cd desto
+
+# Run the quick start script
+./docker-start.sh
+```
+
+This script will:
+- Check Docker requirements
+- Create necessary directories
+- Copy example scripts
+- Build and start the Docker container
+- Provide access instructions
+
+**Manual Docker Setup:**
+```bash
+# Using Docker Compose
+docker-compose up -d
+
+# Or using Docker directly
+make docker-build
+make docker-run
+```
+
+---
+
+### 🔧 Traditional Installation
+
 <div align="left">
 
 
@@ -94,6 +128,102 @@ More settings to be added!
   
 Check [`pyproject.toml`](pyproject.toml)
 
+
+## 🐳 Docker Installation (Recommended)
+
+The easiest way to run **desto** is using Docker. This eliminates the need to install system dependencies and provides a consistent environment across different platforms.
+
+### Quick Start with Docker
+
+1. **Using Docker Compose (Recommended)**
+   ```bash
+   # Clone the repository
+   git clone https://github.com/kalfasyan/desto.git
+   cd desto
+
+   # Start desto with Docker Compose
+   docker-compose up -d
+   ```
+
+2. **Using Docker directly**
+   ```bash
+   # Build the image
+   docker build -t desto .
+
+   # Run the container
+   docker run -d \
+     -p 8088:8088 \
+     -v $(pwd)/docker-scripts:/app/scripts \
+     -v $(pwd)/docker-logs:/app/logs \
+     --name desto-dashboard \
+     desto
+   ```
+
+3. **Open in your browser**  
+   Visit [http://localhost:8088](http://localhost:8088) to access the dashboard.
+
+### Docker Examples
+
+The repository includes example scripts in `docker-examples/` to test the Docker setup:
+
+- `demo-script.sh` - Basic bash script demo
+- `demo-script.py` - Python script demo  
+- `long-running-demo.sh` - Long-running process demo
+
+**Copy examples to your scripts directory:**
+```bash
+# Create scripts directory and copy examples
+mkdir -p docker-scripts
+cp docker-examples/* docker-scripts/
+chmod +x docker-scripts/*.sh
+```
+
+### Docker Configuration
+
+The Docker setup includes:
+
+- **Automatic dependency management** using `uv`
+- **Volume mounting** for persistent scripts and logs
+- **Health checks** for container monitoring
+- **Environment variables** for configuration
+
+**Environment Variables:**
+- `DESTO_SCRIPTS_DIR=/app/scripts` - Scripts directory
+- `DESTO_LOGS_DIR=/app/logs` - Logs directory
+
+**Custom Configuration:**
+```yaml
+# docker-compose.yml
+services:
+  desto:
+    build: .
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./my-scripts:/app/scripts
+      - ./my-logs:/app/logs
+    environment:
+      - DESTO_SCRIPTS_DIR=/app/scripts
+      - DESTO_LOGS_DIR=/app/logs
+```
+
+### Docker Management
+
+```bash
+# View logs
+docker-compose logs -f desto
+
+# Stop the service
+docker-compose down
+
+# Restart the service
+docker-compose restart desto
+
+# Update the container
+docker-compose pull && docker-compose up -d
+```
+
+---
 
 ## Installation
 

@@ -1,0 +1,38 @@
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    tmux \
+    at \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY src/ ./src/
+
+# Install dependencies using uv
+RUN uv sync --frozen
+
+# Create directories for scripts and logs
+RUN mkdir -p /app/scripts /app/logs
+
+# Set environment variables
+ENV DESTO_SCRIPTS_DIR=/app/scripts
+ENV DESTO_LOGS_DIR=/app/logs
+
+# Expose web dashboard port
+EXPOSE 8088
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8088 || exit 1
+
+# Start the dashboard using uv
+CMD ["uv", "run", "desto"]
