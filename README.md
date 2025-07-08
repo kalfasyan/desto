@@ -1,11 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" alt="desto Logo" ---
-
-## 📋 Features Overview
-
-<div align="left">
-
-<details>Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
+  <img src="images/logo.png" alt="desto Logo" title="desto Logo" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
 </p>  
 
 
@@ -71,9 +65,10 @@ make docker-run
 
 ---
 
-## � Features Overview
+### 🔧 Traditional Installation
 
 <div align="left">
+
 
 <details>
 <summary><strong>👀 Dashboard Overview</strong></summary>
@@ -128,7 +123,15 @@ More settings to be added!
 
 </div>
 
----
+
+## Requirements
+
+- Python 3.11+
+- [tmux](https://github.com/tmux/tmux)
+- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
+  
+Check [`pyproject.toml`](pyproject.toml)
+
 
 ## 🐳 Docker Installation (Recommended)
 
@@ -225,17 +228,7 @@ services:
 
 ---
 
-## 🔧 Traditional Installation
-
-If you prefer to install desto without Docker, you can install it directly on your system.
-
-### Requirements
-
-- Python 3.11+
-- [tmux](https://github.com/tmux/tmux)
-- [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
-
-### Installation Steps
+## Installation
 
 1. **Install `tmux` and `at`**  
    <details>
