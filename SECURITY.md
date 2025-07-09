@@ -15,9 +15,7 @@ If you discover a security vulnerability in this project, **please do not create
 
 **kalfasyan+security@gmail.com**
 
-Please include as much detail as possible to help us quickly understand and address the issue. I will respond as soon as possible and coordinate a fix and disclosure process as appropriate.
+Please include as much detail as possible to help me quickly understand and address the issue. I will respond as soon as possible and coordinate a fix and disclosure process as appropriate.
 
 - I appreciate responsible disclosure.
 - After a fix is released, I will credit reporters (if desired) in the release notes.
-
-For more information, see [GitHub's documentation on coordinated disclosure](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/creating-a-security-advisory). 
