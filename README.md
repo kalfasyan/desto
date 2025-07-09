@@ -119,42 +119,39 @@ More settings to be added!
 
 ---   
 
-## 🛠️ Installation  
+## 📊 Dashboard Installation with Docker 🐳  
 
-
-### 🐳 Docker Installation (only dashboard)
-
-Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.
+Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started. Note that the Docker installation will only install the dashboard, not the CLI. If you are not familiar with Docker, you may visit [Docker's official website](https://www.docker.com/) for more information.
 
 ### Quick Setup
 
-See the [Quick Start with Docker](#-quick-start-with-docker) section above for a complete guide.
+See section above: [Quick Start with Docker](#-quick-start-with-docker)
 
+<details>
+<summary><strong>Useful Docker Commands</strong></summary>
 
-### Useful Commands
-
-#### View logs
 ```bash
+# View logs
 docker logs -f desto-dashboard
 ```
 
-#### Stop the container
 ```bash
+# Stop the container
 docker stop desto-dashboard
 ```
 
-#### Remove the container
 ```bash
+# Remove the container
 docker rm desto-dashboard
 ```
 
-#### Rebuild after changes
 ```bash
+# Rebuild after changes
 docker build -t desto:latest . --no-cache
 ```
 
-#### Run the container
 ```bash
+# Run the container
 docker run -d -p 8809:8809 \
   -v $PWD/desto_scripts:/app/scripts \
   -v $PWD/desto_logs:/app/logs \
@@ -162,35 +159,41 @@ docker run -d -p 8809:8809 \
   desto:latest
 ```
 
-#### List all containers
 ```bash
+# List all containers
 docker ps -a
 ```
 
-#### List all images
 ```bash
+# List all images
 docker images -a
 ```
 
-#### Remove all stopped containers
 ```bash
+# Remove all stopped containers
 docker container prune
 ```
 
-#### Remove all unused images
 ```bash
+# Remove all unused images
 docker image prune -a
 ```
 
-#### Remove the container and image
 ```bash
+# Remove the container and image
 docker rm -f desto-dashboard
 ```
+
 ```bash
+# Remove the container and image
 docker rmi desto:latest
 ```
 
-## 🔧 Traditional Installation
+</details>
+
+## 🖥️ CLI & 📊 Dashboard Installation with `uv` or `pip`  
+
+If you are not familiar with `uv`, you may visit [uv's official website](https://docs.astral.sh/uv/getting-started/installation/) for more information.  
 
 ### Requirements
 
@@ -226,11 +229,11 @@ Check [`pyproject.toml`](pyproject.toml)
    <details>
    <summary>Installation Steps</summary>
 
-    - With [uv](https://github.com/astral-sh/uv), simply run:
+    - (Recommended) With [uv](https://github.com/astral-sh/uv), simply run:
       ```bash
       uv add desto
       ```
-      This will install desto in your project ✅
+      This will install desto in your project ✅  
       Or if you don't have a project yet, you can set up everything with [`uv`](https://docs.astral.sh/uv/getting-started/installation/):
 
       1. [Install `uv`](https://docs.astral.sh/uv/getting-started/installation/) by following the instructions on the official site.
@@ -258,11 +261,11 @@ Check [`pyproject.toml`](pyproject.toml)
 4. **Open in your browser**  
    After starting, visit [http://localhost:8809](http://localhost:8809) (or the address shown in your terminal).
 
-## 🖥️ Command Line Interface (CLI)
+### 🖥️ Command Line Interface (CLI)
 
-In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line. Note that the CLI is not required to use **desto**, and it is only available when you follow the traditional installation steps.
+In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line. Note that the CLI is not required to use **desto**, and it is not available when you use the Docker installation steps.  
 
-### Installation as a uv Tool
+#### Installation as a uv Tool
 
 ```bash
 # Install desto CLI globally
@@ -277,57 +280,61 @@ This installs two executables:
 - `desto` - Web dashboard  
 - `desto-cli` - Command-line interface
 
-### Quick CLI Usage
+<details>
+<summary><strong>Quick CLI Usage</strong></summary>
 
-#### Check system status
+
 ```bash
+# Check system status
 desto-cli doctor
 ```
 
-#### List all sessions
 ```bash
+# List all sessions
 desto-cli sessions list
 ```
 
-#### Start a new session
 ```bash
+# Start a new session
 desto-cli sessions start "my-task" "python my_script.py"
 ```
 
-#### View session logs
 ```bash
+# View session logs
 desto-cli sessions logs "my-task"
 ```
 
-#### Kill a session
 ```bash
+# Kill a session
 desto-cli sessions kill "my-task"
 ```
 
-#### List all scripts
 ```bash
+# List all scripts
 desto-cli scripts list
 ```
 
-#### Create new script
 ```bash
+# Create new script
 desto-cli scripts create "my_script" --type python
 ```
 
-#### Edit script in $EDITOR
 ```bash
+# Edit script in $EDITOR
 desto-cli scripts edit "my_script"
 ```
 
-#### Run script in tmux session
 ```bash
+# Run script in tmux session
 desto-cli scripts run "my_script"
 ```
 
-#### Run script directly
 ```bash
+# Run script directly
 desto-cli scripts run "my_script" --direct
 ```
+
+</details>
 
 **📖 [Full CLI Documentation →](src/desto/cli/README.md)**
 
