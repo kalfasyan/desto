@@ -808,26 +808,25 @@ class UserInterfaceManager:
 
     def build_logging_command(self, log_file_path, info_block, exec_cmd, finished_marker_cmd, keep_alive=False):
         """Build a properly formatted logging command that appends to existing logs."""
-        from datetime import datetime
 
         # Check if log file exists to determine if we should append or create new
         append_mode = Path(log_file_path).exists()
 
-        # Build the command components
+        # Build the command components using printf for better shell compatibility
         if append_mode:
             # If log file exists, append a separator and the new info block
-            separator_cmd = f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> '{log_file_path}'"
-            info_cmd = f"echo -e '{info_block}' >> '{log_file_path}'"
+            separator_cmd = f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> '{log_file_path}'"
+            info_cmd = f"printf '%s\\n' {repr(info_block)} >> '{log_file_path}'"
         else:
             # If log file doesn't exist, create it with the info block
             separator_cmd = ""
-            info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
+            info_cmd = f"printf '%s\\n' {repr(info_block)} > '{log_file_path}'"
 
-        # Add pre-script logging - use double dollar to escape for shell expansion
-        pre_script_log = f"echo -e '\\n=== SCRIPT STARTING at $(date) ===\\n' >> '{log_file_path}'"
+        # Add pre-script logging - use printf for better shell compatibility
+        pre_script_log = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
 
-        # Add post-script logging - use double dollar to escape for shell expansion  
-        post_script_log = f"echo -e '\\n=== SCRIPT FINISHED at $(date) ===\\n' >> '{log_file_path}'"
+        # Add post-script logging
+        post_script_log = f"printf '\\n=== SCRIPT FINISHED at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
 
         # Build the full command
         cmd_parts = []
@@ -843,7 +842,9 @@ class UserInterfaceManager:
         cmd_parts.append(pre_script_log)
 
         # Add the actual script execution with output redirection
-        cmd_parts.append(f"{exec_cmd} >> '{log_file_path}' 2>&1")
+        # FIXED: Group the execution command in parentheses to ensure ALL output gets redirected
+        # This fixes the issue where only the last command in a chain gets logged
+        cmd_parts.append(f"({exec_cmd}) >> '{log_file_path}' 2>&1")
 
         # Add post-script logging
         cmd_parts.append(post_script_log)
@@ -928,25 +929,26 @@ class UserInterfaceManager:
                 # Check if log file exists to determine if we should append or create new
                 append_mode = Path(log_file_path).exists()
 
-                # Add initial info block
+                # Add initial info block using printf for better compatibility
                 if append_mode:
-                    cmd_parts.append(f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> '{log_file_path}'")
-                    cmd_parts.append(f"echo -e '{info_block}' >> '{log_file_path}'")
+                    cmd_parts.append(f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> '{log_file_path}'")
+                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} >> '{log_file_path}'")
                 else:
-                    cmd_parts.append(f"echo -e '{info_block}' > '{log_file_path}'")
+                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} > '{log_file_path}'")
 
                 # Add each script in the chain with proper logging
                 for idx, (script, args) in enumerate(self.chain_queue):
                     script_name = Path(script).name
                     # Add separator for each script
-                    separator = f"echo -e '\\n---- NEW SCRIPT ({script_name}) -----\\n' >> '{log_file_path}'"
-                    # Add pre-script logging - use double dollar to escape for shell expansion
-                    pre_script_log = f"echo -e '\\n=== SCRIPT STARTING at $(date) ===\\n' >> '{log_file_path}'"
+                    separator = f"printf '\\n---- NEW SCRIPT (%s) -----\\n' '{script_name}' >> '{log_file_path}'"
+                    # Add pre-script logging
+                    pre_script_log = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
                     # Build execution command
                     exec_cmd = self.build_execution_command(script, args)
-                    run_script = f"{exec_cmd} >> '{log_file_path}' 2>&1"
-                    # Add post-script logging - use double dollar to escape for shell expansion
-                    post_script_log = f"echo -e '\\n=== SCRIPT FINISHED at $(date) ===\\n' >> '{log_file_path}'"
+                    # FIXED: Group execution command to ensure proper logging
+                    run_script = f"({exec_cmd}) >> '{log_file_path}' 2>&1"
+                    # Add post-script logging using printf for consistency
+                    post_script_log = f"printf '\\n=== SCRIPT FINISHED at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
 
                     cmd_parts.extend([separator, pre_script_log, run_script, post_script_log])
 

@@ -171,28 +171,28 @@ class TmuxManager:
         append_mode = log_file.exists()
 
         # Enhanced logging: Create a comprehensive command that handles all logging properly
-        from datetime import datetime
 
-        # Build the enhanced command with proper logging
+        # Build the enhanced command with proper logging using printf for better compatibility
         cmd_parts = []
 
         # Add session separator if appending
         if append_mode:
-            separator = f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> {quoted_log_file}"
+            separator = f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> {quoted_log_file}"
             cmd_parts.append(separator)
-            # Add pre-script logging (append mode) - use $(date) so the shell expands it
-            pre_script_log = f'echo -e "\\n=== SCRIPT STARTING at $(date) ===\\n" >> {quoted_log_file}'
+            # Add pre-script logging (append mode)
+            pre_script_log = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" >> {quoted_log_file}'
             cmd_parts.append(pre_script_log)
         else:
-            # For new log file, create it with the start logging - use $(date) so the shell expands it
-            pre_script_log = f'echo -e "\\n=== SCRIPT STARTING at $(date) ===\\n" > {quoted_log_file}'
+            # For new log file, create it with the start logging
+            pre_script_log = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" > {quoted_log_file}'
             cmd_parts.append(pre_script_log)
 
-        # Add the actual command with output redirection (always append now since log file exists)
-        cmd_parts.append(f"{command} >> {quoted_log_file} 2>&1")
+        # FIXED: Group the command in parentheses to ensure ALL output gets redirected properly
+        # This fixes the chain logging issue where only the last command's output was captured
+        cmd_parts.append(f"({command}) >> {quoted_log_file} 2>&1")
 
         # Add post-script logging
-        post_script_log = f'echo -e "\\n=== SCRIPT FINISHED at $(date) ===\\n" >> {quoted_log_file}'
+        post_script_log = f'printf "\\n=== SCRIPT FINISHED at %s ===\\n" "$(date)" >> {quoted_log_file}'
         cmd_parts.append(post_script_log)
 
         # Add finished marker
@@ -214,6 +214,8 @@ class TmuxManager:
                     "-d",
                     "-s",
                     session_name,
+                    "bash",
+                    "-c",
                     full_command_for_tmux,
                 ],
                 stdout=subprocess.PIPE,
