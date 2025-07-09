@@ -747,21 +747,10 @@ class UserInterfaceManager:
         name_dialog.open()
 
     async def run_session_with_keep_alive(self, session_name, script_path, arguments, keep_alive):
-        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-        info_block = self.get_log_info_block(script_path, session_name)
-        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+        # Build the basic execution command - TmuxManager will handle all logging
         exec_cmd = self.build_execution_command(script_path, arguments)
-        if keep_alive:
-            tmux_cmd = (
-                f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
-                f"{finished_marker_cmd}; "
-                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
-            )
-        else:
-            tmux_cmd = f"echo -e '{info_block}' > '{log_file_path}'; {exec_cmd} >> '{log_file_path}' 2>&1; {finished_marker_cmd}"
 
-        self.tmux_manager.start_tmux_session(session_name, tmux_cmd, logger)
+        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
         ui.notification(f"Started session '{session_name}'.", type="positive")
 
     async def run_chain_queue(self, session_name, arguments, keep_alive):
@@ -770,30 +759,20 @@ class UserInterfaceManager:
             return
 
         session_name = session_name.strip() or f"chain_{os.getpid()}"
-        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-        info_block = self.get_log_info_block(self.chain_queue[0][0], session_name)
 
-        chained_cmds = []
-        for idx, (script, args) in enumerate(self.chain_queue):
-            separator = f"echo -e '\\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
+        # Build a single command that runs all scripts in sequence
+        chain_commands = []
+        for script, args in self.chain_queue:
+            script_name = Path(script).name
             exec_cmd = self.build_execution_command(script, args)
-            run_script = f"{exec_cmd} >> '{log_file_path}' 2>&1"
-            chained_cmds.append(f"{separator} && {run_script}")
+            # Add a separator echo before each script
+            chain_commands.append(f"echo '---- Running {script_name} ----'")
+            chain_commands.append(exec_cmd)
 
-        if not log_file_path.exists():
-            info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
-        else:
-            info_cmd = f"echo '' >> '{log_file_path}'"
+        # Join all commands with &&
+        full_chain_cmd = " && ".join(chain_commands)
 
-        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-
-        # If keep_alive, run tail after marker
-        if keep_alive:
-            cmd = f"bash -c \"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}; tail -f /dev/null >> '{log_file_path}' 2>&1\""
-        else:
-            cmd = f'bash -c "{info_cmd}; {" && ".join(chained_cmds)} && {finished_marker_cmd}"'
-
-        self.tmux_manager.start_tmux_session(session_name, cmd, logger)
+        self.tmux_manager.start_tmux_session(session_name, full_chain_cmd, logger, keep_alive)
         ui.notification(f"Started chained session '{session_name}'.", type="positive")
         self.chain_queue.clear()
         self.refresh_chain_queue_display()
@@ -827,24 +806,62 @@ class UserInterfaceManager:
         info_lines.append("")  # Blank line
         return "\\n".join(info_lines)
 
-    async def run_session_with_save_check(self, session_name, script_path, arguments, keep_alive):
-        log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-        info_block = self.get_log_info_block(script_path, session_name)
-        finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-        exec_cmd = self.build_execution_command(script_path, arguments)
-        if keep_alive:
-            cmd = (
-                f'bash -c "'
-                f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"{exec_cmd} >> '{log_file_path}' 2>&1 && "
-                f"{finished_marker_cmd}; "
-                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
-                f'"'
-            )
-        else:
-            cmd = f"bash -c \"echo -e '{info_block}' > '{log_file_path}'; {exec_cmd} >> '{log_file_path}' 2>&1 && {finished_marker_cmd}\""
+    def build_logging_command(self, log_file_path, info_block, exec_cmd, finished_marker_cmd, keep_alive=False):
+        """Build a properly formatted logging command that appends to existing logs."""
+        from datetime import datetime
 
-        self.tmux_manager.start_tmux_session(session_name, cmd, logger)
+        # Check if log file exists to determine if we should append or create new
+        append_mode = Path(log_file_path).exists()
+
+        # Build the command components
+        if append_mode:
+            # If log file exists, append a separator and the new info block
+            separator_cmd = f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> '{log_file_path}'"
+            info_cmd = f"echo -e '{info_block}' >> '{log_file_path}'"
+        else:
+            # If log file doesn't exist, create it with the info block
+            separator_cmd = ""
+            info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
+
+        # Add pre-script logging - use double dollar to escape for shell expansion
+        pre_script_log = f"echo -e '\\n=== SCRIPT STARTING at $(date) ===\\n' >> '{log_file_path}'"
+
+        # Add post-script logging - use double dollar to escape for shell expansion  
+        post_script_log = f"echo -e '\\n=== SCRIPT FINISHED at $(date) ===\\n' >> '{log_file_path}'"
+
+        # Build the full command
+        cmd_parts = []
+
+        # Add separator if needed
+        if separator_cmd:
+            cmd_parts.append(separator_cmd)
+
+        # Add info block
+        cmd_parts.append(info_cmd)
+
+        # Add pre-script logging
+        cmd_parts.append(pre_script_log)
+
+        # Add the actual script execution with output redirection
+        cmd_parts.append(f"{exec_cmd} >> '{log_file_path}' 2>&1")
+
+        # Add post-script logging
+        cmd_parts.append(post_script_log)
+
+        # Add finished marker
+        cmd_parts.append(finished_marker_cmd)
+
+        # Add keep-alive if requested
+        if keep_alive:
+            cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
+
+        return " && ".join(cmd_parts)
+
+    async def run_session_with_save_check(self, session_name, script_path, arguments, keep_alive):
+        # Build the basic execution command - TmuxManager will handle all logging
+        exec_cmd = self.build_execution_command(script_path, arguments)
+
+        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
         ui.notification(f"Scheduled session '{session_name}' started.", type="positive")
 
     def schedule_launch(self):
@@ -903,23 +920,45 @@ class UserInterfaceManager:
             if self.chain_queue:
                 log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
                 info_block = self.get_log_info_block(self.chain_queue[0][0], session_name, scheduled_dt)
-                chained_cmds = []
+                finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
+
+                # Build the chain command with proper logging
+                cmd_parts = []
+
+                # Check if log file exists to determine if we should append or create new
+                append_mode = Path(log_file_path).exists()
+
+                # Add initial info block
+                if append_mode:
+                    cmd_parts.append(f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> '{log_file_path}'")
+                    cmd_parts.append(f"echo -e '{info_block}' >> '{log_file_path}'")
+                else:
+                    cmd_parts.append(f"echo -e '{info_block}' > '{log_file_path}'")
+
+                # Add each script in the chain with proper logging
                 for idx, (script, args) in enumerate(self.chain_queue):
-                    separator = f"echo -e '\n---- NEW SCRIPT ({Path(script).name}) -----\\n' >> '{log_file_path}'"
+                    script_name = Path(script).name
+                    # Add separator for each script
+                    separator = f"echo -e '\\n---- NEW SCRIPT ({script_name}) -----\\n' >> '{log_file_path}'"
+                    # Add pre-script logging - use double dollar to escape for shell expansion
+                    pre_script_log = f"echo -e '\\n=== SCRIPT STARTING at $(date) ===\\n' >> '{log_file_path}'"
+                    # Build execution command
                     exec_cmd = self.build_execution_command(script, args)
                     run_script = f"{exec_cmd} >> '{log_file_path}' 2>&1"
-                    chained_cmds.append(f"{separator} && {run_script}")
-                if not log_file_path.exists():
-                    info_cmd = f"echo -e '{info_block}' > '{log_file_path}'"
-                else:
-                    info_cmd = f"echo '' >> '{log_file_path}'"
+                    # Add post-script logging - use double dollar to escape for shell expansion
+                    post_script_log = f"echo -e '\\n=== SCRIPT FINISHED at $(date) ===\\n' >> '{log_file_path}'"
 
-                finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-                # The full command to run in tmux
+                    cmd_parts.extend([separator, pre_script_log, run_script, post_script_log])
+
+                # Add finished marker
+                cmd_parts.append(finished_marker_cmd)
+
+                # Add keep-alive if requested
                 if keep_alive:
-                    tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}; tail -f /dev/null >> '{log_file_path}' 2>&1"
-                else:
-                    tmux_cmd = f"{info_cmd}; {' && '.join(chained_cmds)} && {finished_marker_cmd}"
+                    cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
+
+                # Join all parts with &&
+                tmux_cmd = " && ".join(cmd_parts)
                 tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
                 # Schedule with 'at'
                 at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
@@ -951,12 +990,9 @@ class UserInterfaceManager:
             info_block = self.get_log_info_block(script_file_path, session_name, scheduled_dt)
             finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
             exec_cmd = self.build_execution_command(script_file_path, arguments)
-            tmux_cmd = (
-                f"echo -e '{info_block}' > '{log_file_path}'; "
-                f"{exec_cmd} >> '{log_file_path}' 2>&1; "
-                f"{finished_marker_cmd}; "
-                f"tail -f /dev/null >> '{log_file_path}' 2>&1"
-            )
+
+            # Use the new logging command builder
+            tmux_cmd = self.build_logging_command(log_file_path, info_block, exec_cmd, finished_marker_cmd, keep_alive=True)
             tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
             at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
             import subprocess

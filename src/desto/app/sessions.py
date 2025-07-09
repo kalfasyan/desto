@@ -169,23 +169,42 @@ class TmuxManager:
 
         quoted_log_file = shlex.quote(str(log_file))
         append_mode = log_file.exists()
-        # If appending, add a separator before the new output
-        if append_mode:
-            try:
-                with log_file.open("a") as f:
-                    f.write("\n---- NEW SCRIPT -----\n")
-            except Exception as e:
-                msg = f"Failed to write separator to log file '{log_file}': {e}"
-                logger.error(msg)
-                ui.notification(msg, type="negative")
-                return
 
-        redir = ">>" if append_mode else ">"
+        # Enhanced logging: Create a comprehensive command that handles all logging properly
+        from datetime import datetime
+
+        # Build the enhanced command with proper logging
+        cmd_parts = []
+
+        # Add session separator if appending
+        if append_mode:
+            separator = f"echo -e '\\n---- NEW SESSION ({datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) -----\\n' >> {quoted_log_file}"
+            cmd_parts.append(separator)
+            # Add pre-script logging (append mode) - use $(date) so the shell expands it
+            pre_script_log = f'echo -e "\\n=== SCRIPT STARTING at $(date) ===\\n" >> {quoted_log_file}'
+            cmd_parts.append(pre_script_log)
+        else:
+            # For new log file, create it with the start logging - use $(date) so the shell expands it
+            pre_script_log = f'echo -e "\\n=== SCRIPT STARTING at $(date) ===\\n" > {quoted_log_file}'
+            cmd_parts.append(pre_script_log)
+
+        # Add the actual command with output redirection (always append now since log file exists)
+        cmd_parts.append(f"{command} >> {quoted_log_file} 2>&1")
+
+        # Add post-script logging
+        post_script_log = f'echo -e "\\n=== SCRIPT FINISHED at $(date) ===\\n" >> {quoted_log_file}'
+        cmd_parts.append(post_script_log)
+
+        # Add finished marker
+        finished_marker_cmd = f"touch '{self.LOG_DIR}/{session_name}.finished'"
+        cmd_parts.append(finished_marker_cmd)
+
         # Only append tail -f /dev/null if keep_alive is True
         if keep_alive:
-            full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1; tail -f /dev/null {redir} {quoted_log_file} 2>&1"
-        else:
-            full_command_for_tmux = f"{command} {redir} {quoted_log_file} 2>&1"
+            cmd_parts.append(f"tail -f /dev/null >> {quoted_log_file} 2>&1")
+
+        # Join all parts with &&
+        full_command_for_tmux = " && ".join(cmd_parts)
 
         try:
             subprocess.run(
