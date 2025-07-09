@@ -45,14 +45,14 @@ make docker-setup-examples
 docker build -t desto:latest .
 
 # Use the example scripts (or your own scripts directory)
-docker run -d -p 8088:8088 \
-  -v $PWD/desto_scripts:/app/scripts \
-  -v $PWD/desto_logs:/app/logs \
+docker run -d -p 8809:8809 \
+  -v $PWD/desto_scripts:/app/desto_scripts \
+  -v $PWD/desto_logs:/app/desto_logs \
   --name desto-dashboard \
   desto:latest
 ```
 
-**🌐 Access the dashboard at: http://localhost:8088**
+**🌐 Access the dashboard at: http://localhost:8809**
 
 **Make sure your bash scripts are executable:**
 ```bash
@@ -139,7 +139,7 @@ docker rm desto-dashboard
 
 # Rebuild after changes
 docker build -t desto:latest . --no-cache
-docker run -d -p 8088:8088 \
+docker run -d -p 8809:8809 \
   -v $PWD/desto_scripts:/app/scripts \
   -v $PWD/desto_logs:/app/logs \
   --name desto-dashboard \
@@ -228,7 +228,7 @@ Check [`pyproject.toml`](pyproject.toml)
    ```
 
 4. **Open in your browser**  
-   After starting, visit [http://localhost:8088](http://localhost:8088) (or the address shown in your terminal).
+   After starting, visit [http://localhost:8809](http://localhost:8809) (or the address shown in your terminal).
 
 ## 🖥️ Command Line Interface
 

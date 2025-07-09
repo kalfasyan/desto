@@ -24,7 +24,7 @@ jobs:
     - name: Test Docker image
       run: |
         # Start container in background
-        docker run -d --name desto-test -p 8088:8088 desto:test
+        docker run -d --name desto-test -p 8809:8809 desto:test
         
         # Wait for container to start
         sleep 10
@@ -33,7 +33,7 @@ jobs:
         docker ps | grep desto-test
         
         # Basic connectivity test
-        curl -f http://localhost:8088 || echo "Container is running but endpoint might not be ready"
+        curl -f http://localhost:8809 || echo "Container is running but endpoint might not be ready"
         
         # Check container logs
         docker logs desto-test

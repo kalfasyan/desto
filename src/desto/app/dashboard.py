@@ -53,7 +53,7 @@ def main():
     tm.resume_updates = lambda: resume_global_timer(um, tm)
 
     # Start the NiceGUI app on a custom port
-    ui.run(title="desto dashboard", port=8088, reload=False)
+    ui.run(title="desto dashboard", port=8809, reload=False)
 
 
 if __name__ in {"__main__", "__mp_main__"}:

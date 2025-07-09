@@ -33,7 +33,7 @@ Long-running script (30 seconds) that demonstrates:
 2. **Start desto with Docker:**
    ```bash
    docker build -t desto:latest .
-   docker run -d -p 8088:8088 \
+   docker run -d -p 8809:8809 \
      -v $PWD/desto_scripts:/app/scripts \
      -v $PWD/desto_logs:/app/logs \
      --name desto-dashboard \
@@ -41,7 +41,7 @@ Long-running script (30 seconds) that demonstrates:
    ```
 
 3. **Access the dashboard:**
-   Open http://localhost:8088 in your browser
+   Open http://localhost:8809 in your browser
 
 4. **Run example scripts:**
    - Select any of the demo scripts from the dashboard
