@@ -29,7 +29,7 @@ The key features are:
   
 ## Quick Start with Docker 🐳⚡  
 
-The fastest way to get up and running with `desto` is to use Docker. If you prefer to simply install it on your machine with `uv` or `pip`, follow the [Traditional Installation](#-traditional-installation) section below. To get started with Docker, follow these steps:
+The fastest way to get up and running with `desto` is to use Docker. If you prefer to simply install it on your machine with `uv` or `pip`, follow the [CLI & Dashboard Installation with `uv` or `pip`](#-cli--dashboard-installation-with-uv-or-pip) section below. To get started with Docker, follow these steps:
 
 1. **Clone the repository**
     ```bash
