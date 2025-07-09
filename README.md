@@ -27,40 +27,39 @@ The key features are:
 
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
   
-# ⚡ Quick Start
+## Quick Start with Docker 🐳⚡  
 
-### 🐳 Quick Start with Docker  
+The fastest way to get up and running with `desto` is to use Docker. If you prefer to simply install it on your machine with `uv` or `pip`, follow the [Traditional Installation](#-traditional-installation) section below. To get started with Docker, follow these steps:
 
-The easiest way to get started with desto is using Docker:
+1. **Clone the repository**
+    ```bash
+    git clone https://github.com/kalfasyan/desto.git
+    ```
 
-```bash
-# Clone the repository
-git clone https://github.com/kalfasyan/desto.git
-cd desto
+2. **Navigate to the main directory**
+    ```bash
+    cd desto
+    ```
 
-# Set up example scripts (optional - for testing)
-make docker-setup-examples
+3. **Build the Docker image**
+    ```bash
+    docker build -t desto:latest .
+    ```
 
-# Build Docker image
-docker build -t desto:latest .
+4. **Run the container**
+    ```bash
+    docker run -d -p 8809:8809 \
+      -v $PWD/desto_scripts:/app/desto_scripts \
+      -v $PWD/desto_logs:/app/desto_logs \
+      --name desto-dashboard \
+      desto:latest
+    ```
 
-# Use the example scripts (or your own scripts directory)
-docker run -d -p 8809:8809 \
-  -v $PWD/desto_scripts:/app/desto_scripts \
-  -v $PWD/desto_logs:/app/desto_logs \
-  --name desto-dashboard \
-  desto:latest
-```
-
-**🌐 Access the dashboard at: http://localhost:8809**
-
-**Make sure your bash scripts are executable:**
-```bash
-chmod +x /path/to/your/scripts/*.sh
-```
 ---
 
-# ✨ `desto` Overview
+**🌐 Access the dashboard at:** [http://localhost:8809](http://localhost:8809)
+
+## ✨ `desto` Overview
 
 <div align="left">
 
@@ -71,7 +70,9 @@ chmod +x /path/to/your/scripts/*.sh
 
 </details>  
       
-**🚀 Launch your scripts as `tmux` sessions**    
+<details>
+<summary><strong>🚀 Launch your scripts as `tmux` sessions</strong></summary>
+
 When you start `desto`, it creates `desto_scripts/` and `desto_logs/` folders in your current directory. Want to use your own locations? Just change these in the settings, or set the `DESTO_SCRIPTS_DIR` and `DESTO_LOGS_DIR` environment variables.
 
 Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py` (Python) scripts are supported with automatic detection and appropriate execution. Ready to launch? Just:
@@ -82,8 +83,13 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
 4. Click "Launch"! 🎬
 
 <img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-  
+</details>
+
+<details>
+<summary><strong>🟢 Keep Alive</strong></summary>
+
 🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
+</details>
 
 <details>
 <summary><strong>✍️ Write new scripts and save them</strong></summary>
@@ -113,52 +119,74 @@ More settings to be added!
 
 ---   
 
-# 🛠️ Installation  
+## 🛠️ Installation  
 
 
-## 🐳 Docker Installation (only dashboard)
+### 🐳 Docker Installation (only dashboard)
 
 Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started.
 
-### Quick Docker Setup
+### Quick Setup
 
 See the [Quick Start with Docker](#-quick-start-with-docker) section above for a complete guide.
 
 
-### Docker Management
+### Useful Commands
 
+#### View logs
 ```bash
-# View logs
 docker logs -f desto-dashboard
+```
 
-# Stop the container
+#### Stop the container
+```bash
 docker stop desto-dashboard
+```
 
-# Remove the container
+#### Remove the container
+```bash
 docker rm desto-dashboard
+```
 
-# Rebuild after changes
+#### Rebuild after changes
+```bash
 docker build -t desto:latest . --no-cache
+```
+
+#### Run the container
+```bash
 docker run -d -p 8809:8809 \
   -v $PWD/desto_scripts:/app/scripts \
   -v $PWD/desto_logs:/app/logs \
   --name desto-dashboard \
   desto:latest
+```
 
-# List all containers
+#### List all containers
+```bash
 docker ps -a
+```
 
-# List all images
+#### List all images
+```bash
 docker images -a
+```
 
-# Remove all stopped containers
+#### Remove all stopped containers
+```bash
 docker container prune
+```
 
-# Remove all unused images
+#### Remove all unused images
+```bash
 docker image prune -a
+```
 
-# Remove the container and image
+#### Remove the container and image
+```bash
 docker rm -f desto-dashboard
+```
+```bash
 docker rmi desto:latest
 ```
 
@@ -230,9 +258,9 @@ Check [`pyproject.toml`](pyproject.toml)
 4. **Open in your browser**  
    After starting, visit [http://localhost:8809](http://localhost:8809) (or the address shown in your terminal).
 
-## 🖥️ Command Line Interface
+## 🖥️ Command Line Interface (CLI)
 
-In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line.
+In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line. Note that the CLI is not required to use **desto**, and it is only available when you follow the traditional installation steps.
 
 ### Installation as a uv Tool
 
@@ -251,28 +279,54 @@ This installs two executables:
 
 ### Quick CLI Usage
 
+#### Check system status
 ```bash
-# Check system status
 desto-cli doctor
+```
 
-# Session Management
+#### List all sessions
+```bash
 desto-cli sessions list
+```
 
-# Start a new session
+#### Start a new session
+```bash
 desto-cli sessions start "my-task" "python my_script.py"
+```
 
-# View session logs
+#### View session logs
+```bash
 desto-cli sessions logs "my-task"
+```
 
-# Kill a session
+#### Kill a session
+```bash
 desto-cli sessions kill "my-task"
+```
 
-# Script Management
-desto-cli scripts list                     # List all scripts
-desto-cli scripts create "my_script" --type python  # Create new script
-desto-cli scripts edit "my_script"         # Edit script in $EDITOR  
-desto-cli scripts run "my_script"          # Run script in tmux session
-desto-cli scripts run "my_script" --direct # Run script directly
+#### List all scripts
+```bash
+desto-cli scripts list
+```
+
+#### Create new script
+```bash
+desto-cli scripts create "my_script" --type python
+```
+
+#### Edit script in $EDITOR
+```bash
+desto-cli scripts edit "my_script"
+```
+
+#### Run script in tmux session
+```bash
+desto-cli scripts run "my_script"
+```
+
+#### Run script directly
+```bash
+desto-cli scripts run "my_script" --direct
 ```
 
 **📖 [Full CLI Documentation →](src/desto/cli/README.md)**
