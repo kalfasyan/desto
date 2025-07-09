@@ -261,11 +261,7 @@ Check [`pyproject.toml`](pyproject.toml)
 4. **Open in your browser**  
    After starting, visit [http://localhost:8809](http://localhost:8809) (or the address shown in your terminal).
 
-### 🖥️ Command Line Interface (CLI)
-
-In addition to the web dashboard, **desto** includes a powerful CLI for managing tmux sessions from the terminal. Perfect for automation, scripting, or when you prefer the command line. Note that the CLI is not required to use **desto**, and it is not available when you use the Docker installation steps.  
-
-#### Installation as a uv Tool
+### Global `desto` Installation as a `uv` Tool (includes CLI)
 
 ```bash
 # Install desto CLI globally
@@ -278,7 +274,7 @@ uv tool install . --force
 
 This installs two executables:
 - `desto` - Web dashboard  
-- `desto-cli` - Command-line interface
+- `desto-cli` - Command-line interface (work in progress)
 
 <details>
 <summary><strong>Quick CLI Usage</strong></summary>
