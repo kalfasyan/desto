@@ -26,38 +26,6 @@ The key features are:
 <strong>🎬 Demo</strong>
 
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
-  
-## Quick Start with Docker 🐳⚡  
-
-The fastest way to get up and running with `desto` is to use Docker. If you prefer to simply install it on your machine with `uv` or `pip`, follow the [CLI & Dashboard Installation with `uv` or `pip`](https://github.com/kalfasyan/desto?tab=readme-ov-file#%EF%B8%8F-cli---dashboard-installation-with-uv-or-pip) section below. To get started with Docker, follow these steps:
-
-1. **Clone the repository**
-    ```bash
-    git clone https://github.com/kalfasyan/desto.git
-    ```
-
-2. **Navigate to the main directory**
-    ```bash
-    cd desto
-    ```
-
-3. **Build the Docker image**
-    ```bash
-    docker build -t desto:latest .
-    ```
-
-4. **Run the container**
-    ```bash
-    docker run -d -p 8809:8809 \
-      -v $PWD/desto_scripts:/app/desto_scripts \
-      -v $PWD/desto_logs:/app/desto_logs \
-      --name desto-dashboard \
-      desto:latest
-    ```
-
----
-
-**🌐 Access the dashboard at:** [http://localhost:8809](http://localhost:8809)
 
 ## ✨ `desto` Overview
 
@@ -117,83 +85,78 @@ More settings to be added!
 
 </div>  
 
----   
+## ⚡ Quick Start with Docker 🐳  
 
-## 📊 Dashboard Installation with Docker 🐳  
+The fastest way to ship `desto` is by using Docker Compose 🚢  
 
-Docker lets you run desto without installing anything on your computer. It provides a consistent environment across all platforms, making it the easiest way to get started. Note that the Docker installation will only install the dashboard, not the CLI. If you are not familiar with Docker, you may visit [Docker's official website](https://www.docker.com/) for more information.
+You only need Docker and Docker Compose installed on your machine. If you don't have them yet, you can find installation instructions on the [Docker website](https://docs.docker.com/get-docker/) and [Docker Compose documentation](https://docs.docker.com/compose/install/) (or follow your favorite LLM's instructions 😉).  
 
-### Quick Setup
+Start `desto` in just a few steps: 
 
-See section above: [Quick Start with Docker](#quick-start-with-docker-)
+1. **Clone the repository and go to it's main directory**
+    ```bash
+    git clone https://github.com/kalfasyan/desto.git && cd desto
+    ```
+
+2. **Start the application with Docker Compose**
+    ```bash
+    docker compose up -d
+    ```
+
+✅ **Done!** 🎉  
+
+You’re all set—your desto dashboard is now running at:  
+🌐 [http://localhost:8809](http://localhost:8809)
+
 
 <details>
-<summary><strong>Useful Docker Commands</strong></summary>
+<summary><strong>🚀 Essential Docker & Docker Compose Commands</strong></summary>
 
 ```bash
-# View logs
-docker logs -f desto-dashboard
+# Start the app in background (Docker Compose)
+docker compose up -d
 ```
 
 ```bash
-# Stop the container
-docker stop desto-dashboard
+# View logs (Docker Compose)
+docker compose logs -f
 ```
 
 ```bash
-# Remove the container
-docker rm desto-dashboard
+# Stop and remove services (Docker Compose)
+docker compose down
 ```
 
 ```bash
-# Rebuild after changes
-docker build -t desto:latest . --no-cache
+# Rebuild and start (Docker Compose)
+docker compose up -d --build
 ```
 
 ```bash
-# Run the container
+# Run the container directly (plain Docker)
 docker run -d -p 8809:8809 \
-  -v $PWD/desto_scripts:/app/scripts \
-  -v $PWD/desto_logs:/app/logs \
+  -v $PWD/desto_scripts:/app/desto_scripts \
+  -v $PWD/desto_logs:/app/desto_logs \
   --name desto-dashboard \
   desto:latest
 ```
 
 ```bash
-# List all containers
-docker ps -a
+# View logs (plain Docker)
+docker logs -f desto-dashboard
 ```
 
 ```bash
-# List all images
-docker images -a
+# Stop and remove the container (plain Docker)
+docker stop desto-dashboard && docker rm desto-dashboard
 ```
-
-```bash
-# Remove all stopped containers
-docker container prune
-```
-
-```bash
-# Remove all unused images
-docker image prune -a
-```
-
-```bash
-# Remove the container and image
-docker rm -f desto-dashboard
-```
-
-```bash
-# Remove the container and image
-docker rmi desto:latest
-```
-
 </details>
 
 ## 🖥️ CLI & 📊 Dashboard Installation with `uv` or `pip`  
 
-If you are not familiar with `uv`, you may visit [uv's official website](https://docs.astral.sh/uv/getting-started/installation/) for more information.  
+If you are not familiar with `uv`, you may visit [uv's official website](https://docs.astral.sh/uv/getting-started/installation/) for more information.
+
+`uv` is a super-fast Python package manager and virtual environment tool, written in Rust. It helps you manage dependencies, create isolated environments, and install packages much faster than traditional tools like pip.  
 
 ### Requirements
 

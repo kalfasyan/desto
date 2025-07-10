@@ -179,3 +179,5 @@ cython_debug/
 *.json
 output/
 *.finished
+tests/test_docker_compose.py
+desto_scripts/test_python.py

@@ -1,0 +1,21 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: desto-dashboard
+    ports:
+      - "8809:8809"
+    volumes:
+      - ./desto_scripts:/app/desto_scripts
+      - ./desto_logs:/app/desto_logs
+    environment:
+      - DESTO_SCRIPTS_DIR=/app/desto_scripts
+      - DESTO_LOGS_DIR=/app/desto_logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8809"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
