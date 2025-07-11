@@ -1,27 +1,24 @@
 import os
 import shlex
 import subprocess
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
 from nicegui import ui
 
+from desto.redis.client import DestoRedisClient
+from desto.redis.pubsub import SessionPubSub
+from desto.redis.status_tracker import SessionStatusTracker
+
 
 class TmuxManager:
     def __init__(self, ui, logger, log_dir=None, scripts_dir=None):
         scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
-        self.SCRIPTS_DIR = (
-            Path(scripts_dir_env)
-            if scripts_dir_env
-            else Path(scripts_dir or Path.cwd() / "desto_scripts")
-        )
-        self.LOG_DIR = (
-            Path(logs_dir_env)
-            if logs_dir_env
-            else Path(log_dir or Path.cwd() / "desto_logs")
-        )
+        self.SCRIPTS_DIR = Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        self.LOG_DIR = Path(logs_dir_env) if logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
         self.sessions = {}
         self.ui = ui
         self.sessions_container = ui.column().style("margin-top: 20px;")
@@ -39,6 +36,23 @@ class TmuxManager:
             ui.notification(msg, type="negative")
             raise
 
+        # Initialize Redis components with config
+        from desto.app.config import config as ui_settings
+
+        self.redis_client = DestoRedisClient(ui_settings.get("redis"))
+
+        # Only initialize Redis components if connected
+        if self.redis_client.is_connected():
+            self.status_tracker = SessionStatusTracker(self.redis_client)
+            self.pubsub = SessionPubSub(self.redis_client)
+            self.use_redis = True
+            logger.info("Redis enabled for session tracking")
+        else:
+            self.status_tracker = None
+            self.pubsub = None
+            self.use_redis = False
+            logger.info("Redis not available - using file-based session tracking")
+
     def start_session(self, session_name, command):
         """Start a new tmux session with the given command."""
         # Clean up finished marker before starting
@@ -54,6 +68,42 @@ class TmuxManager:
 
         subprocess.run(["tmux", "new-session", "-d", "-s", session_name, command])
         self.sessions[session_name] = command
+
+        # Track in Redis if available
+        if self.use_redis and self.status_tracker:
+            self.status_tracker.mark_session_started(
+                session_name=session_name,
+                command=command,
+                script_path=command,  # or extract script path from command
+            )
+
+            # Start monitoring this session
+            self._start_redis_monitoring(session_name)
+
+    def _start_redis_monitoring(self, session_name):
+        """Monitor tmux session and update Redis - only called if Redis is available"""
+
+        def monitor():
+            while True:
+                try:
+                    # Check if tmux session still exists
+                    sessions = self.check_sessions()
+                    if session_name not in sessions:
+                        # Session finished
+                        if self.use_redis:
+                            self.status_tracker.mark_session_finished(session_name, exit_code=0)
+                        break
+
+                    # Update heartbeat
+                    if self.use_redis:
+                        self.status_tracker.update_heartbeat(session_name)
+
+                    time.sleep(5)
+                except Exception as e:
+                    self.logger.error(f"Error monitoring session {session_name}: {e}")
+                    time.sleep(10)
+
+        threading.Thread(target=monitor, daemon=True).start()
 
     def check_sessions(self):
         """Check the status of existing tmux sessions with detailed information."""
@@ -226,6 +276,12 @@ class TmuxManager:
             msg = f"Tmux session '{session_name}' started. Command: '{full_command_for_tmux}'."
             logger.info(msg)
             ui.notification(f"Tmux session '{session_name}' started.", type="positive")
+
+            # Track in Redis if available
+            if self.use_redis:
+                self.status_tracker.mark_session_started(session_name=session_name, command=command, script_path=command)
+                self._start_redis_monitoring(session_name)
+
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"
             msg = f"Failed to start session '{session_name}': {error_output}"
@@ -243,9 +299,7 @@ class TmuxManager:
         sessions_status = self.check_sessions()
 
         self.clear_sessions_container()
-        self.add_to_sessions_container(
-            lambda: self.add_sessions_table(sessions_status, self.ui)
-        )
+        self.add_to_sessions_container(lambda: self.add_sessions_table(sessions_status, self.ui))
 
     def kill_tmux_session(self, session_name):
         """
@@ -273,9 +327,7 @@ class TmuxManager:
             self.pause_updates()  # Pause the global timer
 
         with self.ui.dialog() as dialog, self.ui.card():
-            self.ui.label(
-                f"Are you sure you want to kill the session '{session_name}'?"
-            )
+            self.ui.label(f"Are you sure you want to kill the session '{session_name}'?")
             with self.ui.row():
                 self.ui.button(
                     "Yes",
@@ -337,9 +389,7 @@ class TmuxManager:
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
                 ui.label(session_name).style(cell_style)
-                ui.label(
-                    datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")
-                ).style(cell_style)
+                ui.label(datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")).style(cell_style)
                 ui.label(elapsed_str).style(cell_style)
                 ui.label("Yes" if session["attached"] else "No").style(cell_style)
                 ui.label(status).style(cell_style)  # NEW STATUS COLUMN
@@ -412,9 +462,7 @@ class TmuxManager:
                     try:
                         finished_marker.unlink()
                     except Exception as e:
-                        self.logger.warning(
-                            f"Could not remove marker for {session_name}: {e}"
-                        )
+                        self.logger.warning(f"Could not remove marker for {session_name}: {e}")
 
                 self.logger.info(f"Successfully killed session: {session_name}")
 
@@ -423,9 +471,7 @@ class TmuxManager:
                 error_messages.append(error_msg)
                 self.logger.warning(error_msg)
             except Exception as e:
-                error_msg = (
-                    f"Unexpected error killing session '{session_name}': {str(e)}"
-                )
+                error_msg = f"Unexpected error killing session '{session_name}': {str(e)}"
                 error_messages.append(error_msg)
                 self.logger.error(error_msg)
 
@@ -468,28 +514,20 @@ class TmuxManager:
         finished_count = len(finished_sessions)
 
         def do_kill_all():
-            session_success, session_total, job_success, job_total, error_messages = (
-                self.kill_all_sessions_and_jobs()
-            )
+            session_success, session_total, job_success, job_total, error_messages = self.kill_all_sessions_and_jobs()
 
             results = []
             if session_total > 0:
                 if session_success == session_total:
                     results.append(f"Successfully cleared all {session_total} sessions")
                 else:
-                    results.append(
-                        f"Cleared {session_success}/{session_total} sessions"
-                    )
+                    results.append(f"Cleared {session_success}/{session_total} sessions")
 
             if job_total > 0:
                 if job_success == job_total:
-                    results.append(
-                        f"Successfully cancelled all {job_total} scheduled jobs"
-                    )
+                    results.append(f"Successfully cancelled all {job_total} scheduled jobs")
                 else:
-                    results.append(
-                        f"Cancelled {job_success}/{job_total} scheduled jobs"
-                    )
+                    results.append(f"Cancelled {job_success}/{job_total} scheduled jobs")
 
             if not results:
                 results.append("No items to clear")
@@ -497,9 +535,7 @@ class TmuxManager:
             msg = ". ".join(results) + "."
 
             if error_messages:
-                msg += (
-                    f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
-                )
+                msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
                 self.logger.warning(msg)
                 self.ui.notification(msg, type="warning")
             else:
@@ -516,17 +552,13 @@ class TmuxManager:
                 self.resume_updates()
 
         with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
-            self.ui.label("⚠️ Clear All Jobs").style(
-                "font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
-            )
+            self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
 
             # Build warning text
             warning_parts = []
             if session_count > 0:
                 if running_count > 0 and finished_count > 0:
-                    warning_parts.append(
-                        f"{session_count} sessions ({running_count} running, {finished_count} finished)"
-                    )
+                    warning_parts.append(f"{session_count} sessions ({running_count} running, {finished_count} finished)")
                 elif running_count > 0:
                     warning_parts.append(f"{running_count} RUNNING sessions")
                 else:
@@ -539,43 +571,27 @@ class TmuxManager:
             if running_count > 0:
                 warning_text += "\n\n⚠️ This may interrupt active processes!"
 
-            self.ui.label(warning_text).style(
-                "margin-bottom: 15px; white-space: pre-line;"
-            )
+            self.ui.label(warning_text).style("margin-bottom: 15px; white-space: pre-line;")
 
             # Show running sessions
             if running_count > 0:
-                self.ui.label("Running sessions:").style(
-                    "font-weight: bold; margin-bottom: 5px;"
-                )
+                self.ui.label("Running sessions:").style("font-weight: bold; margin-bottom: 5px;")
                 for session in running_sessions[:5]:  # Show max 5 sessions
-                    self.ui.label(f"• {session}").style(
-                        "margin-left: 10px; color: #d32f2f;"
-                    )
+                    self.ui.label(f"• {session}").style("margin-left: 10px; color: #d32f2f;")
                 if len(running_sessions) > 5:
-                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style(
-                        "margin-left: 10px; color: #666;"
-                    )
+                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style("margin-left: 10px; color: #666;")
 
             # Show scheduled jobs
             if job_count > 0:
-                self.ui.label("Scheduled jobs:").style(
-                    "font-weight: bold; margin-bottom: 5px; margin-top: 10px;"
-                )
+                self.ui.label("Scheduled jobs:").style("font-weight: bold; margin-bottom: 5px; margin-top: 10px;")
                 for job in scheduled_jobs[:5]:  # Show max 5 jobs
-                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style(
-                        "margin-left: 10px; color: #ff9800;"
-                    )
+                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style("margin-left: 10px; color: #ff9800;")
                 if len(scheduled_jobs) > 5:
-                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style(
-                        "margin-left: 10px; color: #666;"
-                    )
+                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style("margin-left: 10px; color: #666;")
 
             with self.ui.row().style("margin-top: 20px; gap: 10px;"):
                 self.ui.button("Cancel", on_click=cancel_kill_all).props("color=grey")
-                self.ui.button(
-                    "Clear All Jobs", color="red", on_click=do_kill_all
-                ).props("icon=delete_forever")
+                self.ui.button("Clear All Jobs", color="red", on_click=do_kill_all).props("icon=delete_forever")
 
         dialog.open()
 
