@@ -113,6 +113,19 @@ def doctor():
     python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     console.print(f"[green]✅ Python: {python_version}[/green]")
 
+    # Check Redis connection
+    try:
+        from desto.app.config import config as ui_settings
+        from desto.redis.client import DestoRedisClient
+
+        redis_client = DestoRedisClient(ui_settings.get("redis"))
+        if redis_client.is_connected():
+            console.print("[green]✅ Redis: connected[/green]")
+        else:
+            console.print("[yellow]⚠️  Redis: not connected (real-time updates disabled)[/yellow]")
+    except Exception as e:
+        console.print(f"[yellow]⚠️  Redis: connection failed - {e}[/yellow]")
+
     # Check directories
     manager = CLISessionManager()
 
