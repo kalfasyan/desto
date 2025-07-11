@@ -43,6 +43,7 @@ class SessionStatusTracker:
             "exit_code": str(exit_code),
             "end_time": datetime.now().isoformat(),
             "duration": self._calculate_duration(session_name),
+            "elapsed": self._calculate_elapsed(session_name),
         }
 
         self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=finish_data)
@@ -106,6 +107,33 @@ class SessionStatusTracker:
             duration = datetime.now() - start_time
             return str(duration)
         return "unknown"
+
+    def _calculate_elapsed(self, session_name: str) -> str:
+        """Calculate elapsed time from start to finish (script execution time only)"""
+        try:
+            session_data = self.redis.redis.hgetall(self.redis.get_session_key(session_name))
+            if not session_data:
+                return "N/A"
+
+            # Handle bytes from Redis
+            if isinstance(list(session_data.values())[0], bytes):
+                session_data = {
+                    k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                    for k, v in session_data.items()
+                }
+
+            start_time_str = session_data.get("start_time")
+            if not start_time_str:
+                return "N/A"
+
+            start_time = datetime.fromisoformat(start_time_str)
+            end_time = datetime.now()
+            elapsed = end_time - start_time
+
+            return str(elapsed)
+        except Exception as e:
+            print(f"Error calculating elapsed time: {e}")
+            return "N/A"
 
     def _publish_status_update(self, session_name: str, data: Dict):
         """Publish status update for real-time dashboard"""
