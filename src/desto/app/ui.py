@@ -410,6 +410,7 @@ class UserInterfaceManager:
                     with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
+                        history_tab = ui.tab("History", icon="history")  # ADD THIS LINE
                 with splitter.after:
                     with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
                         with ui.tab_panel(scripts_tab):
@@ -541,6 +542,9 @@ class UserInterfaceManager:
                                 "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"
                             ):
                                 self.new_script_panel.build()
+
+                        with ui.tab_panel(history_tab):  # ADD THIS
+                            self.build_history_tab()
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
@@ -1041,3 +1045,257 @@ class UserInterfaceManager:
         self.refresh_chain_queue_display()
         ui.notification(f"Cleared {queue_count} item(s) from chain queue.", type="positive")
         logger.info(f"Chain queue cleared - removed {queue_count} items")
+
+    def get_session_history(self, days=7):
+        """Get session history from Redis"""
+        if not self.tmux_manager.use_redis:
+            return []
+
+        history = []
+        try:
+            # Debug: print all keys to see what's in Redis
+            all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
+            print(f"DEBUG: Found {len(all_keys)} session keys in Redis")
+
+            for key in all_keys:
+                # Handle both string and bytes keys
+                if isinstance(key, bytes):
+                    key = key.decode("utf-8")
+
+                print(f"DEBUG: Processing key: {key}")
+                session_data = self.tmux_manager.redis_client.redis.hgetall(key)
+
+                if session_data:
+                    # Handle bytes values from Redis
+                    if isinstance(list(session_data.values())[0], bytes):
+                        session_data = {
+                            k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                            for k, v in session_data.items()
+                        }
+
+                    # Extract session name from Redis key
+                    session_name = key.split("desto:session:", 1)[1] if "desto:session:" in key else "Unknown"
+                    session_data["session_name"] = session_name
+                    history.append(session_data)
+                    print(f"DEBUG: Added session {session_name} with status {session_data.get('status', 'Unknown')}")
+                else:
+                    print(f"DEBUG: No data found for key: {key}")
+
+        except Exception as e:
+            print(f"DEBUG: Error getting session history: {e}")
+            return []
+
+        # Sort by start time (newest first)
+        history.sort(key=lambda x: x.get("start_time", ""), reverse=True)
+        print(f"DEBUG: Returning {len(history)} sessions")
+        return history
+
+    def build_history_tab(self):
+        """Build session history tab with Redis availability check"""
+        with ui.card().style(
+            "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; max-width: 1200px; margin: 0 auto;"
+        ):
+            # Header with refresh button
+            with ui.row().style("width: 100%; justify-content: space-between; align-items: center; margin-bottom: 20px;"):
+                ui.label("Session History").style("font-size: 1.5em; font-weight: bold;")
+
+                # Only show refresh button if Redis is available
+                if self.tmux_manager.use_redis:
+                    ui.button("Refresh", icon="refresh", on_click=lambda: self.refresh_history_display()).props("flat")
+
+            # Check Redis availability first
+            if not self.tmux_manager.use_redis:
+                ui.label("📊 Session History").style("font-size: 1.2em; font-weight: bold; margin-bottom: 10px;")
+                ui.label("Session history requires Redis to be enabled.").style("color: #666; font-style: italic;")
+                ui.label("Redis benefits:").style("color: #333; font-weight: bold; margin-top: 15px;")
+
+                with ui.column().style("margin-left: 20px; margin-top: 10px;"):
+                    ui.label("✅ Persistent session tracking across desto restarts").style("color: #4CAF50;")
+                    ui.label("✅ Session duration and exit code tracking").style("color: #4CAF50;")
+                    ui.label("✅ Real-time status updates").style("color: #4CAF50;")
+                    ui.label("✅ Session history with filtering and search").style("color: #4CAF50;")
+
+                ui.label("To enable Redis:").style("color: #333; font-weight: bold; margin-top: 15px;")
+                with ui.column().style("margin-left: 20px; margin-top: 10px;"):
+                    ui.label("1. Install Redis: sudo apt install redis-server").style(
+                        "font-family: monospace; background-color: #f0f0f0; padding: 5px;"
+                    )
+                    ui.label("2. Start Redis: sudo systemctl start redis-server").style(
+                        "font-family: monospace; background-color: #f0f0f0; padding: 5px;"
+                    )
+                    ui.label("3. Restart desto").style("font-family: monospace; background-color: #f0f0f0; padding: 5px;")
+
+                return
+
+            # Get history data (Redis is available)
+            history = self.get_session_history()
+
+            if not history:
+                ui.label("No session history available yet.").style("color: #666; font-style: italic;")
+                ui.label("Session history will appear here after you run some scripts.").style("color: #666; font-style: italic; margin-top: 10px;")
+                return
+
+            # Summary stats
+            total_sessions = len(history)
+            finished_sessions = len([s for s in history if s.get("status") == "finished"])
+            failed_sessions = len([s for s in history if s.get("status") == "failed"])
+            running_sessions = len([s for s in history if s.get("status") == "running"])
+
+            with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
+                ui.label(f"Total: {total_sessions}").style("font-weight: bold; color: #333; font-size: 1.1em;")
+                ui.label(f"✅ Finished: {finished_sessions}").style("font-weight: bold; color: #4CAF50; font-size: 1.1em;")
+                if failed_sessions > 0:
+                    ui.label(f"❌ Failed: {failed_sessions}").style("font-weight: bold; color: #f44336; font-size: 1.1em;")
+                if running_sessions > 0:
+                    ui.label(f"🔄 Running: {running_sessions}").style("font-weight: bold; color: #2196F3; font-size: 1.1em;")
+
+            # History table container
+            self.history_container = ui.column().style("width: 100%; overflow-x: auto;")
+
+            # Initial display
+            self.display_history_table(history)
+
+    def display_history_table(self, history):
+        """Display the history table with better spacing"""
+        from datetime import datetime
+
+        # Check if history_container exists, if not create it
+        if not hasattr(self, "history_container") or self.history_container is None:
+            print("DEBUG: history_container not found, creating new one")
+            self.history_container = ui.column().style("width: 100%; overflow-x: auto;")
+
+        # Clear existing content
+        self.history_container.clear()
+
+        with self.history_container:
+            if not history:
+                ui.label("No sessions found").style("color: #666; font-style: italic;")
+                return
+
+            # Simple table header - updated to include Elapsed
+            with ui.row().style(
+                "width: 100%; min-width: 900px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
+            ):
+                ui.label("Session Name").style("width: 180px; min-width: 180px; font-weight: bold; font-size: 0.9em;")
+                ui.label("Status").style("width: 100px; min-width: 100px; font-weight: bold; font-size: 0.9em;")
+                ui.label("Session_Duration").style("width: 110px; min-width: 110px; font-weight: bold; font-size: 0.9em;")
+                ui.label("Job_Duration").style("width: 110px; min-width: 110px; font-weight: bold; font-size: 0.9em;")
+                ui.label("Session_Started").style("width: 110px; min-width: 110px; font-weight: bold; font-size: 0.9em;")
+                ui.label("Session_Finished").style("width: 110px; min-width: 110px; font-weight: bold; font-size: 0.9em;")
+
+            # Table rows (show last 20 sessions)
+            for session in history[:20]:
+                session_name = session.get("session_name", "Unknown")
+                status = session.get("status", "Unknown")
+                duration = session.get("duration", "N/A")
+                elapsed = session.get("elapsed", "N/A")  # GET ELAPSED FROM REDIS
+                start_time = session.get("start_time", "Unknown")
+                end_time = session.get("end_time", "N/A")
+
+                # Format start time
+                if start_time != "Unknown":
+                    try:
+                        dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                        start_time_display = dt.strftime("%d/%m %H:%M")
+                    except ValueError:
+                        start_time_display = start_time[:16] if len(start_time) > 16 else start_time
+                else:
+                    start_time_display = "Unknown"
+
+                # Format end time
+                if end_time != "N/A" and end_time != "Unknown":
+                    try:
+                        dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+                        end_time_display = dt.strftime("%d/%m %H:%M")
+                    except ValueError:
+                        end_time_display = end_time[:16] if len(end_time) > 16 else end_time
+                else:
+                    end_time_display = "N/A" if status == "running" else "Unknown"
+
+                # Format elapsed time from Redis (script execution time)
+                if elapsed != "N/A" and ":" in elapsed:
+                    try:
+                        time_parts = elapsed.split(":")
+                        if len(time_parts) >= 3:
+                            seconds = float(time_parts[2])
+                            minutes = int(time_parts[1])
+                            hours = int(time_parts[0])
+                            if hours > 0:
+                                elapsed_display = f"{hours}h {minutes}m"
+                            elif minutes > 0:
+                                elapsed_display = f"{minutes}m {seconds:.1f}s"
+                            else:
+                                elapsed_display = f"{seconds:.1f}s"
+                        else:
+                            elapsed_display = elapsed
+                    except:
+                        elapsed_display = elapsed
+                else:
+                    elapsed_display = elapsed if elapsed != "N/A" else "N/A"
+
+                # Format duration to be more readable (total session time)
+                if duration != "N/A" and ":" in duration:
+                    try:
+                        time_parts = duration.split(":")
+                        if len(time_parts) >= 3:
+                            seconds = float(time_parts[2])
+                            minutes = int(time_parts[1])
+                            hours = int(time_parts[0])
+                            if hours > 0:
+                                duration_display = f"{hours}h {minutes}m"
+                            elif minutes > 0:
+                                duration_display = f"{minutes}m {seconds:.1f}s"
+                            else:
+                                duration_display = f"{seconds:.1f}s"
+                        else:
+                            duration_display = duration
+                    except:
+                        duration_display = duration
+                else:
+                    duration_display = duration
+
+                # Status styling
+                if status == "finished":
+                    status_display = "✅ Finished"
+                    row_color = "#f9fff9"
+                elif status == "failed":
+                    status_display = "❌ Failed"
+                    row_color = "#fff9f9"
+                elif status == "running":
+                    status_display = "🔄 Running"
+                    row_color = "#f9f9ff"
+                else:
+                    status_display = status
+                    row_color = "#fff"
+
+                # Truncate session name if too long
+                if len(session_name) > 22:
+                    session_name_display = session_name[:19] + "..."
+                else:
+                    session_name_display = session_name
+
+                # Create row with fixed widths
+                with ui.row().style(
+                    f"width: 100%; min-width: 900px; padding: 10px; margin-bottom: 2px; "
+                    f"background-color: {row_color}; border-radius: 4px; "
+                    "border: 1px solid #eee;"
+                ):
+                    ui.label(session_name_display).style(
+                        "width: 180px; min-width: 180px; font-weight: 500; font-size: 0.9em; "
+                        "overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                    )
+                    ui.label(status_display).style("width: 100px; min-width: 100px; font-size: 0.9em;")
+                    ui.label(duration_display).style("width: 110px; min-width: 110px; font-family: monospace; font-size: 0.9em;")
+                    ui.label(elapsed_display).style("width: 110px; min-width: 110px; font-family: monospace; font-size: 0.9em;")
+                    ui.label(start_time_display).style("width: 110px; min-width: 110px; font-size: 0.9em;")
+                    ui.label(end_time_display).style("width: 110px; min-width: 110px; font-size: 0.9em;")
+
+    def refresh_history_display(self):
+        """Refresh the history display"""
+        if self.tmux_manager.use_redis:
+            print("DEBUG: Refreshing history display")
+            history = self.get_session_history()
+            print(f"DEBUG: Got {len(history)} sessions")
+            self.display_history_table(history)
+        else:
+            ui.notification("Redis not available", type="warning")
