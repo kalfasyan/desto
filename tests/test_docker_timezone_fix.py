@@ -25,10 +25,7 @@ import pytest
 def ensure_docker_containers():
     """Ensure Docker containers are running for timezone tests."""
     # Check if desto-dashboard container is running
-    result = subprocess.run(
-        ["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"],
-        capture_output=True, text=True
-    )
+    result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
 
     if "desto-dashboard" not in result.stdout:
         # Start containers if not running
@@ -36,6 +33,7 @@ def ensure_docker_containers():
 
         # Wait a moment for containers to be ready
         import time
+
         time.sleep(3)
 
     yield
