@@ -379,14 +379,7 @@ class HistoryTab:
                 ui.label("Session history requires Redis to be enabled.").style("color: #666; font-style: italic; text-align: center; padding: 40px;")
                 return
 
-            # Get history data (Redis is available)
-            history = self.get_session_history()
-
-            if not history:
-                ui.label("No session history found.").style("color: #666; font-style: italic; text-align: center; padding: 40px;")
-                return
-
-            # Create stats container with labels we can update
+            # Always create stats container with labels we can update
             with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
                 with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
                     self.total_sessions_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #2196F3;")
@@ -404,10 +397,11 @@ class HistoryTab:
                     self.running_jobs_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #FF9800;")
                     ui.label("Running").style("color: #666; font-size: 0.9em;")
 
-            # History table container
+            # History table container - always create it
             self.history_container = ui.column().style("width: 100%; overflow-x: auto;")
 
-            # Initial display and stats calculation
+            # Get initial history data and display it
+            history = self.get_session_history()
             self.update_stats_and_display(history)
 
     def update_stats_and_display(self, history):
@@ -487,14 +481,15 @@ class HistoryTab:
                 status = session.get("status", "unknown")
                 job_status = session.get("job_status", "")
 
-                # Determine display status and color
+                # FIXED: Prioritize job_status over session status for display
+                # This handles Keep Alive scenarios properly
                 if job_status == "finished":
                     display_status = "✅ Finished"
                     status_color = "#4CAF50"
                 elif job_status == "failed":
                     display_status = "❌ Failed"
                     status_color = "#F44336"
-                elif status == "running":
+                elif job_status == "running":
                     display_status = "🟡 Running"
                     status_color = "#FF9800"
                 elif status == "finished":
@@ -503,6 +498,13 @@ class HistoryTab:
                 elif status == "failed":
                     display_status = "❌ Error"
                     status_color = "#F44336"
+                elif status == "running":
+                    # This is likely a keep-alive session or job still running
+                    if job_status == "":
+                        display_status = "🟡 Running"
+                    else:
+                        display_status = "🟡 Active"  # Keep-alive mode
+                    status_color = "#FF9800"
                 else:
                     display_status = "❓ Unknown"
                     status_color = "#9E9E9E"
@@ -518,7 +520,7 @@ class HistoryTab:
                 else:
                     formatted_start_time = "Unknown"
 
-                # Format end time
+                # Format end time - for keep-alive sessions, show "Keep Alive" instead of "Running"
                 end_time = session.get("end_time", "")
                 if end_time:
                     try:
@@ -527,7 +529,15 @@ class HistoryTab:
                     except Exception:
                         formatted_end_time = end_time[:19] if len(end_time) > 19 else end_time
                 else:
-                    formatted_end_time = "N/A" if status in ["finished", "failed"] or job_status in ["finished", "failed"] else "Running"
+                    # Smart end time display for keep-alive sessions
+                    if job_status == "finished" and status == "running":
+                        formatted_end_time = "Keep Alive"
+                    elif job_status == "failed" and status == "running":
+                        formatted_end_time = "Keep Alive"
+                    elif status == "running":
+                        formatted_end_time = "Running"
+                    else:
+                        formatted_end_time = "N/A"
 
                 # Get job duration (script execution time) - Redis stores this as "job_elapsed"
                 job_duration = session.get("job_elapsed", "N/A")
@@ -538,10 +548,14 @@ class HistoryTab:
                 # Get session duration (total session time) - Redis stores this as "duration"
                 session_duration = session.get("duration", "N/A")
 
+                # For keep-alive sessions, show ongoing duration
+                if status == "running" and job_status in ["finished", "failed"]:
+                    session_duration = "Ongoing"
+
                 # Format both durations if they're raw timedelta strings
                 def format_duration(duration_str):
-                    if duration_str == "N/A" or duration_str == "unknown":
-                        return "N/A"
+                    if duration_str == "N/A" or duration_str == "unknown" or duration_str == "Ongoing":
+                        return duration_str
 
                     # Parse format like "0:05:23.456789" or "1 day, 0:05:23.456789"
                     if ":" in duration_str:
@@ -584,7 +598,7 @@ class HistoryTab:
                     # Session name
                     ui.label(session.get("session_name", "Unknown")).style("flex: 2; min-width: 150px; font-weight: 500;")
 
-                    # Status with color
+                    # Status with color (now properly shows job status)
                     ui.label(display_status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
 
                     # Job Duration (script execution time)

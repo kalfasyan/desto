@@ -716,9 +716,30 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         if self.use_redis:
             # Use dedicated script to mark job completion
-            # Use relative path from project root - go up 3 levels from src/desto/app/sessions.py to reach project root
+            # First try relative path from project root
             script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
-            return f"python3 '{script_path}' '{session_name}' {exit_code_ref}"
+
+            # If that doesn't exist, try from current working directory (Docker case)
+            if not script_path.exists():
+                script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
+
+            # If still not found, try to find project root by looking for pyproject.toml
+            if not script_path.exists():
+                current = Path(__file__).parent
+                while current != current.parent:
+                    if (current / "pyproject.toml").exists():
+                        script_path = current / "scripts" / "mark_job_finished.py"
+                        break
+                    current = current.parent
+
+            # Determine the correct Python command
+            # In Docker with uv, use 'uv run python', otherwise use 'python3'
+            if Path("/usr/local/bin/uv").exists():
+                python_cmd = "uv run python"
+            else:
+                python_cmd = "python3"
+
+            return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"
         else:
             # Fallback to file-based marker for non-Redis setups
             return f"touch '{self.LOG_DIR}/{session_name}.finished'"

@@ -34,6 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy source code and scripts
 COPY src ./src
+COPY scripts ./scripts
 COPY desto_scripts/. /app/desto_scripts/
 
 # Install the project itself
