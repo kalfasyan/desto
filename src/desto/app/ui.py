@@ -298,7 +298,7 @@ class HistoryTab:
         try:
             # Debug: print all keys to see what's in Redis
             all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
-            print(f"DEBUG: Found {len(all_keys)} session keys in Redis")
+            logger.debug(f"Found {len(all_keys)} session keys in Redis")
 
             # Get SessionStatusTracker for duration calculations
             from desto.redis.status_tracker import SessionStatusTracker
@@ -310,7 +310,7 @@ class HistoryTab:
                 if isinstance(key, bytes):
                     key = key.decode("utf-8")
 
-                print(f"DEBUG: Processing key: {key}")
+                logger.debug(f"Processing key: {key}")
                 session_data = self.tmux_manager.redis_client.redis.hgetall(key)
 
                 if session_data:
@@ -332,20 +332,20 @@ class HistoryTab:
                         session_data["elapsed"] = status_tracker._calculate_elapsed(session_name)
 
                     history.append(session_data)
-                    print(
-                        f"DEBUG: Added session {session_name} with status {session_data.get('status', 'Unknown')}, "
+                    logger.debug(
+                        f"Added session {session_name} with status {session_data.get('status', 'Unknown')}, "
                         f"duration: {session_data.get('duration', 'N/A')}, elapsed: {session_data.get('elapsed', 'N/A')}"
                     )
                 else:
-                    print(f"DEBUG: No data found for key: {key}")
+                    logger.debug(f"No data found for key: {key}")
 
         except Exception as e:
-            print(f"DEBUG: Error getting session history: {e}")
+            logger.error(f"Error getting session history: {e}")
             return []
 
         # Sort by start time (newest first)
         history.sort(key=lambda x: x.get("start_time", ""), reverse=True)
-        print(f"DEBUG: Returning {len(history)} sessions")
+        logger.debug(f"Returning {len(history)} sessions")
         return history
 
     def build(self):
@@ -421,7 +421,7 @@ class HistoryTab:
 
         # Check if history_container exists, if not create it
         if not hasattr(self, "history_container") or self.history_container is None:
-            print("DEBUG: history_container not found, creating new one")
+            logger.debug("history_container not found, creating new one")
             self.history_container = ui.column().style("width: 100%; overflow-x: auto;")
 
         # Clear existing content
@@ -577,9 +577,9 @@ class HistoryTab:
     def refresh_history_display(self):
         """Refresh the history display"""
         if self.tmux_manager.use_redis:
-            print("DEBUG: Refreshing history display")
+            logger.debug("Refreshing history display")
             history = self.get_session_history()
-            print(f"DEBUG: Got {len(history)} sessions")
+            logger.debug(f"Got {len(history)} sessions")
             self.display_history_table(history)
         else:
             ui.notification("Redis not available", type="warning")

@@ -7,12 +7,14 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
+from loguru import logger
+
 from desto.app.sessions import TmuxManager
 
 
 def test_logging_integration():
     """Integration test demonstrating the logging fix."""
-    print("🧪 Testing logging functionality integration...")
+    logger.info("🧪 Testing logging functionality integration...")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -33,7 +35,7 @@ def test_logging_integration():
         tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=log_dir, scripts_dir=scripts_dir)
 
         # Test 1: First session
-        print("📝 Running first session...")
+        logger.info("📝 Running first session...")
         session_name = "integration_test"
         command = f"bash {test_script}"
 
@@ -41,22 +43,23 @@ def test_logging_integration():
 
         # Wait for completion
         import time
+
         time.sleep(4)
 
         log_file = log_dir / f"{session_name}.log"
         if log_file.exists():
             content1 = log_file.read_text()
-            print(f"✅ First session log created ({len(content1)} chars)")
-            print("📄 First session content:")
-            print("=" * 50)
-            print(content1)
-            print("=" * 50)
+            logger.info(f"✅ First session log created ({len(content1)} chars)")
+            logger.debug("📄 First session content:")
+            logger.debug("=" * 50)
+            logger.debug(content1)
+            logger.debug("=" * 50)
         else:
-            print("❌ First session log file not created")
+            logger.error("❌ First session log file not created")
             return False
 
         # Test 2: Second session (should append)
-        print("\n📝 Running second session...")
+        logger.info("\n📝 Running second session...")
         command2 = "echo 'Second session test'"
 
         tmux_manager.start_tmux_session(session_name, command2, mock_logger, keep_alive=False)
@@ -64,38 +67,38 @@ def test_logging_integration():
 
         if log_file.exists():
             content2 = log_file.read_text()
-            print(f"✅ Second session appended to log ({len(content2)} chars)")
-            print("📄 Final log content:")
-            print("=" * 50)
-            print(content2)
-            print("=" * 50)
+            logger.info(f"✅ Second session appended to log ({len(content2)} chars)")
+            logger.debug("📄 Final log content:")
+            logger.debug("=" * 50)
+            logger.debug(content2)
+            logger.debug("=" * 50)
 
             # Verify both sessions are present
             if "Test script output" in content2 and "Second session test" in content2:
-                print("✅ Both sessions preserved in log")
+                logger.info("✅ Both sessions preserved in log")
             else:
-                print("❌ Log content was overwritten")
+                logger.error("❌ Log content was overwritten")
                 return False
 
             if "---- NEW SESSION" in content2:
-                print("✅ Session separator found")
+                logger.info("✅ Session separator found")
             else:
-                print("⚠️  Session separator not found")
+                logger.warning("⚠️  Session separator not found")
 
             start_count = content2.count("=== SCRIPT STARTING at")
             finish_count = content2.count("=== SCRIPT FINISHED at")
 
-            print(f"📊 Found {start_count} start entries and {finish_count} finish entries")
+            logger.info(f"📊 Found {start_count} start entries and {finish_count} finish entries")
 
             if start_count == 2 and finish_count == 2:
-                print("✅ Correct number of start/finish entries")
+                logger.info("✅ Correct number of start/finish entries")
             else:
-                print("⚠️  Unexpected number of start/finish entries")
+                logger.warning("⚠️  Unexpected number of start/finish entries")
         else:
-            print("❌ Second session log file not found")
+            logger.error("❌ Second session log file not found")
             return False
 
-    print("\n🎉 Integration test completed successfully!")
+    logger.info("\n🎉 Integration test completed successfully!")
     return True
 
 

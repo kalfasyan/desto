@@ -15,6 +15,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from loguru import logger
+
 # Add project root to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
@@ -258,11 +260,11 @@ echo "Test script finished successfully"
 exit 0
 """
 
-    print("Running comprehensive job completion and logging tests...")
-    print("=" * 60)
+    logger.info("Running comprehensive job completion and logging tests...")
+    logger.info("=" * 60)
 
     # Run the unit tests
     unittest.main(verbosity=2, exit=False)
 
-    print("=" * 60)
-    print("All tests completed!")
+    logger.info("=" * 60)
+    logger.info("All tests completed!")

@@ -2,6 +2,8 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
+from loguru import logger
+
 from .client import DestoRedisClient
 
 
@@ -33,7 +35,7 @@ class SessionStatusTracker:
             self._publish_status_update(session_name, session_data)
 
         except Exception as e:
-            print(f"Redis error in mark_session_started: {e}")
+            logger.error(f"Redis error in mark_session_started: {e}")
             # Don't crash - just log the error
 
     def mark_session_finished(self, session_name: str, exit_code: int = 0):
@@ -141,7 +143,7 @@ class SessionStatusTracker:
 
             return str(elapsed)
         except Exception as e:
-            print(f"Error calculating elapsed time: {e}")
+            logger.error(f"Error calculating elapsed time: {e}")
             return "N/A"
 
     def mark_job_finished(self, session_name: str, exit_code: int = 0):
@@ -204,7 +206,7 @@ class SessionStatusTracker:
             return str(elapsed)
 
         except Exception as e:
-            print(f"Error calculating job elapsed time: {e}")
+            logger.error(f"Error calculating job elapsed time: {e}")
             return "N/A"
 
     def get_job_status(self, session_name: str) -> str:
@@ -234,7 +236,7 @@ class SessionStatusTracker:
             return job_status
 
         except Exception as e:
-            print(f"Error getting job status for {session_name}: {e}")
+            logger.error(f"Error getting job status for {session_name}: {e}")
             return "unknown"
 
     def _publish_status_update(self, session_name: str, data: Dict):

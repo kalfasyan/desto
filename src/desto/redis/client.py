@@ -1,6 +1,7 @@
 import os
 
 import redis
+from loguru import logger
 
 
 class DestoRedisClient:
@@ -37,14 +38,14 @@ class DestoRedisClient:
             )
             # Test connection
             self.redis.ping()
-            print(f"Redis connected successfully at {self.config['host']}:{self.config['port']}")
+            logger.info(f"Redis connected successfully at {self.config['host']}:{self.config['port']}")
         except redis.ConnectionError as e:
-            print(f"Redis connection failed: {e}")
-            print(f"Attempted to connect to {self.config['host']}:{self.config['port']}")
-            print("Redis features will be disabled. Application will use file-based tracking.")
+            logger.error(f"Redis connection failed: {e}")
+            logger.error(f"Attempted to connect to {self.config['host']}:{self.config['port']}")
+            logger.warning("Redis features will be disabled. Application will use file-based tracking.")
             self.redis = None
         except Exception as e:
-            print(f"Redis initialization error: {e}")
+            logger.error(f"Redis initialization error: {e}")
             self.redis = None
 
     def is_connected(self) -> bool:

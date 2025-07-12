@@ -4,6 +4,7 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
+from loguru import logger
 
 from desto.app.sessions import TmuxManager
 
@@ -15,12 +16,12 @@ def mock_ui():
 
 @pytest.fixture
 def mock_logger():
-    logger = MagicMock()
-    logger.error = MagicMock()
-    logger.info = MagicMock()
-    logger.success = MagicMock()
-    logger.warning = MagicMock()
-    return logger
+    mock_logger_obj = MagicMock()
+    mock_logger_obj.error = MagicMock()
+    mock_logger_obj.info = MagicMock()
+    mock_logger_obj.success = MagicMock()
+    mock_logger_obj.warning = MagicMock()
+    return mock_logger_obj
 
 
 @pytest.fixture
@@ -72,9 +73,7 @@ class TestScheduledJobsIntegration:
             initial_job_count = len(jobs)
 
             if initial_job_count == 0:
-                pytest.skip(
-                    "No jobs found after creation - 'at' might not be working properly"
-                )
+                pytest.skip("No jobs found after creation - 'at' might not be working properly")
 
             # Kill all scheduled jobs
             success_count, total_count, errors = tmux_manager.kill_scheduled_jobs()
@@ -83,15 +82,11 @@ class TestScheduledJobsIntegration:
             time.sleep(1)
             remaining_jobs = tmux_manager.get_scheduled_jobs()
 
-            assert len(remaining_jobs) < initial_job_count, (
-                "Some jobs should have been removed"
-            )
-            assert success_count <= total_count, (
-                "Success count should not exceed total count"
-            )
+            assert len(remaining_jobs) < initial_job_count, "Some jobs should have been removed"
+            assert success_count <= total_count, "Success count should not exceed total count"
 
             if errors:
-                print(f"Errors during job removal: {errors}")
+                logger.warning(f"Errors during job removal: {errors}")
                 # Don't fail the test due to permission errors, etc.
 
         finally:
@@ -201,14 +196,10 @@ class TestCombinedFunctionalityIntegration:
             # Get initial counts
             initial_sessions = tmux_manager.check_sessions()
 
-            test_session_count = len(
-                [s for s in initial_sessions.keys() if s.startswith("test_session_")]
-            )
+            test_session_count = len([s for s in initial_sessions.keys() if s.startswith("test_session_")])
 
             # Kill all sessions and jobs
-            session_success, session_total, job_success, job_total, all_errors = (
-                tmux_manager.kill_all_sessions_and_jobs()
-            )
+            session_success, session_total, job_success, job_total, all_errors = tmux_manager.kill_all_sessions_and_jobs()
 
             # Verify results
             assert isinstance(session_success, int)
@@ -218,16 +209,12 @@ class TestCombinedFunctionalityIntegration:
             assert isinstance(all_errors, list)
 
             # Should have killed at least our test session
-            assert session_success >= min(test_session_count, 1), (
-                "Should have killed at least one session"
-            )
+            assert session_success >= min(test_session_count, 1), "Should have killed at least one session"
 
             # Wait and verify sessions are gone
             time.sleep(1)
             remaining_sessions = tmux_manager.check_sessions()
-            remaining_test_sessions = [
-                s for s in remaining_sessions.keys() if s.startswith("test_session_")
-            ]
+            remaining_test_sessions = [s for s in remaining_sessions.keys() if s.startswith("test_session_")]
 
             assert len(remaining_test_sessions) == 0, "Test sessions should be removed"
 
