@@ -28,11 +28,7 @@ class TestTmuxManagerLogging:
             log_dir.mkdir()
             scripts_dir.mkdir()
 
-            yield {
-                "temp_path": temp_path,
-                "log_dir": log_dir,
-                "scripts_dir": scripts_dir
-            }
+            yield {"temp_path": temp_path, "log_dir": log_dir, "scripts_dir": scripts_dir}
 
     @pytest.fixture
     def tmux_manager(self, temp_dirs):
@@ -46,12 +42,7 @@ class TestTmuxManagerLogging:
             mock_redis_instance.is_connected.return_value = False
             mock_redis_class.return_value = mock_redis_instance
 
-            tmux_manager = TmuxManager(
-                mock_ui,
-                mock_logger,
-                log_dir=temp_dirs["log_dir"],
-                scripts_dir=temp_dirs["scripts_dir"]
-            )
+            tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
             # Force Redis to be disabled to ensure file-based markers are used
             tmux_manager.use_redis = False
@@ -170,18 +161,13 @@ class TestTmuxManagerLogging:
 
         # Check if tmux session is still running
         try:
-            result = subprocess.run(
-                ["tmux", "list-sessions", "-f", "#{session_name}", "-F", "#{session_name}"],
-                capture_output=True,
-                text=True
-            )
+            result = subprocess.run(["tmux", "list-sessions", "-f", "#{session_name}", "-F", "#{session_name}"], capture_output=True, text=True)
 
             # If keep_alive is working, the session should still be listed
             assert session_name in result.stdout, "Keep-alive session should still be running"
 
             # Clean up the session
-            subprocess.run(["tmux", "kill-session", "-t", session_name],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError:
             # tmux might not be available in test environment
             pytest.skip("tmux not available in test environment")
@@ -201,7 +187,6 @@ class TestTmuxManagerLogging:
             # Kill any test sessions that might be running
             test_sessions = ["test_session", "test_keep_alive", "path_test"]
             for session in test_sessions:
-                subprocess.run(["tmux", "kill-session", "-t", session],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["tmux", "kill-session", "-t", session], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass  # Ignore errors if sessions don't exist or tmux is not available
