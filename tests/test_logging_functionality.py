@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -40,12 +40,23 @@ class TestTmuxManagerLogging:
         mock_ui = Mock()
         mock_logger = Mock()
 
-        return TmuxManager(
-            mock_ui,
-            mock_logger,
-            log_dir=temp_dirs["log_dir"],
-            scripts_dir=temp_dirs["scripts_dir"]
-        )
+        # Patch Redis to be unavailable for consistent file-based testing
+        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+            mock_redis_instance = Mock()
+            mock_redis_instance.is_connected.return_value = False
+            mock_redis_class.return_value = mock_redis_instance
+
+            tmux_manager = TmuxManager(
+                mock_ui,
+                mock_logger,
+                log_dir=temp_dirs["log_dir"],
+                scripts_dir=temp_dirs["scripts_dir"]
+            )
+
+            # Force Redis to be disabled to ensure file-based markers are used
+            tmux_manager.use_redis = False
+
+            return tmux_manager
 
     def test_log_file_creation_and_content(self, tmux_manager, temp_dirs):
         """Test that log files are created with proper content."""

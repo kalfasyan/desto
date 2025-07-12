@@ -674,6 +674,27 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         return (session_success, session_total, job_success, job_total, all_errors)
 
+    def get_session_start_command(self, session_name, command):
+        """
+        Get the appropriate command to mark session started.
+        Returns Redis call if Redis is available, otherwise empty string.
+
+        Args:
+            session_name: Name of the session
+            command: Command being executed
+        """
+        if self.use_redis:
+            # Use dedicated script to mark session started
+            # Use relative path from project root - go up 3 levels from src/desto/app/sessions.py to reach project root
+            script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_session_started.py"
+            # Use shlex.quote to properly escape the command
+            import shlex
+
+            return f"python3 '{script_path}' '{session_name}' {shlex.quote(command)}"
+        else:
+            # No Redis, return empty string
+            return ""
+
     def get_job_completion_command(self, session_name, use_variable=False):
         """
         Get the appropriate command to mark job completion.
@@ -687,8 +708,8 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         if self.use_redis:
             # Use dedicated script to mark job completion
-            # Use absolute path to ensure it's found
-            script_path = "/home/kalfasy/repos/desto/scripts/mark_job_finished.py"
+            # Use relative path from project root - go up 3 levels from src/desto/app/sessions.py to reach project root
+            script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
             return f"python3 '{script_path}' '{session_name}' {exit_code_ref}"
         else:
             # Fallback to file-based marker for non-Redis setups

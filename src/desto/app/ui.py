@@ -1098,7 +1098,7 @@ class UserInterfaceManager:
         info_lines.append("")  # Blank line
         return "\\n".join(info_lines)
 
-    def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=False):
+    def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=False, session_start_cmd=None):
         """Build a properly formatted logging command that appends to existing logs."""
 
         # Check if log file exists to determine if we should append or create new
@@ -1119,6 +1119,10 @@ class UserInterfaceManager:
 
         # Build the full command
         cmd_parts = []
+
+        # Add Redis session start tracking first if provided
+        if session_start_cmd:
+            cmd_parts.append(session_start_cmd)
 
         # Add separator if needed
         if separator_cmd:
@@ -1239,6 +1243,11 @@ class UserInterfaceManager:
                 # Check if log file exists to determine if we should append or create new
                 append_mode = Path(log_file_path).exists()
 
+                # Add Redis session start tracking for scheduled scripts
+                session_start_cmd = self.tmux_manager.get_session_start_command(session_name, f"Chain: {len(self.chain_queue)} scripts")
+                if session_start_cmd:
+                    cmd_parts.append(session_start_cmd)
+
                 # Add initial info block using printf for better compatibility
                 if append_mode:
                     cmd_parts.append(f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> '{log_file_path}'")
@@ -1303,8 +1312,13 @@ class UserInterfaceManager:
             job_completion_cmd = self.tmux_manager.get_job_completion_command(session_name)
             exec_cmd = self.build_execution_command(script_file_path, arguments)
 
+            # Add Redis session start tracking for scheduled scripts
+            session_start_cmd = self.tmux_manager.get_session_start_command(session_name, exec_cmd)
+
             # Use the new logging command builder
-            tmux_cmd = self.build_logging_command(log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=True)
+            tmux_cmd = self.build_logging_command(
+                log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=True, session_start_cmd=session_start_cmd
+            )
             tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
             at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
             import subprocess

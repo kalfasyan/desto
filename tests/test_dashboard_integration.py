@@ -78,8 +78,14 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
             # Mock UI components for the table
             mock_ui = Mock()
-            mock_ui.row.return_value.__enter__ = Mock(return_value=mock_ui)
-            mock_ui.row.return_value.__exit__ = Mock(return_value=None)
+            mock_context = Mock()
+            mock_context.__enter__ = Mock(return_value=mock_context)
+            mock_context.__exit__ = Mock(return_value=None)
+
+            # Mock the chained method calls: ui.row().style() returns a context manager
+            mock_row = Mock()
+            mock_row.style.return_value = mock_context
+            mock_ui.row.return_value = mock_row
             mock_ui.label = Mock()
             mock_ui.button = Mock()
 
@@ -123,10 +129,16 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             finished_marker = self.log_dir / "test_session.finished"
             finished_marker.touch()
 
-            # Mock UI components
+            # Mock UI components with proper context manager support
             mock_ui = Mock()
-            mock_ui.row.return_value.__enter__ = Mock(return_value=mock_ui)
-            mock_ui.row.return_value.__exit__ = Mock(return_value=None)
+            mock_context = Mock()
+            mock_context.__enter__ = Mock(return_value=mock_context)
+            mock_context.__exit__ = Mock(return_value=None)
+
+            # Mock the chained method calls: ui.row().style() returns a context manager
+            mock_row = Mock()
+            mock_row.style.return_value = mock_context
+            mock_ui.row.return_value = mock_row
             mock_ui.label = Mock()
             mock_ui.button = Mock()
 
@@ -182,18 +194,26 @@ class TestDashboardStatusDisplay(unittest.TestCase):
                         return Mock()
 
                     mock_ui = Mock()
-                    mock_ui.row.return_value.__enter__ = Mock(return_value=mock_ui)
-                    mock_ui.row.return_value.__exit__ = Mock(return_value=None)
+                    mock_context = Mock()
+                    mock_context.__enter__ = Mock(return_value=mock_context)
+                    mock_context.__exit__ = Mock(return_value=None)
+
+                    # Mock the chained method calls: ui.row().style() returns a context manager
+                    mock_row = Mock()
+                    mock_row.style.return_value = mock_context
+                    mock_ui.row.return_value = mock_row
                     mock_ui.label = capture_label
                     mock_ui.button = Mock()
 
                     # Call add_sessions_table
                     tmux_manager.add_sessions_table(mock_session_data, mock_ui)
 
-                    # Find the status label (should be the 6th label call)
-                    # Labels: ID, Name, Created, Elapsed, Attached, Status
-                    if len(captured_labels) >= 6:
-                        status_label = captured_labels[5]  # 0-indexed, so 5th is the status
+                    # Find the status label
+                    # Headers: Session ID, Name, Created, Elapsed, Attached, Status, Actions (7 labels)
+                    # Data row: ID, Name, Created, Elapsed, Attached, Status (6 labels + button)
+                    # So status should be at index 7 + 5 = 12 (0-based)
+                    if len(captured_labels) >= 13:
+                        status_label = captured_labels[12]  # 0-indexed, 12th is the status data
                         self.assertEqual(status_label, expected_display)
 
 
@@ -250,6 +270,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         # Mock Redis client
         mock_redis_client = Mock(spec=DestoRedisClient)
         mock_redis_client.is_connected.return_value = True
+        mock_redis_client.redis = Mock()  # Add the redis attribute
 
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
@@ -272,6 +293,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         # Mock Redis client as disconnected
         mock_redis_client = Mock(spec=DestoRedisClient)
         mock_redis_client.is_connected.return_value = False
+        mock_redis_client.redis = Mock()  # Add the redis attribute
 
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
