@@ -301,7 +301,7 @@ class HistoryTab:
             print(f"DEBUG: Found {len(all_keys)} session keys in Redis")
 
             # Get SessionStatusTracker for duration calculations
-            from src.desto.redis.status_tracker import SessionStatusTracker
+            from desto.redis.status_tracker import SessionStatusTracker
 
             status_tracker = SessionStatusTracker(self.tmux_manager.redis_client)
 

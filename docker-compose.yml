@@ -1,4 +1,22 @@
 services:
+  # Redis service (optional - comment out if not needed)
+  redis:
+    image: redis:7-alpine
+    container_name: desto-redis
+    ports:
+      - "6380:6379"  # Use port 6380 on host to avoid conflict
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Main desto dashboard service
   dashboard:
     build:
       context: .
@@ -9,13 +27,30 @@ services:
     volumes:
       - ./desto_scripts:/app/desto_scripts
       - ./desto_logs:/app/desto_logs
+      # Mount timezone information to sync with host
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     environment:
       - DESTO_SCRIPTS_DIR=/app/desto_scripts
       - DESTO_LOGS_DIR=/app/desto_logs
+      # Timezone configuration - set to match host system
+      - TZ=Europe/Berlin
+      # Redis configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_ENABLED=true
+      - REDIS_CONNECTION_TIMEOUT=5
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8809"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
+
+volumes:
+  redis_data:

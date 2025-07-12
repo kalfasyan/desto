@@ -7,7 +7,12 @@ RUN apt-get update && apt-get install -y \
     tmux \
     at \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Set timezone
+ENV TZ=Europe/Berlin
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Set UV environment variables
 ENV UV_LINK_MODE=copy \

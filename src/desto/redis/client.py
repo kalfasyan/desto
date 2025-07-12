@@ -1,17 +1,19 @@
+import os
+
 import redis
 
 
 class DestoRedisClient:
     def __init__(self, config=None):
         if config is None:
-            # Default config if none provided
+            # Default config if none provided, with environment variable support
             config = {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0,
-                "connection_timeout": 5,
-                "retry_attempts": 3,
-                "enabled": True,
+                "host": os.getenv("REDIS_HOST", "localhost"),
+                "port": int(os.getenv("REDIS_PORT", "6379")),
+                "db": int(os.getenv("REDIS_DB", "0")),
+                "connection_timeout": int(os.getenv("REDIS_CONNECTION_TIMEOUT", "5")),
+                "retry_attempts": int(os.getenv("REDIS_RETRY_ATTEMPTS", "3")),
+                "enabled": os.getenv("REDIS_ENABLED", "true").lower() in ("true", "1", "yes", "on"),
             }
 
         self.config = config
@@ -35,8 +37,14 @@ class DestoRedisClient:
             )
             # Test connection
             self.redis.ping()
-        except Exception as e:
+            print(f"Redis connected successfully at {self.config['host']}:{self.config['port']}")
+        except redis.ConnectionError as e:
             print(f"Redis connection failed: {e}")
+            print(f"Attempted to connect to {self.config['host']}:{self.config['port']}")
+            print("Redis features will be disabled. Application will use file-based tracking.")
+            self.redis = None
+        except Exception as e:
+            print(f"Redis initialization error: {e}")
             self.redis = None
 
     def is_connected(self) -> bool:
@@ -47,6 +55,8 @@ class DestoRedisClient:
             self.redis.ping()
             return True
         except redis.ConnectionError:
+            return False
+        except Exception:
             return False
 
     def get_session_key(self, session_name: str) -> str:

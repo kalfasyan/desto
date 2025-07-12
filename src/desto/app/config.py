@@ -1,3 +1,4 @@
+import os
 from dataclasses import asdict, dataclass, field
 
 
@@ -80,7 +81,16 @@ class UISettings:
     main_content: MainContent = field(default_factory=MainContent)
     redis: RedisSettings = field(default_factory=RedisSettings)
 
-    def __post_init__(self): ...
+    def __post_init__(self):
+        """Override settings with environment variables if available"""
+        # Redis configuration from environment variables
+        self.redis.host = os.getenv("REDIS_HOST", self.redis.host)
+        self.redis.port = int(os.getenv("REDIS_PORT", self.redis.port))
+        self.redis.db = int(os.getenv("REDIS_DB", self.redis.db))
+        self.redis.enabled = os.getenv("REDIS_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+        self.redis.connection_timeout = int(os.getenv("REDIS_CONNECTION_TIMEOUT", self.redis.connection_timeout))
+        self.redis.retry_attempts = int(os.getenv("REDIS_RETRY_ATTEMPTS", self.redis.retry_attempts))
+        self.redis.session_history_days = int(os.getenv("REDIS_SESSION_HISTORY_DAYS", self.redis.session_history_days))
 
 
 config = asdict(UISettings())

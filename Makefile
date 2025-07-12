@@ -65,6 +65,18 @@ docker-stop:  ## Stop and remove Docker container
 docker-logs:  ## View Docker container logs
 	docker logs -f desto-dashboard
 
+docker-start:  ## Start desto with Redis (default)
+	docker compose up -d
+
+docker-start-no-redis:  ## Start desto without Redis
+	docker compose -f docker-compose.no-redis.yml up -d
+
+docker-stop-all:  ## Stop all desto services (including Redis)
+	docker compose down
+
+docker-redis-logs:  ## View Redis logs
+	docker logs -f desto-redis
+
 docker-test:  ## Run Docker integration tests (excluding slow/hanging tests)
 	uv run --extra dev pytest tests/test_docker_integration.py -k "not test_docker_run_health_check and not test_docker_build" -v
 

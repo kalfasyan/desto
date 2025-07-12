@@ -19,6 +19,7 @@ The key features are:
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
+- ✨ **\*NEW!\*** ✨ **Session history:** Optional Redis integration for persistent session tracking and history.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
   
   
