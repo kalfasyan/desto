@@ -203,6 +203,14 @@ class TmuxManager:
         Shows notifications for success or failure.
         Only appends 'tail -f /dev/null' if keep_alive is True.
         """
+        # Check if session already exists
+        existing_sessions = self.check_sessions()
+        if session_name in existing_sessions:
+            msg = f"Session '{session_name}' already exists. Please choose a different name."
+            logger.error(msg)
+            ui.notification(msg, type="negative")
+            return
+
         # Clean up finished marker before starting
         finished_marker = self.LOG_DIR / f"{session_name}.finished"
         if finished_marker.exists():
