@@ -25,8 +25,8 @@ class SessionStatusTracker:
         try:
             self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=session_data)
 
-            # Auto-expire after configured session history days
-            expire_seconds = getattr(self.redis.settings, "session_history_days", 1) * 86400
+            # Auto-expire after configured session history days (default 7 days)
+            expire_seconds = 7 * 86400  # 7 days in seconds
             self.redis.redis.expire(self.redis.get_session_key(session_name), expire_seconds)
 
             # Publish to dashboard
@@ -37,13 +37,13 @@ class SessionStatusTracker:
             # Don't crash - just log the error
 
     def mark_session_finished(self, session_name: str, exit_code: int = 0):
-        """Replace creating .finished files"""
+        """Mark the entire session as finished (tmux session ended)"""
         finish_data = {
             "status": "finished",
             "exit_code": str(exit_code),
             "end_time": datetime.now().isoformat(),
             "duration": self._calculate_duration(session_name),
-            "elapsed": self._calculate_elapsed(session_name),
+            "elapsed": self._calculate_elapsed(session_name),  # This now uses job_finished_time if available
         }
 
         self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=finish_data)
@@ -109,7 +109,7 @@ class SessionStatusTracker:
         return "unknown"
 
     def _calculate_elapsed(self, session_name: str) -> str:
-        """Calculate elapsed time from start to finish (script execution time only)"""
+        """Calculate elapsed time from start to job finish (script execution time only)"""
         try:
             session_data = self.redis.redis.hgetall(self.redis.get_session_key(session_name))
             if not session_data:
@@ -127,13 +127,115 @@ class SessionStatusTracker:
                 return "N/A"
 
             start_time = datetime.fromisoformat(start_time_str)
-            end_time = datetime.now()
+
+            # Use job_finished_time if available (job completed), otherwise current time
+            job_finished_time_str = session_data.get("job_finished_time")
+            if job_finished_time_str:
+                # Job is finished, use the stored job_finished_time (script execution time only)
+                end_time = datetime.fromisoformat(job_finished_time_str)
+            else:
+                # Job is still running, use current time
+                end_time = datetime.now()
+
             elapsed = end_time - start_time
 
             return str(elapsed)
         except Exception as e:
             print(f"Error calculating elapsed time: {e}")
             return "N/A"
+
+    def mark_job_finished(self, session_name: str, exit_code: int = 0):
+        """Mark the job as finished (script completed) - separate from session end"""
+        job_finish_data = {
+            "job_status": "finished",
+            "job_exit_code": str(exit_code),
+            "job_finished_time": datetime.now().isoformat(),
+            "job_elapsed": self._calculate_job_elapsed(session_name),
+        }
+
+        self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=job_finish_data)
+
+        # Publish to dashboard
+        self._publish_status_update(session_name, job_finish_data)
+
+    def mark_job_failed(self, session_name: str, error_message: str):
+        """Mark the job as failed (script failed) - separate from session end"""
+        job_fail_data = {
+            "job_status": "failed",
+            "job_error": error_message,
+            "job_finished_time": datetime.now().isoformat(),
+            "job_elapsed": self._calculate_job_elapsed(session_name),
+        }
+
+        self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=job_fail_data)
+
+        self._publish_status_update(session_name, job_fail_data)
+
+    def _calculate_job_elapsed(self, session_name: str) -> str:
+        """Calculate job elapsed time from start to job completion"""
+        try:
+            session_data = self.redis.redis.hgetall(self.redis.get_session_key(session_name))
+            if not session_data:
+                return "N/A"
+
+            # Handle bytes from Redis
+            if isinstance(list(session_data.values())[0], bytes):
+                session_data = {
+                    k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                    for k, v in session_data.items()
+                }
+
+            start_time_str = session_data.get("start_time")
+            if not start_time_str:
+                return "N/A"
+
+            start_time = datetime.fromisoformat(start_time_str)
+
+            # Use job_finished_time if available (job completed), otherwise current time
+            job_finished_time_str = session_data.get("job_finished_time")
+            if job_finished_time_str:
+                # Job is finished, use the stored job_finished_time
+                end_time = datetime.fromisoformat(job_finished_time_str)
+            else:
+                # Job is still running, use current time
+                end_time = datetime.now()
+
+            elapsed = end_time - start_time
+            return str(elapsed)
+
+        except Exception as e:
+            print(f"Error calculating job elapsed time: {e}")
+            return "N/A"
+
+    def get_job_status(self, session_name: str) -> str:
+        """
+        Get the current job status for a session.
+
+        Args:
+            session_name: The name of the session
+
+        Returns:
+            str: The job status ("running", "finished", "failed", or "unknown")
+        """
+        try:
+            session_data = self.redis.redis.hgetall(self.redis.get_session_key(session_name))
+            if not session_data:
+                return "unknown"
+
+            # Handle bytes from Redis
+            if isinstance(list(session_data.values())[0], bytes):
+                session_data = {
+                    k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                    for k, v in session_data.items()
+                }
+
+            # Check job status - defaults to "running" if not set
+            job_status = session_data.get("job_status", "running")
+            return job_status
+
+        except Exception as e:
+            print(f"Error getting job status for {session_name}: {e}")
+            return "unknown"
 
     def _publish_status_update(self, session_name: str, data: Dict):
         """Publish status update for real-time dashboard"""

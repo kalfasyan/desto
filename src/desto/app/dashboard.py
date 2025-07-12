@@ -55,7 +55,7 @@ def main():
     um = UserInterfaceManager(ui, ui_settings, tm)
 
     logger.add(
-        lambda msg: um.log_panel.update_log_messages(msg.strip()),
+        lambda msg: um.log_section.update_log_messages(msg.strip()),
         format="{message}",
         level="INFO",
     )

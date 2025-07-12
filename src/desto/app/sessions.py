@@ -84,17 +84,20 @@ class TmuxManager:
         """Monitor tmux session and update Redis - only called if Redis is available"""
 
         def monitor():
+            # Give the session a moment to start up before monitoring
+            time.sleep(2)
+
             while True:
                 try:
                     # Check if tmux session still exists
                     sessions = self.check_sessions()
                     if session_name not in sessions:
-                        # Session finished
+                        # Session finished (entire tmux session ended)
                         if self.use_redis:
                             self.status_tracker.mark_session_finished(session_name, exit_code=0)
                         break
 
-                    # Update heartbeat
+                    # Update heartbeat (job completion is now handled by the embedded Redis call)
                     if self.use_redis:
                         self.status_tracker.update_heartbeat(session_name)
 
@@ -237,24 +240,19 @@ class TmuxManager:
             pre_script_log = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" > {quoted_log_file}'
             cmd_parts.append(pre_script_log)
 
-        # FIXED: Group the command in parentheses to ensure ALL output gets redirected properly
-        # This fixes the chain logging issue where only the last command's output was captured
-        cmd_parts.append(f"({command}) >> {quoted_log_file} 2>&1")
+        # Create a robust bash command that ensures logging and keep-alive work regardless of script outcome
+        pre_script_commands = " && ".join(cmd_parts) if cmd_parts else ""
 
-        # Add post-script logging
-        post_script_log = f'printf "\\n=== SCRIPT FINISHED at %s ===\\n" "$(date)" >> {quoted_log_file}'
-        cmd_parts.append(post_script_log)
+        bash_script = f"""
+{pre_script_commands}
+({command}) >> {quoted_log_file} 2>&1
+SCRIPT_EXIT_CODE=$?
+printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(date)" >> {quoted_log_file}
+{self.get_job_completion_command(session_name, use_variable=True)}
+{f"tail -f /dev/null >> {quoted_log_file} 2>&1" if keep_alive else ""}
+""".strip()
 
-        # Add finished marker
-        finished_marker_cmd = f"touch '{self.LOG_DIR}/{session_name}.finished'"
-        cmd_parts.append(finished_marker_cmd)
-
-        # Only append tail -f /dev/null if keep_alive is True
-        if keep_alive:
-            cmd_parts.append(f"tail -f /dev/null >> {quoted_log_file} 2>&1")
-
-        # Join all parts with &&
-        full_command_for_tmux = " && ".join(cmd_parts)
+        full_command_for_tmux = bash_script
 
         try:
             subprocess.run(
@@ -384,7 +382,18 @@ class TmuxManager:
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
 
             finished_marker = self.LOG_DIR / f"{session_name}.finished"
-            status = "Finished" if finished_marker.exists() else "Running"
+
+            # Check job completion status from Redis if available, otherwise fall back to file marker
+            if self.use_redis:
+                # Get job status from Redis
+                job_status = self.status_tracker.get_job_status(session_name)
+                if job_status in ["finished", "failed"]:
+                    status = "Finished"
+                else:
+                    status = "Running"
+            else:
+                # Fall back to file marker for non-Redis setups
+                status = "Finished" if finished_marker.exists() else "Running"
 
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
@@ -664,3 +673,23 @@ class TmuxManager:
         all_errors = session_errors + job_errors
 
         return (session_success, session_total, job_success, job_total, all_errors)
+
+    def get_job_completion_command(self, session_name, use_variable=False):
+        """
+        Get the appropriate command to mark job completion.
+        Returns Redis call if Redis is available, otherwise file marker.
+
+        Args:
+            session_name: Name of the session
+            use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
+        """
+        exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
+
+        if self.use_redis:
+            # Use dedicated script to mark job completion
+            # Use absolute path to ensure it's found
+            script_path = "/home/kalfasy/repos/desto/scripts/mark_job_finished.py"
+            return f"python3 '{script_path}' '{session_name}' {exit_code_ref}"
+        else:
+            # Fallback to file-based marker for non-Redis setups
+            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
