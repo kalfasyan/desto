@@ -275,6 +275,11 @@ class HistoryTab:
     def __init__(self, tmux_manager):
         self.tmux_manager = tmux_manager
         self.history_container = None
+        # Add references to the stats labels so we can update them
+        self.total_sessions_label = None
+        self.finished_jobs_label = None
+        self.failed_jobs_label = None
+        self.running_jobs_label = None
 
     def get_session_history(self, days=7):
         """Get session history from Redis"""
@@ -286,11 +291,6 @@ class HistoryTab:
             # Debug: print all keys to see what's in Redis
             all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
             logger.debug(f"Found {len(all_keys)} session keys in Redis")
-
-            # Get SessionStatusTracker for duration calculations
-            from desto.redis.status_tracker import SessionStatusTracker
-
-            status_tracker = SessionStatusTracker(self.tmux_manager.redis_client)
 
             for key in all_keys:
                 try:
@@ -304,8 +304,42 @@ class HistoryTab:
                             k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
                         }
 
-                        # Calculate duration using SessionStatusTracker
-                        duration_str = status_tracker.get_session_duration(session_name)
+                        # Get duration from session data or calculate it
+                        duration_str = session_info.get("duration")
+                        if not duration_str or duration_str == "unknown":
+                            # Calculate duration if not already stored
+                            start_time_str = session_info.get("start_time")
+                            if start_time_str:
+                                try:
+                                    from datetime import datetime
+
+                                    start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+
+                                    # Use end_time if available, otherwise current time
+                                    end_time_str = session_info.get("end_time")
+                                    if end_time_str:
+                                        end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+                                    else:
+                                        end_time = datetime.now()
+
+                                    duration = end_time - start_time
+                                    # Format duration nicely
+                                    total_seconds = int(duration.total_seconds())
+                                    hours = total_seconds // 3600
+                                    minutes = (total_seconds % 3600) // 60
+                                    seconds = total_seconds % 60
+
+                                    if hours > 0:
+                                        duration_str = f"{hours}h {minutes}m {seconds}s"
+                                    elif minutes > 0:
+                                        duration_str = f"{minutes}m {seconds}s"
+                                    else:
+                                        duration_str = f"{seconds}s"
+                                except Exception as e:
+                                    logger.error(f"Error calculating duration for {session_name}: {e}")
+                                    duration_str = "N/A"
+                            else:
+                                duration_str = "N/A"
 
                         session_info.update(
                             {
@@ -333,10 +367,12 @@ class HistoryTab:
         with ui.card().style(
             "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; max-width: 1200px; margin: 0 auto;"
         ):
-            # Header with refresh button
+            # Header with refresh and clear buttons
             with ui.row().style("width: 100%; justify-content: space-between; align-items: center; margin-bottom: 20px;"):
                 ui.label("Session History").style("font-size: 1.5em; font-weight: bold;")
-                ui.button("Refresh", icon="refresh", on_click=self.refresh_history_display).props("flat")
+                with ui.row().style("gap: 10px;"):
+                    ui.button("Refresh", icon="refresh", on_click=self.refresh_history_display).props("flat")
+                    ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
 
             # Check Redis availability first
             if not self.tmux_manager.use_redis:
@@ -350,36 +386,72 @@ class HistoryTab:
                 ui.label("No session history found.").style("color: #666; font-style: italic; text-align: center; padding: 40px;")
                 return
 
-            # Summary stats - based on job status, not session status
-            total_sessions = len(history)
-            finished_jobs = len(
-                [s for s in history if s.get("job_status") == "finished" or (s.get("status") == "finished" and not s.get("job_status"))]
-            )
-            failed_jobs = len([s for s in history if s.get("job_status") == "failed" or (s.get("status") == "failed" and not s.get("job_status"))])
-            running_jobs = len([s for s in history if s.get("status") == "running" and not s.get("job_status")])
-
+            # Create stats container with labels we can update
             with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
                 with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
-                    ui.label(str(total_sessions)).style("font-size: 2em; font-weight: bold; color: #2196F3;")
+                    self.total_sessions_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #2196F3;")
                     ui.label("Total Sessions").style("color: #666; font-size: 0.9em;")
 
                 with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
-                    ui.label(str(finished_jobs)).style("font-size: 2em; font-weight: bold; color: #4CAF50;")
+                    self.finished_jobs_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #4CAF50;")
                     ui.label("Finished").style("color: #666; font-size: 0.9em;")
 
                 with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
-                    ui.label(str(failed_jobs)).style("font-size: 2em; font-weight: bold; color: #F44336;")
+                    self.failed_jobs_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #F44336;")
                     ui.label("Failed").style("color: #666; font-size: 0.9em;")
 
                 with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
-                    ui.label(str(running_jobs)).style("font-size: 2em; font-weight: bold; color: #FF9800;")
+                    self.running_jobs_label = ui.label("0").style("font-size: 2em; font-weight: bold; color: #FF9800;")
                     ui.label("Running").style("color: #666; font-size: 0.9em;")
 
             # History table container
             self.history_container = ui.column().style("width: 100%; overflow-x: auto;")
 
-            # Initial display
-            self.display_history_table(history)
+            # Initial display and stats calculation
+            self.update_stats_and_display(history)
+
+    def update_stats_and_display(self, history):
+        """Update the stats labels and display table with current data"""
+        # Calculate stats
+        total_sessions = len(history)
+        finished_jobs = len([s for s in history if s.get("job_status") == "finished" or (s.get("status") == "finished" and not s.get("job_status"))])
+        failed_jobs = len([s for s in history if s.get("job_status") == "failed" or (s.get("status") == "failed" and not s.get("job_status"))])
+
+        # Count running jobs properly
+        actually_running = []
+        for s in history:
+            job_status = s.get("job_status", "")
+            session_status = s.get("status", "")
+
+            # Count as running if:
+            # 1. Session is running and no job status set (job still running)
+            # 2. Session is running and job status is explicitly "running"
+            if session_status == "running" and (not job_status or job_status == "running"):
+                actually_running.append(s)
+
+        running_jobs = len(actually_running)
+
+        # Debug logging to understand the data
+        logger.debug(f"Session summary stats: Total={total_sessions}, Finished={finished_jobs}, Failed={failed_jobs}, Running={running_jobs}")
+        logger.debug("Session status breakdown:")
+        for i, s in enumerate(history[:5]):  # Log first 5 sessions for debugging
+            session_name = s.get("session_name", "unknown")
+            status = s.get("status", "unknown")
+            job_status = s.get("job_status", "none")
+            logger.debug(f"  Session {i + 1}: name={session_name}, status={status}, job_status={job_status}")
+
+        # Update the UI labels with new values
+        if self.total_sessions_label:
+            self.total_sessions_label.text = str(total_sessions)
+        if self.finished_jobs_label:
+            self.finished_jobs_label.text = str(finished_jobs)
+        if self.failed_jobs_label:
+            self.failed_jobs_label.text = str(failed_jobs)
+        if self.running_jobs_label:
+            self.running_jobs_label.text = str(running_jobs)
+
+        # Update the history table
+        self.display_history_table(history)
 
     def display_history_table(self, history):
         """Display the history table with better spacing"""
@@ -398,15 +470,17 @@ class HistoryTab:
                 ui.label("No sessions found.").style("color: #666; font-style: italic; text-align: center; padding: 20px;")
                 return
 
-            # Simple table header - updated to include Elapsed
+            # Table header with original column structure
             with ui.row().style(
-                "width: 100%; min-width: 900px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
+                "width: 100%; min-width: 1000px; background-color: #f5f5f5; "
+                "padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
             ):
-                ui.label("Session").style("flex: 2; min-width: 150px;")
-                ui.label("Command").style("flex: 3; min-width: 200px;")
-                ui.label("Status").style("flex: 1; min-width: 80px;")
-                ui.label("Started").style("flex: 2; min-width: 120px;")
-                ui.label("Elapsed").style("flex: 1; min-width: 100px;")
+                ui.label("Session Name").style("flex: 2; min-width: 150px;")
+                ui.label("Status").style("flex: 1; min-width: 100px;")
+                ui.label("Job Duration").style("flex: 1; min-width: 120px;")
+                ui.label("Session Duration").style("flex: 1; min-width: 130px;")
+                ui.label("Started").style("flex: 2; min-width: 140px;")
+                ui.label("Finished").style("flex: 2; min-width: 140px;")
 
             # Table rows (show last 20 sessions)
             for session in history[:20]:
@@ -438,38 +512,92 @@ class HistoryTab:
                 if start_time:
                     try:
                         dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                        formatted_time = dt.strftime("%m/%d %H:%M")
+                        formatted_start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
                     except Exception:
-                        formatted_time = start_time[:16] if len(start_time) > 16 else start_time
+                        formatted_start_time = start_time[:19] if len(start_time) > 19 else start_time
                 else:
-                    formatted_time = "Unknown"
+                    formatted_start_time = "Unknown"
 
-                # Get duration
-                duration = session.get("duration", "N/A")
+                # Format end time
+                end_time = session.get("end_time", "")
+                if end_time:
+                    try:
+                        dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+                        formatted_end_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        formatted_end_time = end_time[:19] if len(end_time) > 19 else end_time
+                else:
+                    formatted_end_time = "N/A" if status in ["finished", "failed"] or job_status in ["finished", "failed"] else "Running"
 
-                # Truncate command for display
-                command = session.get("command", "N/A")
-                if len(command) > 50:
-                    command = command[:47] + "..."
+                # Get job duration (script execution time) - Redis stores this as "job_elapsed"
+                job_duration = session.get("job_elapsed", "N/A")
+                if job_duration == "N/A" or job_duration == "unknown":
+                    # Fallback to "elapsed" field for compatibility
+                    job_duration = session.get("elapsed", "N/A")
+
+                # Get session duration (total session time) - Redis stores this as "duration"
+                session_duration = session.get("duration", "N/A")
+
+                # Format both durations if they're raw timedelta strings
+                def format_duration(duration_str):
+                    if duration_str == "N/A" or duration_str == "unknown":
+                        return "N/A"
+
+                    # Parse format like "0:05:23.456789" or "1 day, 0:05:23.456789"
+                    if ":" in duration_str:
+                        try:
+                            # Handle "X days, H:M:S" format
+                            if "day" in duration_str:
+                                parts = duration_str.split(", ")
+                                days_part = parts[0]
+                                time_part = parts[1] if len(parts) > 1 else "0:00:00"
+                                days = int(days_part.split()[0])
+                            else:
+                                days = 0
+                                time_part = duration_str
+
+                            # Parse H:M:S part
+                            time_components = time_part.split(":")
+                            if len(time_components) >= 3:
+                                hours = int(time_components[0]) + (days * 24)
+                                minutes = int(time_components[1])
+                                seconds = int(float(time_components[2]))
+
+                                if hours > 0:
+                                    return f"{hours}h {minutes}m {seconds}s"
+                                elif minutes > 0:
+                                    return f"{minutes}m {seconds}s"
+                                else:
+                                    return f"{seconds}s"
+                        except Exception:
+                            pass  # Keep original format if parsing fails
+
+                    return duration_str
+
+                job_duration = format_duration(job_duration)
+                session_duration = format_duration(session_duration)
 
                 with ui.row().style(
-                    "width: 100%; min-width: 900px; padding: 10px 12px; border-bottom: 1px solid #eee; "
+                    "width: 100%; min-width: 1000px; padding: 10px 12px; border-bottom: 1px solid #eee; "
                     "align-items: center; hover:background-color: #f9f9f9;"
                 ):
                     # Session name
                     ui.label(session.get("session_name", "Unknown")).style("flex: 2; min-width: 150px; font-weight: 500;")
 
-                    # Command (truncated)
-                    ui.label(command).style("flex: 3; min-width: 200px; font-family: monospace; font-size: 0.9em; color: #555;")
-
                     # Status with color
-                    ui.label(display_status).style(f"flex: 1; min-width: 80px; color: {status_color}; font-weight: 500;")
+                    ui.label(display_status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
+
+                    # Job Duration (script execution time)
+                    ui.label(job_duration).style("flex: 1; min-width: 120px; color: #666;")
+
+                    # Session Duration (total session time)
+                    ui.label(session_duration).style("flex: 1; min-width: 130px; color: #666;")
 
                     # Start time
-                    ui.label(formatted_time).style("flex: 2; min-width: 120px; color: #666;")
+                    ui.label(formatted_start_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
 
-                    # Duration
-                    ui.label(duration).style("flex: 1; min-width: 100px; color: #666;")
+                    # End time
+                    ui.label(formatted_end_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
 
     def refresh_history_display(self):
         """Refresh the history display"""
@@ -477,9 +605,64 @@ class HistoryTab:
             logger.debug("Refreshing history display")
             history = self.get_session_history()
             logger.debug(f"Got {len(history)} sessions")
-            self.display_history_table(history)
+            self.update_stats_and_display(history)
         else:
             ui.notification("Redis not available", type="warning")
+
+    def confirm_clear_history(self):
+        """Show confirmation dialog before clearing history"""
+        if not self.tmux_manager.use_redis:
+            ui.notification("Redis not available", type="warning")
+            return
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
+            ui.label("This action cannot be undone.").style("color: #666; margin-bottom: 20px;")
+
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
+                ui.button("Cancel", on_click=dialog.close).props("color=grey")
+                ui.button("Clear History", color="red", on_click=lambda: [self.clear_session_history(), dialog.close()]).props("icon=delete_forever")
+
+        dialog.open()
+
+    def clear_session_history(self):
+        """Clear all session history from Redis"""
+        if not self.tmux_manager.use_redis:
+            ui.notification("Redis not available", type="warning")
+            return
+
+        try:
+            # Get all session keys
+            all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
+
+            if not all_keys:
+                ui.notification("No session history to clear", type="info")
+                return
+
+            # Delete all session keys
+            deleted_count = 0
+            for key in all_keys:
+                try:
+                    self.tmux_manager.redis_client.redis.delete(key)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.error(f"Error deleting session key {key}: {e}")
+
+            if deleted_count > 0:
+                msg = f"Successfully cleared {deleted_count} session record(s) from history"
+                logger.info(msg)
+                ui.notification(msg, type="positive")
+
+                # Refresh the display to show empty history
+                self.refresh_history_display()
+            else:
+                ui.notification("No sessions were cleared", type="warning")
+
+        except Exception as e:
+            error_msg = f"Error clearing session history: {e}"
+            logger.error(error_msg)
+            ui.notification(error_msg, type="negative")
 
 
 class ScriptManagerTab:
