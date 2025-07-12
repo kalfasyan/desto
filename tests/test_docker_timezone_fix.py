@@ -17,8 +17,30 @@ Fix: Configure timezone in Dockerfile and docker-compose.yml:
 """
 
 import subprocess
+
 import pytest
-from datetime import datetime
+
+
+@pytest.fixture(scope="module", autouse=True)
+def ensure_docker_containers():
+    """Ensure Docker containers are running for timezone tests."""
+    # Check if desto-dashboard container is running
+    result = subprocess.run(
+        ["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"],
+        capture_output=True, text=True
+    )
+
+    if "desto-dashboard" not in result.stdout:
+        # Start containers if not running
+        subprocess.run(["docker", "compose", "up", "-d"], cwd="/home/kalfasy/repos/desto")
+
+        # Wait a moment for containers to be ready
+        import time
+        time.sleep(3)
+
+    yield
+
+    # Cleanup is optional since other tests might need containers
 
 
 def test_docker_container_timezone():
@@ -63,18 +85,14 @@ def test_scheduling_validation_past_date():
     """Test that past date validation works in Docker container."""
 
     # Test past date validation using the same logic as the UI
-    python_code = """
-from datetime import datetime
-
-# Test past date (yesterday)
-past_dt = datetime.strptime("2025-07-11 10:00", "%Y-%m-%d %H:%M")
-now = datetime.now()
-delta = (past_dt - now).total_seconds()
-
-# Should be negative (past)
-print(f"DELTA:{delta}")
-print(f"VALID:{delta < 0}")
-"""
+    python_code = (
+        "from datetime import datetime; "
+        'past_dt = datetime.strptime("2025-07-11 10:00", "%Y-%m-%d %H:%M"); '
+        "now = datetime.now(); "
+        "delta = (past_dt - now).total_seconds(); "
+        'print(f"DELTA:{delta}"); '
+        'print(f"VALID:{delta < 0}")'
+    )
 
     result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
 
@@ -96,18 +114,14 @@ def test_scheduling_validation_future_date():
     """Test that future date validation works in Docker container."""
 
     # Test future date validation
-    python_code = """
-from datetime import datetime
-
-# Test future date (tomorrow)  
-future_dt = datetime.strptime("2025-07-13 10:00", "%Y-%m-%d %H:%M")
-now = datetime.now()
-delta = (future_dt - now).total_seconds()
-
-# Should be positive (future)
-print(f"DELTA:{delta}")
-print(f"VALID:{delta > 0}")
-"""
+    python_code = (
+        "from datetime import datetime; "
+        'future_dt = datetime.strptime("2025-07-13 10:00", "%Y-%m-%d %H:%M"); '
+        "now = datetime.now(); "
+        "delta = (future_dt - now).total_seconds(); "
+        'print(f"DELTA:{delta}"); '
+        'print(f"VALID:{delta > 0}")'
+    )
 
     result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
 

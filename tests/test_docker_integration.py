@@ -169,7 +169,7 @@ class TestDockerIntegration:
 
             # Check that the container is running without Redis
             logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-            assert "Redis not available - using file-based session tracking" in logs_result.stdout
+            assert "Redis not available - using file-based session tracking" in logs_result.stderr
 
         finally:
             # Clean up container and image
