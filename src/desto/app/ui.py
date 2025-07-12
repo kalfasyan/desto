@@ -300,6 +300,10 @@ class HistoryTab:
             all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
             print(f"DEBUG: Found {len(all_keys)} session keys in Redis")
 
+            # Get SessionStatusTracker for duration calculations
+            from src.desto.redis.status_tracker import SessionStatusTracker
+            status_tracker = SessionStatusTracker(self.tmux_manager.redis_client)
+
             for key in all_keys:
                 # Handle both string and bytes keys
                 if isinstance(key, bytes):
@@ -319,8 +323,16 @@ class HistoryTab:
                     # Extract session name from Redis key
                     session_name = key.split("desto:session:", 1)[1] if "desto:session:" in key else "Unknown"
                     session_data["session_name"] = session_name
+
+                    # Calculate duration and elapsed fields dynamically if not present
+                    if "duration" not in session_data:
+                        session_data["duration"] = status_tracker._calculate_duration(session_name)
+                    if "elapsed" not in session_data:
+                        session_data["elapsed"] = status_tracker._calculate_elapsed(session_name)
+
                     history.append(session_data)
-                    print(f"DEBUG: Added session {session_name} with status {session_data.get('status', 'Unknown')}")
+                    print(f"DEBUG: Added session {session_name} with status {session_data.get('status', 'Unknown')}, "
+                          f"duration: {session_data.get('duration', 'N/A')}, elapsed: {session_data.get('elapsed', 'N/A')}")
                 else:
                     print(f"DEBUG: No data found for key: {key}")
 
