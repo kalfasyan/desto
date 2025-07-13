@@ -63,7 +63,7 @@ class TmuxManager:
 
     def _start_redis_monitoring(self, session_name):
         """Monitor tmux session and update Redis"""
-        
+
         # Skip monitoring if Redis is not available
         if not self.desto_manager:
             return

@@ -119,7 +119,7 @@ def test_redis_required_for_initialization(mock_redis_class, mock_ui, mock_logge
 
     # Should initialize successfully but in limited mode when Redis is not available
     tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
-    
+
     # Verify that it operates in limited mode
     assert tmux_manager.use_redis is False
     assert tmux_manager.desto_manager is None
