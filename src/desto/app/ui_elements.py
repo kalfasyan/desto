@@ -283,9 +283,6 @@ class HistoryTab:
 
     def get_session_history(self, days=7):
         """Get session history from Redis"""
-        if not self.tmux_manager.use_redis:
-            return []
-
         history = []
         try:
             # Debug: print all keys to see what's in Redis
@@ -374,11 +371,6 @@ class HistoryTab:
                     ui.button("Refresh", icon="refresh", on_click=self.refresh_history_display).props("flat")
                     ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
                     ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
-
-            # Check Redis availability first
-            if not self.tmux_manager.use_redis:
-                ui.label("Session history requires Redis to be enabled.").style("color: #666; font-style: italic; text-align: center; padding: 40px;")
-                return
 
             # Always create stats container with labels we can update
             with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
@@ -618,20 +610,13 @@ class HistoryTab:
 
     def refresh_history_display(self):
         """Refresh the history display"""
-        if self.tmux_manager.use_redis:
-            logger.debug("Refreshing history display")
-            history = self.get_session_history()
-            logger.debug(f"Got {len(history)} sessions")
-            self.update_stats_and_display(history)
-        else:
-            ui.notification("Redis not available", type="warning")
+        logger.debug("Refreshing history display")
+        history = self.get_session_history()
+        logger.debug(f"Got {len(history)} sessions")
+        self.update_stats_and_display(history)
 
     def confirm_clear_history(self):
         """Show confirmation dialog before clearing history"""
-        if not self.tmux_manager.use_redis:
-            ui.notification("Redis not available", type="warning")
-            return
-
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
             ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
@@ -645,10 +630,6 @@ class HistoryTab:
 
     def clear_session_history(self):
         """Clear all session history from Redis"""
-        if not self.tmux_manager.use_redis:
-            ui.notification("Redis not available", type="warning")
-            return
-
         try:
             # Get all session keys
             all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))

@@ -61,11 +61,11 @@ def main():
     )
 
     # Set up real-time updates using TmuxManager's Redis client
-    if tm.use_redis and tm.pubsub:
+    if tm.pubsub:
         tm.pubsub.subscribe_to_session_updates(lambda update: handle_instant_update(um, update))
         logger.info("Redis pub/sub enabled for real-time updates")
     else:
-        logger.info("Redis not available - using polling updates only")
+        logger.warning("Redis pub/sub not available")
 
     um.build_ui()
 
