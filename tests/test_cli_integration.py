@@ -29,9 +29,7 @@ class TestCLIIntegration:
         """Test complete session lifecycle through CLI components."""
         from desto.cli.session_manager import CLISessionManager
 
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Mock subprocess for tmux operations
         with patch("desto.cli.session_manager.subprocess.run") as mock_run:
@@ -63,9 +61,7 @@ class TestCLIIntegration:
         """Test log management integration."""
         from desto.cli.session_manager import CLISessionManager
 
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Create a log file
         log_file = temp_dirs["log_dir"] / "test_session.log"
@@ -116,9 +112,7 @@ class TestCLIIntegration:
         """Test error handling across CLI components."""
         from desto.cli.session_manager import CLISessionManager
 
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Test handling non-existent session
         assert manager.session_exists("nonexistent") is False
@@ -173,9 +167,7 @@ class TestCLIIntegration:
         env_scripts = str(temp_dirs["temp_path"] / "env_scripts")
         env_logs = str(temp_dirs["temp_path"] / "env_logs")
 
-        with patch.dict(
-            "os.environ", {"DESTO_SCRIPTS_DIR": env_scripts, "DESTO_LOGS_DIR": env_logs}
-        ):
+        with patch.dict("os.environ", {"DESTO_SCRIPTS_DIR": env_scripts, "DESTO_LOGS_DIR": env_logs}):
             with patch("pathlib.Path.mkdir"):
                 manager = CLISessionManager()
                 assert str(manager.scripts_dir) == env_scripts
@@ -186,9 +178,7 @@ class TestCLIIntegration:
         from desto.cli.session_manager import CLISessionManager
         from desto.cli.utils import format_duration
 
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Mock a session with runtime
         with patch.object(manager, "list_sessions") as mock_list:
@@ -214,9 +204,7 @@ class TestCLIIntegration:
         """Test file operations across CLI components."""
         from desto.cli.session_manager import CLISessionManager
 
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Test script file path generation
         script_file = manager.get_script_file("test_script.sh")
@@ -243,12 +231,8 @@ class TestCLIIntegration:
         from desto.cli.session_manager import CLISessionManager
 
         # Create multiple managers (simulating concurrent access)
-        manager1 = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
-        manager2 = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager1 = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
+        manager2 = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Both should use the same directories
         assert manager1.log_dir == manager2.log_dir

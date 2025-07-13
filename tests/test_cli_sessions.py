@@ -119,31 +119,23 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         assert "started successfully" in result.stdout
-        mock_session_manager.start_session.assert_called_with(
-            "test_session", "echo hello", False
-        )
+        mock_session_manager.start_session.assert_called_with("test_session", "echo hello", False)
 
     def test_start_session_with_keep_alive(self, runner, mock_session_manager):
         """Test starting a session with keep-alive flag."""
         mock_session_manager.session_exists.return_value = False
         mock_session_manager.start_session.return_value = True
 
-        result = runner.invoke(
-            sessions_app, ["start", "test_session", "echo hello", "--keep-alive"]
-        )
+        result = runner.invoke(sessions_app, ["start", "test_session", "echo hello", "--keep-alive"])
 
         assert result.exit_code == 0
-        mock_session_manager.start_session.assert_called_with(
-            "test_session", "echo hello", True
-        )
+        mock_session_manager.start_session.assert_called_with("test_session", "echo hello", True)
 
     def test_start_session_already_exists(self, runner, mock_session_manager):
         """Test starting a session that already exists."""
         mock_session_manager.session_exists.return_value = True
 
-        result = runner.invoke(
-            sessions_app, ["start", "existing_session", "echo hello"]
-        )
+        result = runner.invoke(sessions_app, ["start", "existing_session", "echo hello"])
 
         assert result.exit_code == 1
         assert "already exists" in result.stdout
@@ -158,9 +150,7 @@ class TestStartCommand:
         assert result.exit_code == 1
         assert "Failed to start" in result.stdout
 
-    def test_start_session_with_custom_dirs(
-        self, runner, mock_session_manager, temp_dirs
-    ):
+    def test_start_session_with_custom_dirs(self, runner, mock_session_manager, temp_dirs):
         """Test starting a session with custom directories."""
         mock_session_manager.session_exists.return_value = False
         mock_session_manager.start_session.return_value = True
@@ -322,9 +312,7 @@ class TestLogsCommand:
         mock_session_manager.get_log_content.return_value = "Last 5 lines"
 
         with patch("pathlib.Path.exists", return_value=True):
-            result = runner.invoke(
-                sessions_app, ["logs", "test_session", "--lines", "5"]
-            )
+            result = runner.invoke(sessions_app, ["logs", "test_session", "--lines", "5"])
 
         assert result.exit_code == 0
         mock_session_manager.get_log_content.assert_called_with("test_session", 5)

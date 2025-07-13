@@ -17,9 +17,7 @@ from loguru import logger
 class CLISessionManager:
     """Session manager adapted for CLI use without UI dependencies."""
 
-    def __init__(
-        self, log_dir: Optional[Path] = None, scripts_dir: Optional[Path] = None
-    ):
+    def __init__(self, log_dir: Optional[Path] = None, scripts_dir: Optional[Path] = None):
         """Initialize the CLI session manager.
 
         Args:
@@ -29,16 +27,8 @@ class CLISessionManager:
         self.scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         self.logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
 
-        self.scripts_dir = (
-            Path(self.scripts_dir_env)
-            if self.scripts_dir_env
-            else Path(scripts_dir or Path.cwd() / "desto_scripts")
-        )
-        self.log_dir = (
-            Path(self.logs_dir_env)
-            if self.logs_dir_env
-            else Path(log_dir or Path.cwd() / "desto_logs")
-        )
+        self.scripts_dir = Path(self.scripts_dir_env) if self.scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        self.log_dir = Path(self.logs_dir_env) if self.logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
 
         self.sessions: Dict[str, str] = {}
 
@@ -50,9 +40,7 @@ class CLISessionManager:
             logger.error(f"Failed to create log/scripts directory: {e}")
             raise
 
-    def start_session(
-        self, session_name: str, command: str, keep_alive: bool = False
-    ) -> bool:
+    def start_session(self, session_name: str, command: str, keep_alive: bool = False) -> bool:
         """Start a new tmux session with the given command.
 
         Args:
@@ -156,18 +144,14 @@ class CLISessionManager:
                         session_attached = session_info[3] == "1"
                         session_windows = int(session_info[4])
                         session_group = session_info[5] if session_info[5] else None
-                        session_group_size = (
-                            int(session_info[6]) if session_info[6] else 1
-                        )
+                        session_group_size = int(session_info[6]) if session_info[6] else 1
                     else:
                         # Simple format for tests: "session_name: N windows (created ...)"
                         parts = line.split(":")
                         if len(parts) >= 2:
                             session_name = parts[0].strip()
                             session_id = "1"  # Default for tests
-                            session_created = int(
-                                datetime.now().timestamp()
-                            )  # Default for tests
+                            session_created = int(datetime.now().timestamp())  # Default for tests
                             session_attached = False
                             session_windows = 1
                             session_group = None
@@ -202,9 +186,7 @@ class CLISessionManager:
                         "runtime": runtime,
                     }
             else:
-                logger.debug(
-                    f"No tmux sessions found or tmux not running: {result.stderr}"
-                )
+                logger.debug(f"No tmux sessions found or tmux not running: {result.stderr}")
 
         except FileNotFoundError:
             logger.error("tmux command not found. Please install tmux.")
@@ -250,9 +232,7 @@ class CLISessionManager:
 
                 return True
             else:
-                logger.error(
-                    f"Failed to kill session '{session_name}': {result.stderr}"
-                )
+                logger.error(f"Failed to kill session '{session_name}': {result.stderr}")
                 return False
 
         except Exception as e:
@@ -309,9 +289,7 @@ class CLISessionManager:
             logger.error(f"Error attaching to session '{session_name}': {e}")
             return False
 
-    def get_log_content(
-        self, session_name: str, lines: Optional[int] = None
-    ) -> Optional[str]:
+    def get_log_content(self, session_name: str, lines: Optional[int] = None) -> Optional[str]:
         """Get log content for a session.
 
         Args:

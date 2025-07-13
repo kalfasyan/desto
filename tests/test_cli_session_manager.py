@@ -30,9 +30,7 @@ def temp_dirs():
 @pytest.fixture
 def session_manager(temp_dirs):
     """Create a session manager with temporary directories."""
-    return CLISessionManager(
-        log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-    )
+    return CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
 
 @pytest.fixture
@@ -54,9 +52,7 @@ class TestCLISessionManagerInit:
 
     def test_init_with_custom_dirs(self, temp_dirs):
         """Test initialization with custom directories."""
-        manager = CLISessionManager(
-            log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
-        )
+        manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
         assert manager.log_dir == temp_dirs["log_dir"]
         assert manager.scripts_dir == temp_dirs["scripts_dir"]
 
@@ -65,9 +61,7 @@ class TestCLISessionManagerInit:
         env_scripts = str(temp_dirs["temp_path"] / "env_scripts")
         env_logs = str(temp_dirs["temp_path"] / "env_logs")
 
-        with patch.dict(
-            os.environ, {"DESTO_SCRIPTS_DIR": env_scripts, "DESTO_LOGS_DIR": env_logs}
-        ):
+        with patch.dict(os.environ, {"DESTO_SCRIPTS_DIR": env_scripts, "DESTO_LOGS_DIR": env_logs}):
             with patch("pathlib.Path.mkdir"):
                 manager = CLISessionManager()
                 assert str(manager.scripts_dir) == env_scripts
@@ -129,9 +123,7 @@ class TestSessionManagement:
 
         assert sessions == {}
 
-    def test_list_sessions_with_active_sessions(
-        self, session_manager, mock_subprocess, temp_dirs
-    ):
+    def test_list_sessions_with_active_sessions(self, session_manager, mock_subprocess, temp_dirs):
         """Test listing active sessions."""
         # Mock tmux list-sessions output
         mock_result = Mock()
