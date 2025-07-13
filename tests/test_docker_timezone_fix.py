@@ -17,6 +17,7 @@ Fix: Configure timezone in Dockerfile and docker-compose.yml:
 """
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -40,8 +41,11 @@ def ensure_docker_containers():
         # Clean up any existing desto containers first
         safe_docker_cleanup()
 
+        # Get the project root directory dynamically
+        project_root = Path(__file__).parent.parent.resolve()
+
         # Start containers if not running
-        subprocess.run(["docker", "compose", "up", "-d"], cwd="/home/kalfasy/repos/desto")
+        subprocess.run(["docker", "compose", "up", "-d"], cwd=str(project_root))
 
         # Wait a moment for containers to be ready
         import time
