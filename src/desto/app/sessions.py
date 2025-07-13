@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from loguru import logger
 from nicegui import ui
 
 from desto.redis.client import DestoRedisClient
@@ -14,15 +15,14 @@ from desto.redis.status_tracker import SessionStatusTracker
 
 
 class TmuxManager:
-    def __init__(self, ui, logger, log_dir=None, scripts_dir=None):
+    def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
         scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
         self.SCRIPTS_DIR = Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
         self.LOG_DIR = Path(logs_dir_env) if logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
-        self.sessions = {}
-        self.ui = ui
-        self.sessions_container = ui.column().style("margin-top: 20px;")
-        self.logger = logger
+        self.ui = ui_instance
+        self.sessions_container = ui_instance.column().style("margin-top: 20px;")
+        self.logger = instance_logger
         self.pause_updates = None  # Function to pause updates
         self.resume_updates = None  # Function to resume updates
 
@@ -36,56 +36,30 @@ class TmuxManager:
             ui.notification(msg, type="negative")
             raise
 
-        # Initialize Redis components with config
+        # Initialize Redis components with config (Redis is now required)
         from desto.app.config import config as ui_settings
 
         self.redis_client = DestoRedisClient(ui_settings.get("redis"))
 
-        # Only initialize Redis components if connected
-        if self.redis_client.is_connected():
-            self.status_tracker = SessionStatusTracker(self.redis_client)
-            self.pubsub = SessionPubSub(self.redis_client)
-            self.use_redis = True
-            logger.info("Redis enabled for session tracking")
-        else:
-            self.status_tracker = None
-            self.pubsub = None
-            self.use_redis = False
-            logger.info("Redis not available - using file-based session tracking")
+        # Redis is now required for session management
+        if not self.redis_client.is_connected():
+            msg = "Redis is required for session management but is not available"
+            self.logger.error(msg)
+            ui.notification(msg, type="negative")
+            raise RuntimeError(msg)
 
-    def start_session(self, session_name, command):
-        """Start a new tmux session with the given command."""
-        # Clean up finished marker before starting
-        finished_marker = self.LOG_DIR / f"{session_name}.finished"
-        if finished_marker.exists():
-            try:
-                finished_marker.unlink()
-            except Exception as e:
-                self.logger.warning(f"Could not remove marker: {e}")
-
-        if session_name in self.sessions:
-            raise ValueError(f"Session '{session_name}' already exists.")
-
-        subprocess.run(["tmux", "new-session", "-d", "-s", session_name, command])
-        self.sessions[session_name] = command
-
-        # Track in Redis if available
-        if self.use_redis and self.status_tracker:
-            self.status_tracker.mark_session_started(
-                session_name=session_name,
-                command=command,
-                script_path=command,  # or extract script path from command
-            )
-
-            # Start monitoring this session
-            self._start_redis_monitoring(session_name)
+        self.status_tracker = SessionStatusTracker(self.redis_client)
+        self.pubsub = SessionPubSub(self.redis_client)
+        logger.info("Redis enabled for session tracking")
+        logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
     def _start_redis_monitoring(self, session_name):
-        """Monitor tmux session and update Redis - only called if Redis is available"""
+        """Monitor tmux session and update Redis"""
 
         def monitor():
             # Give the session a moment to start up before monitoring
             time.sleep(2)
+            logger.debug(f"Starting Redis monitoring for session {session_name}")
 
             while True:
                 try:
@@ -93,13 +67,13 @@ class TmuxManager:
                     sessions = self.check_sessions()
                     if session_name not in sessions:
                         # Session finished (entire tmux session ended)
-                        if self.use_redis:
-                            self.status_tracker.mark_session_finished(session_name, exit_code=0)
+                        self.status_tracker.mark_session_finished(session_name, exit_code=0)
+                        logger.info(f"Session {session_name} monitoring ended - tmux session terminated")
                         break
 
                     # Update heartbeat (job completion is now handled by the embedded Redis call)
-                    if self.use_redis:
-                        self.status_tracker.update_heartbeat(session_name)
+                    self.status_tracker.update_heartbeat(session_name)
+                    logger.debug(f"Updated heartbeat for session {session_name}")
 
                     time.sleep(5)
                 except Exception as e:
@@ -111,6 +85,7 @@ class TmuxManager:
     def check_sessions(self):
         """Check the status of existing tmux sessions with detailed information."""
         active_sessions = {}
+        logger.debug("Checking tmux sessions")
         result = subprocess.run(
             [
                 "tmux",
@@ -123,6 +98,7 @@ class TmuxManager:
         )
 
         if result.returncode == 0:
+            session_count = 0
             for line in result.stdout.splitlines():
                 session_info = line.split(":")
                 session_id = session_info[0]
@@ -142,17 +118,18 @@ class TmuxManager:
                     "group": session_group,
                     "group_size": session_group_size,
                 }
+                session_count += 1
+
+            logger.debug(f"Found {session_count} active tmux sessions")
+        else:
+            logger.debug("No active tmux sessions found or tmux not running")
 
         return active_sessions
-
-    def get_session_command(self, session_name):
-        """Get the command associated with a specific session."""
-        return self.sessions.get(session_name, None)
 
     def kill_session(self, session_name):
         """Kill a tmux session by name."""
         msg = f"Attempting to kill session: '{session_name}'"
-        self.logger.info(msg)
+        logger.info(msg)
         escaped_session_name = shlex.quote(session_name)
         result = subprocess.run(
             ["tmux", "kill-session", "-t", escaped_session_name],
@@ -162,20 +139,11 @@ class TmuxManager:
         )
         if result.returncode == 0:
             msg = f"Session '{session_name}' killed successfully."
-            self.logger.success(msg)
+            logger.success(msg)
             self.ui.notification(msg, type="positive")
-            if session_name in self.sessions:
-                del self.sessions[session_name]
-            # Clean up finished marker
-            finished_marker = self.LOG_DIR / f"{session_name}.finished"
-            if finished_marker.exists():
-                try:
-                    finished_marker.unlink()
-                except Exception as e:
-                    self.logger.warning(f"Could not remove marker: {e}")
         else:
             msg = f"Failed to kill session '{session_name}': {result.stderr}"
-            self.logger.warning(msg)
+            logger.warning(msg)
             self.ui.notification(msg, type="negative")
 
     def clear_sessions_container(self):
@@ -197,7 +165,7 @@ class TmuxManager:
     def get_script_file(self, script_name):
         return self.SCRIPTS_DIR / script_name
 
-    def start_tmux_session(self, session_name, command, logger, keep_alive=False):
+    def start_tmux_session(self, session_name, command, instance_logger, keep_alive=False):
         """
         Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
@@ -211,13 +179,7 @@ class TmuxManager:
             ui.notification(msg, type="negative")
             return
 
-        # Clean up finished marker before starting
-        finished_marker = self.LOG_DIR / f"{session_name}.finished"
-        if finished_marker.exists():
-            try:
-                finished_marker.unlink()
-            except Exception as e:
-                self.logger.warning(f"Could not remove marker: {e}")
+        logger.info(f"Starting tmux session '{session_name}' with command: {command}")
 
         log_file = self.get_log_file(session_name)
         try:
@@ -279,14 +241,14 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 text=True,
                 check=True,
             )
-            msg = f"Tmux session '{session_name}' started. Command: '{full_command_for_tmux}'."
+            msg = f"Tmux session '{session_name}' started successfully."
             logger.info(msg)
             ui.notification(f"Tmux session '{session_name}' started.", type="positive")
 
-            # Track in Redis if available
-            if self.use_redis:
-                self.status_tracker.mark_session_started(session_name=session_name, command=command, script_path=command)
-                self._start_redis_monitoring(session_name)
+            # Track in Redis
+            self.status_tracker.mark_session_started(session_name=session_name, command=command, script_path=command)
+            self._start_redis_monitoring(session_name)
+            logger.debug(f"Redis tracking started for session '{session_name}'")
 
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"
@@ -303,6 +265,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
         """
         sessions_status = self.check_sessions()
+        logger.debug(f"Updating UI with {len(sessions_status)} active sessions")
 
         self.clear_sessions_container()
         self.add_to_sessions_container(lambda: self.add_sessions_table(sessions_status, self.ui))
@@ -313,22 +276,17 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         """
         try:
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
-            # Clean up finished marker
-            finished_marker = self.LOG_DIR / f"{session_name}.finished"
-            if finished_marker.exists():
-                try:
-                    finished_marker.unlink()
-                except Exception as e:
-                    self.logger.warning(f"Could not remove marker: {e}")
+            logger.info(f"Successfully killed tmux session '{session_name}'")
         except subprocess.CalledProcessError as e:
             msg = f"Failed to kill tmux session '{session_name}': {e}"
-            self.logger.warning(msg)
+            logger.warning(msg)
             ui.notification(msg, type="negative")
 
     def confirm_kill_session(self, session_name):
         """
         Displays a confirmation dialog before killing a tmux session and pauses updates.
         """
+        logger.debug(f"User requested to kill session: {session_name}")
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
 
@@ -338,6 +296,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 self.ui.button(
                     "Yes",
                     on_click=lambda: [
+                        logger.info(f"User confirmed killing session: {session_name}"),
                         self.kill_tmux_session(session_name),
                         dialog.close(),
                         self.resume_updates(),  # Resume updates after killing
@@ -346,6 +305,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 self.ui.button(
                     "No",
                     on_click=lambda: [
+                        logger.debug(f"User cancelled killing session: {session_name}"),
                         dialog.close(),
                         self.resume_updates(),  # Resume updates if canceled
                     ],
@@ -355,16 +315,26 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
     def get_script_run_time(self, created_time, session_name):
         """
-        Returns the elapsed time for a session.
-        If the .finished marker exists, uses its mtime as the end time.
-        Otherwise, uses the current time.
+        Returns the elapsed time for a session using Redis data.
         """
-        finished_marker = self.LOG_DIR / f"{session_name}.finished"
-        if finished_marker.exists():
-            end_time = finished_marker.stat().st_mtime
-        else:
-            end_time = time.time()
-        return int(end_time - created_time)
+        try:
+            # Get session data from Redis
+            session_data = self.status_tracker.get_session_status(session_name)
+            if session_data and session_data.get("end_time"):
+                # Session has ended, use the recorded end time
+                end_time_str = session_data.get("end_time")
+                from datetime import datetime
+
+                end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")).timestamp()
+            else:
+                # Session is still running, use current time
+                end_time = time.time()
+
+            return int(end_time - created_time)
+        except Exception as e:
+            logger.warning(f"Failed to get script run time for {session_name}: {e}")
+            # Fallback to current time
+            return int(time.time() - created_time)
 
     def add_sessions_table(self, sessions_status, ui):
         """
@@ -379,7 +349,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             ui.label("Created").style(header_style)
             ui.label("Elapsed").style(header_style)
             ui.label("Attached").style(header_style)
-            ui.label("Status").style(header_style)  # NEW COLUMN
+            ui.label("Status").style(header_style)
             ui.label("Actions").style(header_style)
 
         for session_name, session in sessions_status.items():
@@ -389,19 +359,12 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
 
-            finished_marker = self.LOG_DIR / f"{session_name}.finished"
-
-            # Check job completion status from Redis if available, otherwise fall back to file marker
-            if self.use_redis:
-                # Get job status from Redis
-                job_status = self.status_tracker.get_job_status(session_name)
-                if job_status in ["finished", "failed"]:
-                    status = "Finished"
-                else:
-                    status = "Running"
+            # Get job status from Redis
+            job_status = self.status_tracker.get_job_status(session_name)
+            if job_status in ["finished", "failed"]:
+                status = "Finished"
             else:
-                # Fall back to file marker for non-Redis setups
-                status = "Finished" if finished_marker.exists() else "Running"
+                status = "Running"
 
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
@@ -409,7 +372,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 ui.label(datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")).style(cell_style)
                 ui.label(elapsed_str).style(cell_style)
                 ui.label("Yes" if session["attached"] else "No").style(cell_style)
-                ui.label(status).style(cell_style)  # NEW STATUS COLUMN
+                ui.label(status).style(cell_style)
                 ui.button(
                     "Kill",
                     on_click=lambda s=session_name: self.confirm_kill_session(s),
@@ -423,6 +386,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         """
         Pauses the app and opens a dialog to display the last 100 lines of the session's log file.
         """
+        logger.debug(f"User requested to view log for session: {session_name}")
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
 
@@ -431,10 +395,13 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             with log_file.open("r") as f:
                 lines = f.readlines()[-100:]  # Get the last 100 lines
             log_content = "".join(lines)
+            logger.debug(f"Successfully read {len(lines)} lines from log file for session: {session_name}")
         except FileNotFoundError:
             log_content = f"Log file for session '{session_name}' not found."
+            logger.warning(f"Log file not found for session: {session_name}")
         except Exception as e:
             log_content = f"Error reading log file: {e}"
+            logger.error(f"Error reading log file for session {session_name}: {e}")
 
         with (
             ui.dialog() as dialog,
@@ -446,6 +413,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             ui.button(
                 "Close",
                 on_click=lambda: [
+                    logger.debug(f"User closed log view for session: {session_name}"),
                     dialog.close(),
                     self.resume_updates(),  # Resume updates when the dialog is closed
                 ],
@@ -454,7 +422,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
     def kill_all_sessions(self):
         """
-        Kill all active tmux sessions and clean up their finished markers.
+        Kill all active tmux sessions.
         Returns a tuple: (success_count, total_count, error_messages)
         """
         sessions_status = self.check_sessions()
@@ -464,34 +432,28 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         if total_count == 0:
             msg = "No active tmux sessions found."
-            self.logger.info(msg)
+            logger.info(msg)
             self.ui.notification(msg, type="info")
             return (0, 0, [])
+
+        logger.info(f"Attempting to kill {total_count} tmux sessions")
 
         for session_name in sessions_status.keys():
             try:
                 subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
                 success_count += 1
-
-                # Clean up finished marker
-                finished_marker = self.LOG_DIR / f"{session_name}.finished"
-                if finished_marker.exists():
-                    try:
-                        finished_marker.unlink()
-                    except Exception as e:
-                        self.logger.warning(f"Could not remove marker for {session_name}: {e}")
-
-                self.logger.info(f"Successfully killed session: {session_name}")
+                logger.info(f"Successfully killed session: {session_name}")
 
             except subprocess.CalledProcessError as e:
                 error_msg = f"Failed to kill session '{session_name}': {e}"
                 error_messages.append(error_msg)
-                self.logger.warning(error_msg)
+                logger.warning(error_msg)
             except Exception as e:
                 error_msg = f"Unexpected error killing session '{session_name}': {str(e)}"
                 error_messages.append(error_msg)
-                self.logger.error(error_msg)
+                logger.error(error_msg)
 
+        logger.info(f"Killed {success_count}/{total_count} sessions")
         return (success_count, total_count, error_messages)
 
     def confirm_kill_all_sessions(self):
@@ -510,21 +472,26 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         if session_count == 0 and job_count == 0:
             msg = "No active sessions or scheduled jobs to clear."
-            self.logger.info(msg)
+            logger.info(msg)
             self.ui.notification(msg, type="info")
             if self.resume_updates:
                 self.resume_updates()
             return
 
-        # Check for running vs finished sessions
+        # Get session status from Redis
         running_sessions = []
         finished_sessions = []
 
         for session_name in sessions_status.keys():
-            finished_marker = self.LOG_DIR / f"{session_name}.finished"
-            if finished_marker.exists():
-                finished_sessions.append(session_name)
-            else:
+            try:
+                job_status = self.status_tracker.get_job_status(session_name)
+                if job_status in ["finished", "failed"]:
+                    finished_sessions.append(session_name)
+                else:
+                    running_sessions.append(session_name)
+            except Exception as e:
+                logger.warning(f"Could not get status for session {session_name}: {e}")
+                # Assume running if we can't determine status
                 running_sessions.append(session_name)
 
         running_count = len(running_sessions)
@@ -553,10 +520,10 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
             if error_messages:
                 msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
-                self.logger.warning(msg)
+                logger.warning(msg)
                 self.ui.notification(msg, type="warning")
             else:
-                self.logger.success(msg)
+                logger.success(msg)
                 self.ui.notification(msg, type="positive")
 
             dialog.close()
@@ -564,6 +531,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 self.resume_updates()
 
         def cancel_kill_all():
+            logger.debug("User cancelled kill all sessions operation")
             dialog.close()
             if self.resume_updates:
                 self.resume_updates()
@@ -620,6 +588,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         try:
             result = subprocess.run(["atq"], capture_output=True, text=True)
             if result.returncode != 0:
+                logger.debug("No scheduled jobs found or 'at' command failed")
                 return []
 
             jobs = []
@@ -633,9 +602,11 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                         date_time = " ".join(parts[1:5])
                         user = parts[-1]
                         jobs.append({"id": job_id, "datetime": date_time, "user": user})
+
+            logger.debug(f"Found {len(jobs)} scheduled jobs")
             return jobs
         except Exception as e:
-            self.logger.warning(f"Failed to get scheduled jobs: {e}")
+            logger.warning(f"Failed to get scheduled jobs: {e}")
             return []
 
     def kill_scheduled_jobs(self):
@@ -649,22 +620,26 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         error_messages = []
 
         if total_count == 0:
+            logger.debug("No scheduled jobs found to kill")
             return (0, 0, [])
+
+        logger.info(f"Attempting to cancel {total_count} scheduled jobs")
 
         for job in jobs:
             try:
                 subprocess.run(["atrm", job["id"]], check=True)
                 success_count += 1
-                self.logger.info(f"Successfully removed scheduled job: {job['id']}")
+                logger.info(f"Successfully removed scheduled job: {job['id']}")
             except subprocess.CalledProcessError as e:
                 error_msg = f"Failed to remove job '{job['id']}': {e}"
                 error_messages.append(error_msg)
-                self.logger.warning(error_msg)
+                logger.warning(error_msg)
             except Exception as e:
                 error_msg = f"Unexpected error removing job '{job['id']}': {str(e)}"
                 error_messages.append(error_msg)
-                self.logger.error(error_msg)
+                logger.error(error_msg)
 
+        logger.info(f"Cancelled {success_count}/{total_count} scheduled jobs")
         return (success_count, total_count, error_messages)
 
     def kill_all_sessions_and_jobs(self):
@@ -682,31 +657,9 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         return (session_success, session_total, job_success, job_total, all_errors)
 
-    def get_session_start_command(self, session_name, command):
-        """
-        Get the appropriate command to mark session started.
-        Returns Redis call if Redis is available, otherwise empty string.
-
-        Args:
-            session_name: Name of the session
-            command: Command being executed
-        """
-        if self.use_redis:
-            # Use dedicated script to mark session started
-            # Use relative path from project root - go up 3 levels from src/desto/app/sessions.py to reach project root
-            script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_session_started.py"
-            # Use shlex.quote to properly escape the command
-            import shlex
-
-            return f"python3 '{script_path}' '{session_name}' {shlex.quote(command)}"
-        else:
-            # No Redis, return empty string
-            return ""
-
     def get_job_completion_command(self, session_name, use_variable=False):
         """
-        Get the appropriate command to mark job completion.
-        Returns Redis call if Redis is available, otherwise file marker.
+        Get the appropriate command to mark job completion using Redis.
 
         Args:
             session_name: Name of the session
@@ -714,32 +667,28 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         """
         exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
 
-        if self.use_redis:
-            # Use dedicated script to mark job completion
-            # First try relative path from project root
-            script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
+        # Use dedicated script to mark job completion
+        # First try relative path from project root
+        script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
 
-            # If that doesn't exist, try from current working directory (Docker case)
-            if not script_path.exists():
-                script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
+        # If that doesn't exist, try from current working directory (Docker case)
+        if not script_path.exists():
+            script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
 
-            # If still not found, try to find project root by looking for pyproject.toml
-            if not script_path.exists():
-                current = Path(__file__).parent
-                while current != current.parent:
-                    if (current / "pyproject.toml").exists():
-                        script_path = current / "scripts" / "mark_job_finished.py"
-                        break
-                    current = current.parent
+        # If still not found, try to find project root by looking for pyproject.toml
+        if not script_path.exists():
+            current = Path(__file__).parent
+            while current != current.parent:
+                if (current / "pyproject.toml").exists():
+                    script_path = current / "scripts" / "mark_job_finished.py"
+                    break
+                current = current.parent
 
-            # Determine the correct Python command
-            # In Docker with uv, use 'uv run python', otherwise use 'python3'
-            if Path("/usr/local/bin/uv").exists():
-                python_cmd = "uv run python"
-            else:
-                python_cmd = "python3"
-
-            return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"
+        # Determine the correct Python command
+        # In Docker with uv, use 'uv run python', otherwise use 'python3'
+        if Path("/usr/local/bin/uv").exists():
+            python_cmd = "uv run python"
         else:
-            # Fallback to file-based marker for non-Redis setups
-            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
+            python_cmd = "python3"
+
+        return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"

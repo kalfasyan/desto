@@ -34,18 +34,25 @@ class TestDuplicateSessionValidation:
         mock_ui = Mock()
         mock_logger = Mock()
 
-        # Patch Redis to be unavailable for consistent file-based testing
+        # Patch Redis to be available since it's now required
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_instance = Mock()
-            mock_redis_instance.is_connected.return_value = False
+            mock_redis_instance.is_connected.return_value = True
             mock_redis_class.return_value = mock_redis_instance
 
-            tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
+            # Also need to mock the status tracker
+            with patch("src.desto.app.sessions.SessionStatusTracker") as mock_status_tracker_class:
+                mock_status_tracker = Mock()
+                mock_status_tracker_class.return_value = mock_status_tracker
 
-            # Force Redis to be disabled to ensure file-based markers are used
-            tmux_manager.use_redis = False
+                # Mock PubSub
+                with patch("src.desto.app.sessions.SessionPubSub") as mock_pubsub_class:
+                    mock_pubsub = Mock()
+                    mock_pubsub_class.return_value = mock_pubsub
 
-            return tmux_manager
+                    tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
+
+                    return tmux_manager
 
     @pytest.mark.skipif(not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available")
     def test_duplicate_session_validation(self, tmux_manager, temp_dirs):
