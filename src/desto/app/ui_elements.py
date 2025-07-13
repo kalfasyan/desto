@@ -531,12 +531,14 @@ class HistoryTab:
                         formatted_end_time = end_time[:19] if len(end_time) > 19 else end_time
                 else:
                     # Smart end time display for keep-alive sessions
-                    if job_status == "finished" and status == "running":
-                        formatted_end_time = "Keep Alive"
-                    elif job_status == "failed" and status == "running":
-                        formatted_end_time = "Keep Alive"
-                    elif status == "running":
-                        formatted_end_time = "Running"
+                    # Only show "Keep Alive" or "Running" if the session is actually still running
+                    if status == "running":
+                        if job_status == "finished":
+                            formatted_end_time = "Keep Alive"
+                        elif job_status == "failed":
+                            formatted_end_time = "Keep Alive"
+                        else:
+                            formatted_end_time = "Running"
                     else:
                         formatted_end_time = "N/A"
 
@@ -549,7 +551,7 @@ class HistoryTab:
                 # Get session duration (total session time) - Redis stores this as "duration"
                 session_duration = session.get("duration", "N/A")
 
-                # For keep-alive sessions, show ongoing duration
+                # For keep-alive sessions, show ongoing duration only if session is actually still running
                 if status == "running" and job_status in ["finished", "failed"]:
                     session_duration = "Ongoing"
 

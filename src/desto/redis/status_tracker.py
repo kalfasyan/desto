@@ -40,6 +40,16 @@ class SessionStatusTracker:
 
     def mark_session_finished(self, session_name: str, exit_code: int = 0):
         """Mark the entire session as finished (tmux session ended)"""
+        # Get existing session data to preserve job completion status
+        existing_data = self.redis.redis.hgetall(self.redis.get_session_key(session_name))
+        
+        # Convert bytes to strings if needed
+        if existing_data and isinstance(list(existing_data.values())[0], bytes):
+            existing_data = {
+                k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                for k, v in existing_data.items()
+            }
+        
         finish_data = {
             "status": "finished",
             "exit_code": str(exit_code),
@@ -47,6 +57,19 @@ class SessionStatusTracker:
             "duration": self._calculate_duration(session_name),
             "elapsed": self._calculate_elapsed(session_name),  # This now uses job_finished_time if available
         }
+        
+        # If job was already completed before session ended, preserve that information
+        if existing_data:
+            job_status = existing_data.get("job_status")
+            if job_status in ["finished", "failed"]:
+                # Job was already completed - preserve the job completion data
+                finish_data.update({
+                    "job_status": job_status,
+                    "job_exit_code": existing_data.get("job_exit_code", ""),
+                    "job_finished_time": existing_data.get("job_finished_time", ""),
+                    "job_elapsed": existing_data.get("job_elapsed", ""),
+                    "job_error": existing_data.get("job_error", "")  # Preserve error message if job failed
+                })
 
         self.redis.redis.hset(self.redis.get_session_key(session_name), mapping=finish_data)
 
