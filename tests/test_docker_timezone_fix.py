@@ -127,10 +127,13 @@ def test_scheduling_validation_past_date():
 def test_scheduling_validation_future_date():
     """Test that future date validation works in Docker container."""
 
-    # Test future date validation
+    # Test future date validation using a dynamically generated future date
+    from datetime import datetime, timedelta
+
+    future_dt = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
     python_code = (
         "from datetime import datetime; "
-        'future_dt = datetime.strptime("2025-07-13 10:00", "%Y-%m-%d %H:%M"); '
+        f'future_dt = datetime.strptime("{future_dt}", "%Y-%m-%d %H:%M"); '
         "now = datetime.now(); "
         "delta = (future_dt - now).total_seconds(); "
         'print(f"DELTA:{delta}"); '
