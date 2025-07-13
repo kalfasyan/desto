@@ -39,17 +39,29 @@ class SystemStatsPanel:
                 self.cpu_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
             self.cpu_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
 
-            # CPU Cores toggle and container
-            self.show_cpu_cores = ui.switch("Show CPU Cores", value=False).style("margin-top: 8px;")
-            self.cpu_cores_container = ui.column().style("margin-top: 8px;")
+            # CPU Details toggle and container
+            core_info = "Show CPU details"
+            self.show_cpu_cores = ui.switch(core_info, value=False).style("margin-top: 8px;")
+            self.cpu_cores_container = ui.column().style(
+                "margin-top: 8px; min-height: 50px; border: 1px solid #ddd; padding: 8px; border-radius: 4px;"
+            )
 
             def toggle_cpu_cores_visibility(e):
-                self.cpu_cores_container.visible = e.value
-                if e.value and not self.cpu_core_labels:
+                # Access the switch value directly after the event
+                new_value = self.show_cpu_cores.value
+                logger.debug(f"CPU cores toggle: new_value={new_value}")
+                logger.debug(f"Container visible before: {self.cpu_cores_container.visible}")
+                self.cpu_cores_container.visible = new_value
+                logger.debug(f"Container visible after: {self.cpu_cores_container.visible}")
+                if new_value and not self.cpu_core_labels:
+                    logger.debug("Calling _initialize_cpu_cores because new_value=True and cpu_core_labels is empty")
                     self._initialize_cpu_cores()
+                elif new_value and self.cpu_core_labels:
+                    logger.debug(f"CPU cores already initialized, have {len(self.cpu_core_labels)} labels")
 
             self.show_cpu_cores.on("update:model-value", toggle_cpu_cores_visibility)
-            self.cpu_cores_container.visible = self.show_cpu_cores.value
+            # Set initial visibility to match switch value
+            self.cpu_cores_container.visible = False
 
             ui.label("Memory Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
@@ -80,24 +92,33 @@ class SystemStatsPanel:
 
     def _initialize_cpu_cores(self):
         """Initialize the CPU cores display."""
-        cpu_count = psutil.cpu_count()
+        logger.debug("Initializing CPU cores display")
+        logical_cores = psutil.cpu_count(logical=True)
+        physical_cores = psutil.cpu_count(logical=False)
         max_cols = self.ui_settings.get("cpu_cores", {}).get("max_columns", 4)
 
+        logger.debug(f"CPU cores: {logical_cores} logical, {physical_cores} physical, max_cols: {max_cols}")
+
         with self.cpu_cores_container:
-            ui.label("CPU Cores").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;")
+            ui.label(f"CPU Details ({logical_cores} threads on {physical_cores} cores)").style(
+                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;"
+            )
 
             # Create cores in rows based on max_columns
-            for i in range(0, cpu_count, max_cols):
+            for i in range(0, logical_cores, max_cols):
                 with ui.row().style("gap: 8px; margin-bottom: 4px;"):
-                    for j in range(i, min(i + max_cols, cpu_count)):
+                    for j in range(i, min(i + max_cols, logical_cores)):
                         core_column = ui.column().style("align-items: center; min-width: 60px;")
                         with core_column:
-                            ui.label(f"Core {j}").style("font-size: 0.8em; margin-bottom: 2px;")
+                            # Label each thread as T0, T1, etc.
+                            ui.label(f"T{j}").style("font-size: 0.8em; margin-bottom: 2px;")
                             core_percent = ui.label("0%").style("font-size: 0.75em; font-weight: bold;")
                             core_bar = ui.linear_progress(value=0, size="sm", show_value=False).style("width: 50px; height: 4px;")
 
                         self.cpu_core_labels.append(core_percent)
                         self.cpu_core_bars.append(core_bar)
+
+        logger.debug(f"Created {len(self.cpu_core_labels)} CPU core labels and {len(self.cpu_core_bars)} progress bars")
 
 
 class SettingsPanel:

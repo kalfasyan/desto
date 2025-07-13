@@ -198,13 +198,13 @@ class UserInterfaceManager:
         if self.stats_panel.show_cpu_cores.value and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
             try:
                 core_percentages = psutil.cpu_percent(percpu=True, interval=None)
-                for i, (core_percent, core_bar) in enumerate(zip(core_percentages, self.stats_panel.cpu_core_bars)):
-                    if i < len(self.stats_panel.cpu_core_labels):
-                        _, percent_label = self.stats_panel.cpu_core_labels[i]
-                        percent_label.text = f"{core_percent:.1f}%"
-                        core_bar.value = core_percent / 100
-            except Exception:
+                for i, core_percent in enumerate(core_percentages):
+                    if i < len(self.stats_panel.cpu_core_labels) and i < len(self.stats_panel.cpu_core_bars):
+                        self.stats_panel.cpu_core_labels[i].text = f"{core_percent:.1f}%"
+                        self.stats_panel.cpu_core_bars[i].value = core_percent / 100
+            except Exception as e:
                 # If there's an error getting per-core data, just skip the update
+                logger.debug(f"Error updating CPU core data: {e}")
                 pass
 
         memory = psutil.virtual_memory()
