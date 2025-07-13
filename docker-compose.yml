@@ -1,5 +1,5 @@
 services:
-  # Redis service (optional - comment out if not needed)
+  # Redis service (required for session tracking)
   redis:
     image: redis:7-alpine
     container_name: desto-redis

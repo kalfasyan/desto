@@ -65,11 +65,8 @@ docker-stop:  ## Stop and remove Docker container
 docker-logs:  ## View Docker container logs
 	docker logs -f desto-dashboard
 
-docker-start:  ## Start desto with Redis (default)
+docker-start:  ## Start desto with Redis
 	docker compose up -d
-
-docker-start-no-redis:  ## Start desto without Redis
-	docker compose -f docker-compose.no-redis.yml up -d
 
 docker-stop-all:  ## Stop all desto services (including Redis)
 	docker compose down

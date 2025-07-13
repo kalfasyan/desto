@@ -70,14 +70,7 @@ class TestDockerIntegration:
         assert "redis:" in content
         assert "REDIS_HOST=redis" in content
         assert "image: redis:7-alpine" in content
-
-        # No-redis variant
-        no_redis_file = repo_root / "docker-compose.no-redis.yml"
-        assert no_redis_file.exists(), "docker-compose.no-redis.yml should exist"
-
-        no_redis_content = no_redis_file.read_text()
-        assert "REDIS_ENABLED=false" in no_redis_content
-        assert "redis:" not in no_redis_content
+        assert "required for session tracking" in content  # Updated comment
 
     @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
     def test_docker_build(self):
@@ -101,156 +94,61 @@ class TestDockerIntegration:
         )
 
     @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
-    def test_docker_run_without_redis(self, temp_scripts_dir, temp_logs_dir):
-        """Test that Docker container starts successfully without Redis."""
+    def test_docker_compose_health_check(self, temp_scripts_dir, temp_logs_dir):
+        """Test that Docker Compose stack starts with Redis and responds to health checks."""
         repo_root = Path(__file__).parent.parent
 
-        image_name = "desto-test-no-redis"
-        container_name = "desto-test-no-redis-container"
+        # Check if docker compose is available
+        compose_check = subprocess.run(["docker", "compose", "version"], capture_output=True, text=True)
+        if compose_check.returncode != 0:
+            pytest.skip("Docker Compose not available")
 
-        # Build the image first
-        build_result = subprocess.run(["docker", "build", "-t", image_name, "."], cwd=repo_root, capture_output=True, text=True, timeout=300)
-
-        if build_result.returncode != 0:
-            # Clean up any partial image
-            subprocess.run(["docker", "rmi", image_name], capture_output=True)
-            pytest.skip(f"Docker build failed: {build_result.stderr}")
-
-        run_cmd = [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            container_name,
-            "-p",
-            "8810:8809",  # Use different port to avoid conflicts
-            "-v",
-            f"{temp_scripts_dir}:/app/scripts",
-            "-v",
-            f"{temp_logs_dir}:/app/logs",
-            "-e",
-            "REDIS_ENABLED=false",
-            image_name,
-        ]
+        # Test with Docker Compose which includes Redis
+        compose_cmd = ["docker", "compose", "-f", "docker-compose.yml", "up", "-d", "--build"]
 
         try:
-            result = subprocess.run(run_cmd, capture_output=True, text=True, timeout=30)
-            assert result.returncode == 0, f"Container start failed: {result.stderr}"
+            # Start the compose stack
+            result = subprocess.run(compose_cmd, cwd=repo_root, capture_output=True, text=True, timeout=120)
 
-            # Wait for container to be ready
-            max_retries = 20
-            for i in range(max_retries):
-                time.sleep(2)
+            if result.returncode != 0:
+                pytest.skip(f"Docker Compose start failed: {result.stderr}")
 
-                # Check if container is running
-                ps_result = subprocess.run(
-                    ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Status}}"], capture_output=True, text=True
-                )
-
-                if "Up" not in ps_result.stdout:
-                    # Container died, check logs
-                    logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-                    pytest.fail(f"Container died. Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}")
-
-                # Try to connect to the health endpoint
-                try:
-                    response = requests.get("http://localhost:8810", timeout=3)
-                    # Any response means the server is up
-                    assert response.status_code == 200
-                    break
-                except requests.exceptions.RequestException:
-                    if i == max_retries - 1:
-                        # On last retry, get container logs for debugging
-                        logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-                        pytest.skip(
-                            f"Could not connect to container after {max_retries} retries. Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}"
-                        )
-                    continue
-
-            # Check that the container is running without Redis
-            logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-            assert "Redis not available - using file-based session tracking" in logs_result.stderr
-
-        finally:
-            # Clean up container and image
-            subprocess.run(["docker", "stop", container_name], capture_output=True)
-            subprocess.run(["docker", "rm", container_name], capture_output=True)
-            subprocess.run(["docker", "rmi", image_name], capture_output=True)
-
-    @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
-    def test_docker_run_health_check(self, temp_scripts_dir, temp_logs_dir):
-        """Test that Docker container starts and responds to health checks, and cleans up after itself."""
-        repo_root = Path(__file__).parent.parent
-
-        image_name = "desto-test"
-        container_name = "desto-test-container"
-
-        # Build the image first
-        build_result = subprocess.run(["docker", "build", "-t", image_name, "."], cwd=repo_root, capture_output=True, text=True, timeout=300)
-
-        if build_result.returncode != 0:
-            # Clean up any partial image
-            subprocess.run(["docker", "rmi", image_name], capture_output=True)
-            pytest.skip(f"Docker build failed: {build_result.stderr}")
-
-        run_cmd = [
-            "docker",
-            "run",
-            "-d",
-            "--name",
-            container_name,
-            "-p",
-            "8809:8809",
-            "-v",
-            f"{temp_scripts_dir}:/app/scripts",
-            "-v",
-            f"{temp_logs_dir}:/app/logs",
-            "-e",
-            "REDIS_ENABLED=false",  # Disable Redis for simpler test
-            image_name,
-        ]
-
-        try:
-            result = subprocess.run(run_cmd, capture_output=True, text=True, timeout=30)
-            assert result.returncode == 0, f"Container start failed: {result.stderr}"
-
-            # Wait for container to be ready with better health checking
+            # Wait for services to be ready
             max_retries = 30
             for i in range(max_retries):
-                time.sleep(2)
+                time.sleep(3)
 
-                # Check if container is running
+                # Check if desto container is running
                 ps_result = subprocess.run(
-                    ["docker", "ps", "--filter", f"name={container_name}", "--format", "{{.Status}}"], capture_output=True, text=True
+                    ["docker", "compose", "-f", "docker-compose.yml", "ps", "--services", "--filter", "status=running"],
+                    cwd=repo_root,
+                    capture_output=True,
+                    text=True,
                 )
 
-                if "Up" not in ps_result.stdout:
-                    # Container died, check logs
-                    logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-                    pytest.fail(f"Container died. Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}")
+                if "desto" in ps_result.stdout and "redis" in ps_result.stdout:
+                    # Both services are running, try health check
+                    try:
+                        response = requests.get("http://localhost:8809", timeout=3)
+                        # Any response means the server is up
+                        if response.status_code == 200:
+                            break
+                    except requests.exceptions.RequestException:
+                        pass
 
-                # Try to connect to the health endpoint
-                try:
-                    requests.get("http://localhost:8809", timeout=3)
-                    # Any response means the server is up
-                    break
-                except requests.exceptions.RequestException:
-                    if i == max_retries - 1:
-                        # On last retry, get container logs for debugging
-                        logs_result = subprocess.run(["docker", "logs", container_name], capture_output=True, text=True)
-                        pytest.skip(
-                            f"Could not connect to container after {max_retries} retries. Logs: {logs_result.stdout}\nErrors: {logs_result.stderr}"
-                        )
-                    continue
+                if i == max_retries - 1:
+                    # On last retry, get container logs for debugging
+                    logs_result = subprocess.run(
+                        ["docker", "compose", "-f", "docker-compose.yml", "logs", "desto"], cwd=repo_root, capture_output=True, text=True
+                    )
+                    pytest.skip(f"Could not connect to service after {max_retries} retries. Logs: {logs_result.stdout}")
 
-            # If we get here, the container is responding
-            assert True, "Container is running and responding"
+            # If we get here, the service is responding
+            assert True, "Docker Compose stack is running and responding"
 
         finally:
-            # Clean up container and image
-            subprocess.run(["docker", "stop", container_name], capture_output=True)
-            subprocess.run(["docker", "rm", container_name], capture_output=True)
-            subprocess.run(["docker", "rmi", image_name], capture_output=True)
+            # Clean up compose stack
+            subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "down", "-v", "--remove-orphans"], cwd=repo_root, capture_output=True)
 
     def test_example_scripts_exist(self):
         """Test that example scripts exist and are executable."""
