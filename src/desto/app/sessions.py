@@ -692,3 +692,40 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             python_cmd = "python3"
 
         return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"
+
+    def get_session_start_command(self, session_name: str, command: str):
+        """
+        Get the appropriate command to mark session start using Redis.
+
+        Args:
+            session_name: Name of the session
+            command: Command being executed in the session
+        """
+        # Use dedicated script to mark session start
+        # First try relative path from project root
+        script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_session_started.py"
+
+        # If that doesn't exist, try from current working directory (Docker case)
+        if not script_path.exists():
+            script_path = Path.cwd() / "scripts" / "mark_session_started.py"
+
+        # If still not found, try to find project root by looking for pyproject.toml
+        if not script_path.exists():
+            current = Path(__file__).parent
+            while current != current.parent:
+                if (current / "pyproject.toml").exists():
+                    script_path = current / "scripts" / "mark_session_started.py"
+                    break
+                current = current.parent
+
+        # Determine the correct Python command
+        # In Docker with uv, use 'uv run python', otherwise use 'python3'
+        if Path("/usr/local/bin/uv").exists():
+            python_cmd = "uv run python"
+        else:
+            python_cmd = "python3"
+
+        # Escape quotes in command string for shell safety
+        escaped_command = command.replace("'", "'\"'\"'")
+
+        return f"{python_cmd} '{script_path}' '{session_name}' '{escaped_command}'"
