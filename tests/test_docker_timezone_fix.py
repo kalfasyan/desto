@@ -22,6 +22,7 @@ import pytest
 
 from .docker_test_utils import (
     check_for_existing_containers,
+    cleanup_tmux_test_sessions,
     safe_docker_cleanup,
 )
 
@@ -51,6 +52,9 @@ def ensure_docker_containers():
 
     # Cleanup desto containers after tests
     safe_docker_cleanup()
+
+    # Additional explicit session cleanup
+    cleanup_tmux_test_sessions()
 
 
 def test_docker_container_timezone():

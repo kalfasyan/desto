@@ -47,6 +47,9 @@ def safe_docker_cleanup(project_root=None):
         if project_root is None:
             project_root = Path(__file__).parent.parent
 
+        # Clean up any tmux sessions that might be running in containers
+        cleanup_desto_sessions_via_container()
+
         # Only target containers with desto- prefix to avoid affecting user containers
         logger.debug("Stopping desto-specific containers...")
 
@@ -67,6 +70,9 @@ def safe_docker_cleanup(project_root=None):
                 logger.debug("Docker compose down completed successfully")
         else:
             logger.debug("No desto containers found to cleanup")
+
+        # Also clean up any local tmux sessions that might have been created
+        cleanup_tmux_test_sessions()
 
     except Exception as e:
         logger.error(f"Error during safe cleanup: {e}")
@@ -152,3 +158,48 @@ def cleanup_test_artifacts():
         logger.debug("Cleaned up test artifacts")
     except Exception as e:
         logger.debug(f"Error cleaning up test artifacts: {e}")
+
+
+def cleanup_tmux_test_sessions():
+    """Clean up any tmux sessions that might have been created by tests."""
+    try:
+        # List of test session names that might be created
+        test_session_names = ["mysess", "test", "test_session", "integration_test"]
+
+        for session_name in test_session_names:
+            try:
+                # Check if session exists
+                result = subprocess.run(["tmux", "has-session", "-t", session_name], capture_output=True, text=True)
+
+                if result.returncode == 0:
+                    # Session exists, kill it
+                    subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, text=True)
+                    logger.info(f"Cleaned up test tmux session: {session_name}")
+
+            except Exception as e:
+                logger.debug(f"Error cleaning up tmux session {session_name}: {e}")
+
+    except Exception as e:
+        logger.debug(f"Error during tmux session cleanup: {e}")
+
+
+def cleanup_desto_sessions_via_container():
+    """Clean up sessions through the desto container if it's running."""
+    try:
+        # Check if desto-dashboard container is running
+        result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
+
+        if "desto-dashboard" in result.stdout:
+            # Try to clean up sessions through the container
+            test_session_names = ["mysess", "test", "test_session", "integration_test"]
+
+            for session_name in test_session_names:
+                try:
+                    # Use docker exec to kill sessions inside the container
+                    subprocess.run(["docker", "exec", "desto-dashboard", "tmux", "kill-session", "-t", session_name], capture_output=True, text=True)
+                    logger.debug(f"Attempted to clean up container session: {session_name}")
+                except Exception as e:
+                    logger.debug(f"Could not clean up container session {session_name}: {e}")
+
+    except Exception as e:
+        logger.debug(f"Error during container session cleanup: {e}")
