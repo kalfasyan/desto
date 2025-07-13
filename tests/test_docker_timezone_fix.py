@@ -20,14 +20,25 @@ import subprocess
 
 import pytest
 
+from .docker_test_utils import (
+    check_for_existing_containers,
+    safe_docker_cleanup,
+)
+
 
 @pytest.fixture(scope="module", autouse=True)
 def ensure_docker_containers():
     """Ensure Docker containers are running for timezone tests."""
+    # Check for existing user containers that might conflict
+    check_for_existing_containers()
+
     # Check if desto-dashboard container is running
     result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
 
     if "desto-dashboard" not in result.stdout:
+        # Clean up any existing desto containers first
+        safe_docker_cleanup()
+
         # Start containers if not running
         subprocess.run(["docker", "compose", "up", "-d"], cwd="/home/kalfasy/repos/desto")
 
@@ -38,7 +49,8 @@ def ensure_docker_containers():
 
     yield
 
-    # Cleanup is optional since other tests might need containers
+    # Cleanup desto containers after tests
+    safe_docker_cleanup()
 
 
 def test_docker_container_timezone():

@@ -373,6 +373,7 @@ class HistoryTab:
                 with ui.row().style("gap: 10px;"):
                     ui.button("Refresh", icon="refresh", on_click=self.refresh_history_display).props("flat")
                     ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
+                    ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
 
             # Check Redis availability first
             if not self.tmux_manager.use_redis:
@@ -675,6 +676,93 @@ class HistoryTab:
 
         except Exception as e:
             error_msg = f"Error clearing session history: {e}"
+            logger.error(error_msg)
+            ui.notification(error_msg, type="negative")
+
+    def confirm_clear_logs(self):
+        """Show confirmation dialog before clearing log files"""
+        log_dir = self.tmux_manager.LOG_DIR
+
+        # Count log files
+        log_files = []
+        if log_dir.exists():
+            log_files = list(log_dir.glob("*.log"))
+
+        if not log_files:
+            ui.notification("No log files found to clear", type="info")
+            return
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
+            ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
+            ui.label(str(log_dir)).style("font-family: monospace; background: #f5f5f5; padding: 5px; border-radius: 3px; margin-bottom: 15px;")
+            ui.label("This action cannot be undone.").style("color: #666; margin-bottom: 20px;")
+
+            # Show some log files as examples
+            if len(log_files) <= 5:
+                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
+                for log_file in log_files:
+                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
+            else:
+                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
+                for log_file in log_files[:3]:
+                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
+                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; color: #666; font-size: 0.9em;")
+
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
+                ui.button("Cancel", on_click=dialog.close).props("color=grey")
+                ui.button("Clear Log Files", color="orange", on_click=lambda: [self.clear_log_files(), dialog.close()]).props("icon=folder_delete")
+
+        dialog.open()
+
+    def clear_log_files(self):
+        """Clear all log files from the logs directory"""
+        log_dir = self.tmux_manager.LOG_DIR
+
+        if not log_dir.exists():
+            ui.notification("Logs directory not found", type="warning")
+            return
+
+        try:
+            # Get all log files and .finished marker files
+            log_files = list(log_dir.glob("*.log"))
+            finished_files = list(log_dir.glob("*.finished"))
+            all_files = log_files + finished_files
+
+            if not all_files:
+                ui.notification("No log files found to clear", type="info")
+                return
+
+            deleted_count = 0
+            errors = []
+
+            for file_path in all_files:
+                try:
+                    file_path.unlink()
+                    deleted_count += 1
+                    logger.info(f"Deleted log file: {file_path}")
+                except Exception as e:
+                    error_msg = f"Failed to delete {file_path.name}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
+
+            # Report results
+            if deleted_count > 0:
+                msg = f"Successfully deleted {deleted_count} log file(s)"
+                if errors:
+                    msg += f" ({len(errors)} errors)"
+                logger.info(msg)
+                ui.notification(msg, type="positive")
+
+            if errors:
+                # Show first few errors
+                error_summary = "; ".join(errors[:3])
+                if len(errors) > 3:
+                    error_summary += f" (+{len(errors) - 3} more)"
+                ui.notification(f"Errors: {error_summary}", type="warning")
+
+        except Exception as e:
+            error_msg = f"Error clearing log files: {e}"
             logger.error(error_msg)
             ui.notification(error_msg, type="negative")
 
