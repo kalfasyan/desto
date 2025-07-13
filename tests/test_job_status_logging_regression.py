@@ -168,7 +168,7 @@ class TestSessionStatusVsJobStatus(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Mock the status tracker
             tmux_manager.status_tracker = self.mock_status_tracker
@@ -195,7 +195,7 @@ class TestSessionStatusVsJobStatus(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value.is_connected.return_value = False
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Should not use Redis
             self.assertFalse(tmux_manager.use_redis)
@@ -288,7 +288,7 @@ class TestJobCompletionScriptPath(unittest.TestCase):
         ):  # Mock pubsub to avoid errors
             mock_redis_class.return_value = mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Test with Redis enabled
             self.assertTrue(tmux_manager.use_redis)
@@ -311,7 +311,7 @@ class TestJobCompletionScriptPath(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Test without Redis
             self.assertFalse(tmux_manager.use_redis)

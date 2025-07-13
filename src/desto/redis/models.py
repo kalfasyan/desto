@@ -1,0 +1,112 @@
+"""Core data models for session and job management."""
+
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+
+
+class SessionStatus(Enum):
+    STARTING = "starting"
+    RUNNING = "running"
+    FINISHED = "finished"
+    FAILED = "failed"
+
+
+class JobStatus(Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    FINISHED = "finished"
+    FAILED = "failed"
+
+
+@dataclass
+class DestoJob:
+    """Represents a single script execution within a session."""
+
+    job_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str = ""
+    command: str = ""
+    script_path: str = ""
+    status: JobStatus = JobStatus.QUEUED
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    exit_code: Optional[int] = None
+    error_message: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for Redis storage."""
+        return {
+            "job_id": self.job_id,
+            "session_id": self.session_id,
+            "command": self.command,
+            "script_path": self.script_path,
+            "status": self.status.value,
+            "start_time": self.start_time.isoformat() if self.start_time else "",
+            "end_time": self.end_time.isoformat() if self.end_time else "",
+            "exit_code": str(self.exit_code) if self.exit_code is not None else "",
+            "error_message": self.error_message or "",
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DestoJob":
+        """Create from dictionary (Redis data)."""
+        return cls(
+            job_id=data.get("job_id", ""),
+            session_id=data.get("session_id", ""),
+            command=data.get("command", ""),
+            script_path=data.get("script_path", ""),
+            status=JobStatus(data.get("status", "queued")),
+            start_time=datetime.fromisoformat(data["start_time"]) if data.get("start_time") else None,
+            end_time=datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None,
+            exit_code=int(data["exit_code"]) if data.get("exit_code") else None,
+            error_message=data.get("error_message") or None,
+        )
+
+
+@dataclass
+class DestoSession:
+    """Represents a tmux session that can run multiple jobs."""
+
+    session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    session_name: str = ""
+    tmux_session_name: str = ""
+    status: SessionStatus = SessionStatus.STARTING
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    keep_alive: bool = False
+    last_heartbeat: Optional[datetime] = None
+    job_ids: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for Redis storage."""
+        return {
+            "session_id": self.session_id,
+            "session_name": self.session_name,
+            "tmux_session_name": self.tmux_session_name,
+            "status": self.status.value,
+            "start_time": self.start_time.isoformat() if self.start_time else "",
+            "end_time": self.end_time.isoformat() if self.end_time else "",
+            "keep_alive": str(self.keep_alive),
+            "last_heartbeat": self.last_heartbeat.isoformat() if self.last_heartbeat else "",
+            "job_ids": ",".join(self.job_ids),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DestoSession":
+        """Create from dictionary (Redis data)."""
+        # Handle bytes from Redis
+        if data and isinstance(list(data.values())[0], bytes):
+            data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in data.items()}
+        return cls(
+            session_id=data.get("session_id", ""),
+            session_name=data.get("session_name", ""),
+            tmux_session_name=data.get("tmux_session_name", ""),
+            status=SessionStatus(data.get("status", "starting")),
+            start_time=datetime.fromisoformat(data["start_time"]) if data.get("start_time") else None,
+            end_time=datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None,
+            keep_alive=data.get("keep_alive", "").lower() == "true",
+            last_heartbeat=datetime.fromisoformat(data["last_heartbeat"]) if data.get("last_heartbeat") else None,
+            job_ids=data.get("job_ids", "").split(",") if data.get("job_ids") else [],
+        )

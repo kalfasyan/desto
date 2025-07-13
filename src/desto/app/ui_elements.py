@@ -312,8 +312,8 @@ class HistoryTab:
 
             for key in all_keys:
                 try:
-                    # Extract session name from key (remove "desto:session:" prefix)
-                    session_name = key.replace("desto:session:", "")
+                    # Extract session ID from key (remove "desto:session:" prefix)
+                    session_id = key.replace("desto:session:", "")
                     session_data = self.tmux_manager.redis_client.redis.hgetall(key)
 
                     if session_data:
@@ -321,6 +321,9 @@ class HistoryTab:
                         session_info = {
                             k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
                         }
+
+                        # Use the actual session name from the data, not the UUID from the key
+                        display_session_name = session_info.get("session_name", session_id)
 
                         # Get duration from session data or calculate it
                         duration_str = session_info.get("duration")
@@ -354,19 +357,19 @@ class HistoryTab:
                                     else:
                                         duration_str = f"{seconds}s"
                                 except Exception as e:
-                                    logger.error(f"Error calculating duration for {session_name}: {e}")
+                                    logger.error(f"Error calculating duration for {display_session_name}: {e}")
                                     duration_str = "N/A"
                             else:
                                 duration_str = "N/A"
 
                         session_info.update(
                             {
-                                "session_name": session_name,
+                                "session_name": display_session_name,
                                 "duration": duration_str,
                             }
                         )
                         history.append(session_info)
-                        logger.debug(f"Added session: {session_name} with data: {session_info}")
+                        logger.debug(f"Added session: {display_session_name} with data: {session_info}")
                 except Exception as e:
                     logger.error(f"Error processing session key {key}: {e}")
                     continue

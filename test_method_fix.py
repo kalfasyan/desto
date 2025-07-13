@@ -3,13 +3,13 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import Mock
+
+from desto.app.sessions import TmuxManager
 
 # Add src to path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root / "src"))
-
-from unittest.mock import Mock
-from desto.app.sessions import TmuxManager
 
 
 def test_get_session_start_command():

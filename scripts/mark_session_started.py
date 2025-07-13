@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 try:
     from src.desto.redis.client import DestoRedisClient
-    from src.desto.redis.status_tracker import SessionStatusTracker
+    from src.desto.redis.desto_manager import DestoManager
 
     if len(sys.argv) != 3:
         print("Usage: mark_session_started.py <session_name> <command>", file=sys.stderr)
@@ -25,9 +25,10 @@ try:
     # Try to mark session as started in Redis
     client = DestoRedisClient()
     if client.is_connected():
-        tracker = SessionStatusTracker(client)
-        tracker.mark_session_started(session_name=session_name, command=command, script_path=command)
-        print(f"Marked session '{session_name}' as started in Redis")
+        manager = DestoManager(client)
+        # Note: Session should already be created by TmuxManager
+        # This script is mainly for backward compatibility
+        print(f"Session '{session_name}' tracking is handled by TmuxManager")
     else:
         print("Redis not available, skipping session tracking", file=sys.stderr)
 

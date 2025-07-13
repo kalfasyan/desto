@@ -40,10 +40,14 @@ class TestDuplicateSessionValidation:
             mock_redis_instance.is_connected.return_value = True
             mock_redis_class.return_value = mock_redis_instance
 
-            # Also need to mock the status tracker
-            with patch("src.desto.app.sessions.SessionStatusTracker") as mock_status_tracker_class:
-                mock_status_tracker = Mock()
-                mock_status_tracker_class.return_value = mock_status_tracker
+            # Also need to mock the DestoManager
+            with patch("src.desto.app.sessions.DestoManager") as mock_desto_manager_class:
+                mock_desto_manager = Mock()
+                # Configure the mock to return the expected tuple format
+                mock_session = Mock()
+                mock_job = Mock()
+                mock_desto_manager.start_session_with_job.return_value = (mock_session, mock_job)
+                mock_desto_manager_class.return_value = mock_desto_manager
 
                 # Mock PubSub
                 with patch("src.desto.app.sessions.SessionPubSub") as mock_pubsub_class:

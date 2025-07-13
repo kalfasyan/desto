@@ -18,7 +18,7 @@ try:
     from src.desto.app.sessions import TmuxManager
     from src.desto.app.ui import LogSection
     from src.desto.redis.client import DestoRedisClient
-    from src.desto.redis.status_tracker import SessionStatusTracker
+    from src.desto.redis.desto_manager import DestoManager
 except ImportError as e:
     print(f"Import error: {e}")
     sys.exit(1)
@@ -54,11 +54,11 @@ class TestDashboardStatusDisplay(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
-            # Mock the status tracker
-            mock_status_tracker = Mock(spec=SessionStatusTracker)
-            tmux_manager.status_tracker = mock_status_tracker
+            # Mock the desto manager
+            mock_desto_manager = Mock(spec=DestoManager)
+            tmux_manager.desto_manager = mock_desto_manager
 
             # Create a mock session that would appear "Running" in tmux
             mock_session_data = {
@@ -74,7 +74,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             }
 
             # Test case 1: Job is finished (even though session is running)
-            mock_status_tracker.get_job_status.return_value = "finished"
+            mock_desto_manager.get_job_status.return_value = "finished"
 
             # Mock UI components for the table
             mock_ui = Mock()
@@ -93,7 +93,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             tmux_manager.add_sessions_table(mock_session_data, mock_ui)
 
             # Verify that get_job_status was called
-            mock_status_tracker.get_job_status.assert_called_with("test_session")
+            mock_desto_manager.get_job_status.assert_called_with("test_session")
 
             # Verify that UI components were created
             self.assertTrue(mock_ui.row.called)
@@ -107,7 +107,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             mock_redis_instance.is_connected.return_value = False
             mock_redis_class.return_value = mock_redis_instance
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Should not use Redis
             self.assertFalse(tmux_manager.use_redis)
@@ -155,11 +155,11 @@ class TestDashboardStatusDisplay(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
-            # Mock the status tracker
-            mock_status_tracker = Mock(spec=SessionStatusTracker)
-            tmux_manager.status_tracker = mock_status_tracker
+            # Mock the desto manager
+            mock_desto_manager = Mock(spec=DestoManager)
+            tmux_manager.desto_manager = mock_desto_manager
 
             # Test different job status scenarios
             test_cases = [
@@ -171,7 +171,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
             for job_status, expected_display in test_cases:
                 with self.subTest(job_status=job_status):
-                    mock_status_tracker.get_job_status.return_value = job_status
+                    mock_desto_manager.get_job_status.return_value = job_status
 
                     # Create session data
                     mock_session_data = {
@@ -275,7 +275,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Test Redis-based command generation
             self.assertTrue(tmux_manager.use_redis)
@@ -298,7 +298,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
 
-            tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
             # Test file-based command generation
             self.assertFalse(tmux_manager.use_redis)

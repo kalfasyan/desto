@@ -26,9 +26,20 @@ def test_start_tmux_session_creates_tmux_session(mock_redis_class, mock_subproce
     # Mock Redis to be available
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = True
+
+    # Mock the redis.redis object and its methods
+    mock_redis_redis = Mock()
+    mock_redis_redis.scan_iter.return_value = []  # No existing keys
+    mock_redis_redis.hset.return_value = True
+    mock_redis_redis.expire.return_value = True
+    mock_redis_redis.hgetall.return_value = {}
+    mock_redis_redis.publish.return_value = True
+
+    mock_redis_instance.redis = mock_redis_redis
     mock_redis_class.return_value = mock_redis_instance
 
     mock_subprocess.run.return_value.returncode = 0
+    mock_subprocess.CalledProcessError = Exception  # Mock the exception
 
     tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
     tmux.start_tmux_session("test", "echo hello", mock_logger)
@@ -46,6 +57,16 @@ def test_kill_session_calls_tmux_kill(mock_redis_class, mock_subprocess, mock_ui
     # Mock Redis to be available
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = True
+
+    # Mock the redis.redis object and its methods
+    mock_redis_redis = Mock()
+    mock_redis_redis.scan_iter.return_value = []
+    mock_redis_redis.hset.return_value = True
+    mock_redis_redis.expire.return_value = True
+    mock_redis_redis.hgetall.return_value = {}
+    mock_redis_redis.publish.return_value = True
+
+    mock_redis_instance.redis = mock_redis_redis
     mock_redis_class.return_value = mock_redis_instance
 
     mock_subprocess.run.return_value.returncode = 0
@@ -65,6 +86,16 @@ def test_check_sessions_returns_dict(mock_redis_class, mock_subprocess, mock_ui,
     # Mock Redis to be available
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = True
+
+    # Mock the redis.redis object and its methods
+    mock_redis_redis = Mock()
+    mock_redis_redis.scan_iter.return_value = []
+    mock_redis_redis.hset.return_value = True
+    mock_redis_redis.expire.return_value = True
+    mock_redis_redis.hgetall.return_value = {}
+    mock_redis_redis.publish.return_value = True
+
+    mock_redis_instance.redis = mock_redis_redis
     mock_redis_class.return_value = mock_redis_instance
 
     mock_subprocess.run.return_value.returncode = 0
@@ -80,8 +111,16 @@ def test_redis_required_for_initialization(mock_redis_class, mock_ui, mock_logge
     # Mock Redis to be unavailable
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = False
+
+    # Mock the redis.redis object
+    mock_redis_redis = Mock()
+    mock_redis_instance.redis = mock_redis_redis
     mock_redis_class.return_value = mock_redis_instance
 
-    # Should raise RuntimeError when Redis is not available
-    with pytest.raises(RuntimeError, match="Redis is required for session management"):
-        TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    # Should initialize successfully but in limited mode when Redis is not available
+    tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    
+    # Verify that it operates in limited mode
+    assert tmux_manager.use_redis is False
+    assert tmux_manager.desto_manager is None
+    assert tmux_manager.pubsub is None

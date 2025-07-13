@@ -44,7 +44,7 @@ class TestJobCompletionTracking(unittest.TestCase):
 
         # Create TmuxManager (without Redis for testing)
         if TmuxManager:
-            self.tmux_manager = TmuxManager(ui=self.mock_ui, logger=self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            self.tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
     def tearDown(self):
         self.temp_dir.cleanup()

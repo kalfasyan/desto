@@ -10,12 +10,15 @@ from loguru import logger
 from nicegui import ui
 
 from desto.redis.client import DestoRedisClient
+from desto.redis.desto_manager import DestoManager
 from desto.redis.pubsub import SessionPubSub
-from desto.redis.status_tracker import SessionStatusTracker
 
 
 class TmuxManager:
     def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
+        if not ui_instance or not instance_logger:
+            raise ValueError("ui_instance and instance_logger are required")
+
         scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
         self.SCRIPTS_DIR = Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
@@ -36,25 +39,34 @@ class TmuxManager:
             ui.notification(msg, type="negative")
             raise
 
-        # Initialize Redis components with config (Redis is now required)
+        # Initialize Redis components with config
         from desto.app.config import config as ui_settings
 
         self.redis_client = DestoRedisClient(ui_settings.get("redis"))
 
-        # Redis is now required for session management
+        # Check if Redis is available
         if not self.redis_client.is_connected():
-            msg = "Redis is required for session management but is not available"
-            self.logger.error(msg)
-            ui.notification(msg, type="negative")
-            raise RuntimeError(msg)
+            logger.warning("Redis is not available - running in limited mode")
+            self.desto_manager = None
+            self.pubsub = None
+        else:
+            self.desto_manager = DestoManager(self.redis_client)
+            self.pubsub = SessionPubSub(self.redis_client)
+            logger.info("Redis enabled for session tracking")
 
-        self.status_tracker = SessionStatusTracker(self.redis_client)
-        self.pubsub = SessionPubSub(self.redis_client)
-        logger.info("Redis enabled for session tracking")
+        # For backward compatibility with tests
+        self.sessions = {}
+        # For backward compatibility - use_redis attribute
+        self.use_redis = self.redis_client.is_connected()
+
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
     def _start_redis_monitoring(self, session_name):
         """Monitor tmux session and update Redis"""
+        
+        # Skip monitoring if Redis is not available
+        if not self.desto_manager:
+            return
 
         def monitor():
             # Give the session a moment to start up before monitoring
@@ -67,13 +79,15 @@ class TmuxManager:
                     sessions = self.check_sessions()
                     if session_name not in sessions:
                         # Session finished (entire tmux session ended)
-                        self.status_tracker.mark_session_finished(session_name, exit_code=0)
+                        if self.desto_manager:
+                            self.desto_manager.finish_session(session_name, exit_code=0)
                         logger.info(f"Session {session_name} monitoring ended - tmux session terminated")
                         break
 
-                    # Update heartbeat (job completion is now handled by the embedded Redis call)
-                    self.status_tracker.update_heartbeat(session_name)
-                    logger.debug(f"Updated heartbeat for session {session_name}")
+                    # Update heartbeat
+                    if self.desto_manager:
+                        self.desto_manager.update_heartbeat(session_name)
+                        logger.debug(f"Updated heartbeat for session {session_name}")
 
                     time.sleep(5)
                 except Exception as e:
@@ -129,7 +143,7 @@ class TmuxManager:
     def kill_session(self, session_name):
         """Kill a tmux session by name."""
         msg = f"Attempting to kill session: '{session_name}'"
-        logger.info(msg)
+        self.logger.info(msg)
         escaped_session_name = shlex.quote(session_name)
         result = subprocess.run(
             ["tmux", "kill-session", "-t", escaped_session_name],
@@ -139,11 +153,11 @@ class TmuxManager:
         )
         if result.returncode == 0:
             msg = f"Session '{session_name}' killed successfully."
-            logger.success(msg)
+            self.logger.info(msg)  # Changed from logger.success to logger.info
             self.ui.notification(msg, type="positive")
         else:
             msg = f"Failed to kill session '{session_name}': {result.stderr}"
-            logger.warning(msg)
+            self.logger.warning(msg)
             self.ui.notification(msg, type="negative")
 
     def clear_sessions_container(self):
@@ -245,10 +259,13 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             logger.info(msg)
             ui.notification(f"Tmux session '{session_name}' started.", type="positive")
 
-            # Track in Redis
-            self.status_tracker.mark_session_started(session_name=session_name, command=command, script_path=command)
-            self._start_redis_monitoring(session_name)
-            logger.debug(f"Redis tracking started for session '{session_name}'")
+            # Track in Redis using new manager if available
+            if self.desto_manager:
+                session, job = self.desto_manager.start_session_with_job(
+                    session_name=session_name, command=command, script_path=command, keep_alive=keep_alive
+                )
+                self._start_redis_monitoring(session_name)
+                logger.debug(f"Redis tracking started for session '{session_name}'")
 
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"
@@ -318,14 +335,11 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         Returns the elapsed time for a session using Redis data.
         """
         try:
-            # Get session data from Redis
-            session_data = self.status_tracker.get_session_status(session_name)
-            if session_data and session_data.get("end_time"):
+            # Get session from Redis using new manager
+            session = self.desto_manager.session_manager.get_session_by_name(session_name)
+            if session and session.end_time:
                 # Session has ended, use the recorded end time
-                end_time_str = session_data.get("end_time")
-                from datetime import datetime
-
-                end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")).timestamp()
+                end_time = session.end_time.timestamp()
             else:
                 # Session is still running, use current time
                 end_time = time.time()
@@ -359,12 +373,21 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             minutes, seconds = divmod(remainder, 60)
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
 
-            # Get job status from Redis
-            job_status = self.status_tracker.get_job_status(session_name)
-            if job_status in ["finished", "failed"]:
-                status = "Finished"
+            # Get job status from Redis if available, otherwise fall back to file markers
+            if self.desto_manager:
+                job_status = self.desto_manager.get_job_status(session_name)
+                if job_status in ["finished", "failed"]:
+                    status = "Finished"
+                else:
+                    status = "Running"
             else:
-                status = "Running"
+                # Fall back to file-based status checking
+                finished_marker = self.LOG_DIR / f"{session_name}.finished"
+                failed_marker = self.LOG_DIR / f"{session_name}.failed"
+                if finished_marker.exists() or failed_marker.exists():
+                    status = "Finished"
+                else:
+                    status = "Running"
 
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
@@ -484,7 +507,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
         for session_name in sessions_status.keys():
             try:
-                job_status = self.status_tracker.get_job_status(session_name)
+                job_status = self.desto_manager.get_job_status(session_name)
                 if job_status in ["finished", "failed"]:
                     finished_sessions.append(session_name)
                 else:
@@ -588,7 +611,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         try:
             result = subprocess.run(["atq"], capture_output=True, text=True)
             if result.returncode != 0:
-                logger.debug("No scheduled jobs found or 'at' command failed")
+                self.logger.debug("No scheduled jobs found or 'at' command failed")
                 return []
 
             jobs = []
@@ -603,10 +626,10 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                         user = parts[-1]
                         jobs.append({"id": job_id, "datetime": date_time, "user": user})
 
-            logger.debug(f"Found {len(jobs)} scheduled jobs")
+            self.logger.debug(f"Found {len(jobs)} scheduled jobs")
             return jobs
         except Exception as e:
-            logger.warning(f"Failed to get scheduled jobs: {e}")
+            self.logger.warning(f"Failed to get scheduled jobs: {e}")
             return []
 
     def kill_scheduled_jobs(self):
@@ -659,7 +682,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
     def get_job_completion_command(self, session_name, use_variable=False):
         """
-        Get the appropriate command to mark job completion using Redis.
+        Get the appropriate command to mark job completion.
 
         Args:
             session_name: Name of the session
@@ -667,7 +690,11 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         """
         exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
 
-        # Use dedicated script to mark job completion
+        # If Redis is not available, fall back to file-based markers
+        if not self.use_redis:
+            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
+
+        # Use dedicated script to mark job completion in Redis
         # First try relative path from project root
         script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
 

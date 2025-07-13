@@ -13,7 +13,7 @@ sys.path.insert(0, str(project_root))
 
 try:
     from src.desto.redis.client import DestoRedisClient
-    from src.desto.redis.status_tracker import SessionStatusTracker
+    from src.desto.redis.desto_manager import DestoManager
 
     if len(sys.argv) != 3:
         print("Usage: mark_job_finished.py <session_name> <exit_code>", file=sys.stderr)
@@ -25,12 +25,12 @@ try:
     # Try to mark job as finished in Redis
     client = DestoRedisClient()
     if client.is_connected():
-        tracker = SessionStatusTracker(client)
+        manager = DestoManager(client)
         if exit_code == 0:
-            tracker.mark_job_finished(session_name, exit_code)
+            manager.finish_job(session_name, exit_code)
             print(f"Marked job '{session_name}' as finished in Redis")
         else:
-            tracker.mark_job_failed(session_name, f"Job exited with code {exit_code}")
+            manager.fail_job(session_name, f"Job exited with code {exit_code}")
             print(f"Marked job '{session_name}' as failed in Redis (exit code: {exit_code})")
     else:
         print("Redis not available, skipping job completion tracking", file=sys.stderr)
