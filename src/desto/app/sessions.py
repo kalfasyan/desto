@@ -49,9 +49,14 @@ class TmuxManager:
             logger.warning("Redis is not available - running in limited mode")
             self.desto_manager = None
             self.pubsub = None
+            self.job_manager = None
         else:
             self.desto_manager = DestoManager(self.redis_client)
             self.pubsub = SessionPubSub(self.redis_client)
+            # Attach JobManager for UI access
+            from desto.redis.job_manager import JobManager
+
+            self.job_manager = JobManager(self.redis_client)
             logger.info("Redis enabled for session tracking")
 
         # For backward compatibility with tests

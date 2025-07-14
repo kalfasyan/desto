@@ -173,3 +173,35 @@ class JobManager:
                 logger.info(f"Starting next queued job {job.job_id} in session {session_id}")
                 self.start_job(job.job_id)
                 break
+
+    def get_job_duration(self, job_id: str) -> str:
+        """Return the duration of a job as a human-readable string, or 'N/A' if not available."""
+        job = self.get_job(job_id)
+        if not job or not job.start_time or not job.end_time:
+            return "N/A"
+        start = job.start_time
+        end = job.end_time
+        from datetime import datetime
+
+        # If start or end are strings, try to parse them
+        if isinstance(start, str):
+            try:
+                start = datetime.fromisoformat(start)
+            except Exception:
+                return "N/A"
+        if isinstance(end, str):
+            try:
+                end = datetime.fromisoformat(end)
+            except Exception:
+                return "N/A"
+        elapsed = end - start
+        total_seconds = int(elapsed.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            return f"{minutes}m {seconds}s"
+        else:
+            return f"{seconds}s"

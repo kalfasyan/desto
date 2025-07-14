@@ -362,10 +362,33 @@ class HistoryTab:
                             else:
                                 duration_str = "N/A"
 
+                        # Use JobManager to get job duration for the latest job in this session
+                        job_elapsed = "N/A"
+                        job_ids_str = session_info.get("job_ids", "")
+                        job_ids = [jid for jid in job_ids_str.split(",") if jid]
+                        if job_ids:
+                            latest_job_id = job_ids[-1]
+                            # Try to use JobManager if available
+                            job_manager = None
+                            # Try to get job_manager from tmux_manager if possible
+                            if hasattr(self.tmux_manager, "job_manager"):
+                                job_manager = self.tmux_manager.job_manager
+                            elif hasattr(self.tmux_manager, "redis_client") and hasattr(self.tmux_manager.redis_client, "job_manager"):
+                                job_manager = self.tmux_manager.redis_client.job_manager
+                            if job_manager:
+                                try:
+                                    job_elapsed = job_manager.get_job_duration(latest_job_id)
+                                except Exception as e:
+                                    logger.error(f"Error using JobManager.get_job_duration for {display_session_name}: {e}")
+                                    job_elapsed = "N/A"
+                            else:
+                                # Fallback: keep as N/A
+                                job_elapsed = "N/A"
                         session_info.update(
                             {
                                 "session_name": display_session_name,
                                 "duration": duration_str,
+                                "job_elapsed": job_elapsed,
                             }
                         )
                         history.append(session_info)
