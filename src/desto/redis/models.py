@@ -19,6 +19,7 @@ class JobStatus(Enum):
     RUNNING = "running"
     FINISHED = "finished"
     FAILED = "failed"
+    SCHEDULED = "scheduled"
 
 
 @dataclass

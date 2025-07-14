@@ -379,20 +379,46 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
             elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
 
             # Get job status from Redis if available, otherwise fall back to file markers
+            status = "Running"  # Default status
+
             if self.desto_manager:
-                job_status = self.desto_manager.get_job_status(session_name)
-                if job_status in ["finished", "failed"]:
-                    status = "Finished"
-                else:
-                    status = "Running"
+                try:
+                    job_status = self.desto_manager.get_job_status(session_name)
+                    logger.debug(f"Redis job status for {session_name}: {job_status}")
+
+                    if job_status in ["finished", "failed"]:
+                        status = "Finished" if job_status == "finished" else "Failed"
+                    elif job_status == "running":
+                        status = "Running"
+                    else:
+                        # Check if tmux session is still active
+                        # If tmux session exists but no job status, it might be starting
+                        status = "Running"
+                except Exception as e:
+                    logger.debug(f"Error getting job status for {session_name}: {e}")
+                    # Fall back to file-based checking
+                    finished_marker = self.LOG_DIR / f"{session_name}.finished"
+                    failed_marker = self.LOG_DIR / f"{session_name}.failed"
+                    if finished_marker.exists():
+                        status = "Finished"
+                    elif failed_marker.exists():
+                        status = "Failed"
+                    else:
+                        status = "Running"
             else:
-                # Fall back to file-based status checking
+                # Fall back to file-based status checking when Redis unavailable
                 finished_marker = self.LOG_DIR / f"{session_name}.finished"
                 failed_marker = self.LOG_DIR / f"{session_name}.failed"
-                if finished_marker.exists() or failed_marker.exists():
+                if finished_marker.exists():
                     status = "Finished"
+                elif failed_marker.exists():
+                    status = "Failed"
                 else:
                     status = "Running"
+
+            # For finished sessions, check if tmux session should be killed (if keep_alive wasn't used)
+            if status in ["Finished", "Failed"] and session_name in sessions_status:
+                logger.debug(f"Session {session_name} is {status} but tmux session still exists")
 
             with ui.row().style("align-items: center; margin-bottom: 10px;"):
                 ui.label(session["id"]).style(cell_style)
@@ -626,16 +652,55 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                     parts = line.strip().split()
                     if len(parts) >= 5:
                         job_id = parts[0]
-                        # Combine date and time parts
-                        date_time = " ".join(parts[1:5])
+                        # Combine date and time parts (Mon Jul 14 07:59:00 2025)
+                        date_time = " ".join(parts[1:6]) if len(parts) >= 6 else " ".join(parts[1:5])
                         user = parts[-1]
-                        jobs.append({"id": job_id, "datetime": date_time, "user": user})
+
+                        # Try to get the actual command for this job
+                        command = self._get_scheduled_job_command(job_id)
+
+                        # Format the datetime for better display
+                        formatted_datetime = self._format_scheduled_datetime(date_time)
+
+                        jobs.append({"id": job_id, "datetime": formatted_datetime, "raw_datetime": date_time, "user": user, "command": command})
 
             self.logger.debug(f"Found {len(jobs)} scheduled jobs")
             return jobs
         except Exception as e:
             self.logger.warning(f"Failed to get scheduled jobs: {e}")
             return []
+
+    def _get_scheduled_job_command(self, job_id):
+        """Get the actual command for a scheduled job"""
+        try:
+            result = subprocess.run(["at", "-c", job_id], capture_output=True, text=True)
+            if result.returncode == 0:
+                lines = result.stdout.splitlines()
+                # The actual command is usually the last non-empty line
+                for line in reversed(lines):
+                    line = line.strip()
+                    if line and not line.startswith("#") and not line.startswith("cd ") and "export" not in line:
+                        # Truncate very long commands
+                        if len(line) > 60:
+                            return line[:57] + "..."
+                        return line
+                return "Unknown command"
+            else:
+                return "Unknown command"
+        except Exception:
+            return "Unknown command"
+
+    def _format_scheduled_datetime(self, date_time):
+        """Format datetime from atq output for better display"""
+        try:
+            from datetime import datetime
+
+            # Parse format like "Mon Jul 14 07:59:00 2025"
+            dt = datetime.strptime(date_time, "%a %b %d %H:%M:%S %Y")
+            return dt.isoformat()
+        except Exception:
+            # Fallback to original if parsing fails
+            return date_time
 
     def kill_scheduled_jobs(self):
         """

@@ -303,7 +303,7 @@ class HistoryTab:
         self.running_jobs_label = None
 
     def get_session_history(self, days=7):
-        """Get session history from Redis"""
+        """Get session history from Redis and include scheduled jobs"""
         history = []
         try:
             # Debug: print all keys to see what's in Redis
@@ -397,13 +397,110 @@ class HistoryTab:
                     logger.error(f"Error processing session key {key}: {e}")
                     continue
 
+            # --- SCHEDULED JOBS PATCH ---
+            # Add scheduled jobs from atq to the history list as pseudo-sessions
+            if hasattr(self.tmux_manager, "get_scheduled_jobs"):
+                try:
+                    scheduled_jobs = self.tmux_manager.get_scheduled_jobs()
+                    for job in scheduled_jobs:
+                        # Compose a pseudo-session dict for the UI
+                        from desto.redis.models import JobStatus
+
+                        # Create a meaningful but concise session name
+                        command = job.get("command", "Unknown command")
+                        job_id = job.get("id", "unknown")
+
+                        # Extract just the script name from the command if it's a file path
+                        if "/" in command:
+                            # Extract filename from path (e.g., "/path/to/script.sh" -> "script.sh")
+                            script_name = command.split("/")[-1]
+                            if script_name:
+                                command = script_name
+
+                        # Keep it concise - truncate if still too long
+                        if len(command) > 40:
+                            command = command[:37] + "..."
+
+                        session_name = f"📅 {command} (Job {job_id})"
+
+                        scheduled_entry = {
+                            "session_name": session_name,
+                            "status": JobStatus.SCHEDULED.value,
+                            "job_status": JobStatus.SCHEDULED.value,
+                            "start_time": job.get("datetime", ""),
+                            "end_time": "",
+                            "duration": "N/A",
+                            "job_elapsed": "N/A",
+                            "scheduled_job_id": job.get("id", ""),
+                            "user": job.get("user", ""),
+                            "command": command,
+                            "is_scheduled": True,  # Mark as scheduled job
+                        }
+
+                        # Check if this scheduled job already has a running session with the same name
+                        # by looking for sessions that match the tmux session name pattern
+                        extracted_session_name = None
+                        if "tmux new-session -d -s" in job.get("command", ""):
+                            # Extract session name from tmux command
+                            try:
+                                import re
+
+                                tmux_match = re.search(r"tmux new-session -d -s (\S+)", job.get("command", ""))
+                                if tmux_match:
+                                    extracted_session_name = tmux_match.group(1).strip("'\"")
+                            except Exception:
+                                pass
+
+                        # If we found a session name, check if it exists in history already as running/finished
+                        session_already_exists = False
+                        if extracted_session_name:
+                            for existing_session in history:
+                                if existing_session.get("session_name") == extracted_session_name and existing_session.get("status") in [
+                                    "running",
+                                    "finished",
+                                    "failed",
+                                ]:
+                                    session_already_exists = True
+                                    break
+
+                        # Only add the scheduled job to history if it hasn't started running yet
+                        if not session_already_exists:
+                            history.append(scheduled_entry)
+
+                except Exception as e:
+                    logger.error(f"Error fetching scheduled jobs for history: {e}")
+
         except Exception as e:
             logger.error(f"Error getting session history: {e}")
             return []
 
+        # --- PATCH: Update scheduled job pseudo-entries with real status from Redis if available ---
+        # Build a lookup of real session/job statuses by session_name (from Redis)
+        real_status_lookup = {}
+        for entry in history:
+            # Only consider real (non-scheduled) sessions
+            if not entry.get("is_scheduled"):
+                real_status_lookup[entry.get("session_name")] = entry.get("job_status") or entry.get("status")
+
+        # Update scheduled job pseudo-entries if a real session/job exists with a final status
+        for entry in history:
+            if entry.get("is_scheduled"):
+                # Try to extract the session name from the pseudo-entry (matches tmux session name)
+                # The pseudo-entry session_name is like: "📅 script.sh (Job 123)"
+                # We'll try to match by command/script name (best effort)
+                command = entry.get("command")
+                # Look for a real session with the same command/script name
+                for real_name, real_status in real_status_lookup.items():
+                    if command and command in real_name:
+                        # If the real session is finished or failed, update the pseudo-entry
+                        if real_status in ["finished", "failed", "Finished", "Failed"]:
+                            entry["status"] = real_status.capitalize()
+                            entry["job_status"] = real_status.lower()
+                        break
+
         # Sort by start time (newest first)
         history.sort(key=lambda x: x.get("start_time", ""), reverse=True)
-        logger.debug(f"Returning {len(history)} sessions")
+        logger.debug(f"Returning {len(history)} sessions (including scheduled jobs)")
         return history
 
     def build(self):
@@ -532,6 +629,9 @@ class HistoryTab:
                 elif job_status == "running":
                     display_status = "🟡 Running"
                     status_color = "#FF9800"
+                elif job_status == "scheduled" or status == "scheduled":
+                    display_status = "📅 Scheduled"
+                    status_color = "#9C27B0"
                 elif status == "finished":
                     display_status = "✅ Done"
                     status_color = "#4CAF50"
@@ -554,7 +654,11 @@ class HistoryTab:
                 if start_time:
                     try:
                         dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                        formatted_start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        # For scheduled jobs, show "Scheduled for:" prefix
+                        if job_status == "scheduled" or status == "scheduled":
+                            formatted_start_time = f"Scheduled: {dt.strftime('%Y-%m-%d %H:%M:%S')}"
+                        else:
+                            formatted_start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
                     except Exception:
                         formatted_start_time = start_time[:19] if len(start_time) > 19 else start_time
                 else:
@@ -569,9 +673,10 @@ class HistoryTab:
                     except Exception:
                         formatted_end_time = end_time[:19] if len(end_time) > 19 else end_time
                 else:
-                    # Smart end time display for keep-alive sessions
-                    # Only show "Keep Alive" or "Running" if the session is actually still running
-                    if status == "running":
+                    # Smart end time display for different session types
+                    if job_status == "scheduled" or status == "scheduled":
+                        formatted_end_time = "Pending"
+                    elif status == "running":
                         if job_status == "finished":
                             formatted_end_time = "Keep Alive"
                         elif job_status == "failed":

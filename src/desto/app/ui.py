@@ -607,9 +607,20 @@ class UserInterfaceManager:
 
                 # Join all parts with &&
                 tmux_cmd = " && ".join(cmd_parts)
-                tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+
+                # Use the wrapper script for proper Redis tracking of scheduled jobs
+                wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
+
+                # If wrapper script doesn't exist, fall back to direct tmux command
+                if wrapper_script_path.exists():
+                    # Use wrapper script that handles Redis tracking
+                    scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
+                else:
+                    # Fallback to direct tmux command (original behavior)
+                    scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+
                 # Schedule with 'at'
-                at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
+                at_shell_cmd = f"echo {shlex.quote(scheduled_cmd)} | at {shlex.quote(at_time_str)}"
 
                 result = subprocess.run(
                     at_shell_cmd,
@@ -645,8 +656,19 @@ class UserInterfaceManager:
             tmux_cmd = self.build_logging_command(
                 log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=True, session_start_cmd=session_start_cmd
             )
-            tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
-            at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
+
+            # Use the wrapper script for proper Redis tracking of scheduled jobs
+            wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
+
+            # If wrapper script doesn't exist, fall back to direct tmux command
+            if wrapper_script_path.exists():
+                # Use wrapper script that handles Redis tracking
+                scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
+            else:
+                # Fallback to direct tmux command (original behavior)
+                scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+
+            at_shell_cmd = f"echo {shlex.quote(scheduled_cmd)} | at {shlex.quote(at_time_str)}"
 
             result = subprocess.run(
                 at_shell_cmd,
