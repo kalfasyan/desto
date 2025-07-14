@@ -46,10 +46,10 @@ class TmuxManager:
 
         # Check if Redis is available
         if not self.redis_client.is_connected():
-            logger.warning("Redis is not available - running in limited mode")
-            self.desto_manager = None
-            self.pubsub = None
-            self.job_manager = None
+            msg = "Redis is not available - cannot continue without Redis."
+            logger.error(msg)
+            ui.notification(msg, type="negative")
+            raise RuntimeError(msg)
         else:
             self.desto_manager = DestoManager(self.redis_client)
             self.pubsub = SessionPubSub(self.redis_client)
