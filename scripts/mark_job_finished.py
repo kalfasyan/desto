@@ -55,9 +55,18 @@ try:
             client.redis.hset(session_key, "end_time", job_finished_time)
             print(f"Set session 'end_time' to job_finished_time: {job_finished_time}")
 
-        # Also mark the session as finished (status, exit_code)
-        manager.finish_session(session_name, exit_code)
-        print(f"Marked session '{session_name}' as finished in Redis (exit code: {exit_code})")
+        # Also mark the session as finished or failed (status, exit_code)
+        if exit_code == 0:
+            manager.finish_session(session_name, exit_code)
+            print(f"Marked session '{session_name}' as finished in Redis (exit code: {exit_code})")
+        else:
+            # Look up session and pass session_id to fail_session
+            session = manager.session_manager.get_session_by_name(session_name)
+            if session:
+                manager.session_manager.fail_session(session.session_id, f"Session failed (exit code: {exit_code})")
+                print(f"Marked session '{session_name}' as failed in Redis (exit code: {exit_code})")
+            else:
+                print(f"Could not find session '{session_name}' to mark as failed", file=sys.stderr)
     else:
         print("Redis not available, skipping job completion tracking", file=sys.stderr)
 

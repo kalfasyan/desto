@@ -18,9 +18,7 @@ class DestoManager:
         self.session_manager = SessionManager(redis_client)
         self.job_manager = JobManager(redis_client)
 
-    def start_session_with_job(
-        self, session_name: str, command: str, script_path: str, status=None
-    ) -> Tuple[DestoSession, DestoJob]:
+    def start_session_with_job(self, session_name: str, command: str, script_path: str, status=None) -> Tuple[DestoSession, DestoJob]:
         """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""
         session_status = status if status is not None else SessionStatus.STARTING
         session = self.session_manager.create_session(
@@ -64,7 +62,10 @@ class DestoManager:
         session = self.session_manager.get_session_by_name(session_name)
         if not session:
             return False
-
+        # Only finish if not already failed
+        if session.status == SessionStatus.FAILED:
+            logger.info(f"Session {session_name} already failed, not marking as finished.")
+            return False
         return self.session_manager.finish_session(session.session_id, exit_code)
 
     def finish_job(self, session_name: str, exit_code: int = 0) -> bool:
