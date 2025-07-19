@@ -57,9 +57,18 @@ class CLISessionManager:
         # Check if session already exists in Redis
         redis_client = DestoRedisClient()
         session_manager = SessionManager(redis_client)
-        if session_manager.get_session_by_name(session_name):
-            logger.error(f"Session '{session_name}' already exists in Redis.")
-            return False
+        existing_session = session_manager.get_session_by_name(session_name)
+        if existing_session:
+            if hasattr(existing_session, "status") and getattr(existing_session, "status", None) and existing_session.status.value == "scheduled":
+                logger.error(
+                    f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
+                )
+                # If UI notification system is available, trigger it here
+                # Example: self.ui.notification(f"Session '{session_name}' is already scheduled.", type="warning")
+                return False
+            else:
+                logger.error(f"Session '{session_name}' already exists in Redis.")
+                return False
 
         # Create session in Redis
         session = session_manager.create_session(session_name, tmux_session_name=session_name, keep_alive=keep_alive)

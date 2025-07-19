@@ -6,7 +6,7 @@ from loguru import logger
 
 from .client import DestoRedisClient
 from .job_manager import JobManager
-from .models import DestoJob, DestoSession
+from .models import DestoJob, DestoSession, SessionStatus
 from .session_manager import SessionManager
 
 
@@ -18,13 +18,16 @@ class DestoManager:
         self.session_manager = SessionManager(redis_client)
         self.job_manager = JobManager(redis_client)
 
-    def start_session_with_job(self, session_name: str, command: str, script_path: str, keep_alive: bool = False) -> Tuple[DestoSession, DestoJob]:
-        """Start a new session with an initial job."""
-        # Create session
+    def start_session_with_job(
+        self, session_name: str, command: str, script_path: str, keep_alive: bool = False, status=None
+    ) -> Tuple[DestoSession, DestoJob]:
+        """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""
+        session_status = status if status is not None else SessionStatus.STARTING
         session = self.session_manager.create_session(
             session_name=session_name,
             tmux_session_name=session_name,  # Use same name for tmux
             keep_alive=keep_alive,
+            status=session_status,
         )
 
         # Create and queue the first job
@@ -33,10 +36,12 @@ class DestoManager:
         # Add job to session
         self.session_manager.add_job_to_session(session.session_id, job.job_id)
 
-        # Start the session
-        self.session_manager.start_session(session.session_id)
-
-        logger.info(f"Started session {session_name} with job {job.job_id}")
+        # Only start the session if not scheduled
+        if session_status != SessionStatus.SCHEDULED:
+            self.session_manager.start_session(session.session_id)
+            logger.info(f"Started session {session_name} with job {job.job_id}")
+        else:
+            logger.info(f"Scheduled session {session_name} with job {job.job_id}")
         return session, job
 
     def add_job_to_session(self, session_name: str, command: str, script_path: str) -> Optional[DestoJob]:

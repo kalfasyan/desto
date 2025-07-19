@@ -6,9 +6,41 @@ This ensures scheduled jobs get the same Redis tracking as manually started sess
 
 import subprocess
 import sys
+
+# Ensure loguru outputs to both stdout and a file, and set level to DEBUG
+import sys as _sys
 import threading
 import time
 from pathlib import Path
+
+from loguru import logger
+
+logger.remove()
+logger.add(_sys.stdout, level="DEBUG", enqueue=True)
+# Use a logs directory relative to this script's location, with error handling
+try:
+    _log_dir = Path(__file__).parent.parent / "desto_logs"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _log_path = _log_dir / "desto_scheduled_wrapper.log"
+except Exception as e:
+    print(f"[SCHEDULED WRAPPER] ERROR: Could not create log directory '{_log_dir}': {e}")
+    logger.error(f"[SCHEDULED WRAPPER] Could not create log directory '{_log_dir}': {e}")
+    _log_path = "/tmp/desto_scheduled_wrapper.log"
+    print(f"[SCHEDULED WRAPPER] Falling back to log file at {_log_path}")
+    logger.warning(f"[SCHEDULED WRAPPER] Falling back to log file at {_log_path}")
+
+try:
+    logger.add(
+        str(_log_path),
+        level="DEBUG",
+        rotation="10 MB",  # Rotate after 10 MB
+        retention="7 days",  # Keep logs for 7 days
+        enqueue=True,
+    )
+except Exception as e:
+    print(f"[SCHEDULED WRAPPER] ERROR: Could not add log file handler for '{_log_path}': {e}")
+    logger.error(f"[SCHEDULED WRAPPER] Could not add log file handler for '{_log_path}': {e}")
+
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent
@@ -36,26 +68,29 @@ def start_redis_monitoring(session_name, desto_manager):
                         if job_status not in ["finished", "failed"]:
                             # Session ended but job wasn't marked complete - mark as finished
                             desto_manager.finish_job(session_name, 0)
-                            print(f"Session '{session_name}' ended - marked as finished in Redis")
+                            logger.debug(f"Session '{session_name}' ended - marked as finished in Redis")
                         else:
-                            print(f"Session '{session_name}' ended - already marked as {job_status} in Redis")
+                            logger.debug(f"Session '{session_name}' ended - already marked as {job_status} in Redis")
 
                         # Mark session as finished
                         desto_manager.session_manager.finish_session(session_name)
                         break
                     except Exception as e:
-                        print(f"Error updating Redis for finished session {session_name}: {e}")
+                        logger.debug(f"Error updating Redis for finished session {session_name}: {e}")
                         break
         except Exception as e:
-            print(f"Error in Redis monitoring for {session_name}: {e}")
+            logger.debug(f"Error in Redis monitoring for {session_name}: {e}")
 
     # Start monitoring in a daemon thread
     threading.Thread(target=monitor, daemon=True).start()
 
 
 def main():
+    print("[SCHEDULED WRAPPER] main() entered", sys.argv)
+    logger.info("[SCHEDULED WRAPPER] start_scheduled_session.py script started with args: {}", sys.argv)
     if len(sys.argv) < 3:
-        print("Usage: start_scheduled_session.py <session_name> <command>", file=sys.stderr)
+        print("[SCHEDULED WRAPPER] Not enough arguments", sys.argv)
+        logger.debug("Usage: start_scheduled_session.py <session_name> <command>", file=sys.stderr)
         sys.exit(1)
 
     session_name = sys.argv[1]
@@ -65,55 +100,89 @@ def main():
         from src.desto.redis.client import DestoRedisClient
         from src.desto.redis.desto_manager import DestoManager
 
-        # Start the tmux session
-        print(f"Starting scheduled tmux session: {session_name}")
-        result = subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", command], capture_output=True, text=True)
-
-        if result.returncode != 0:
-            print(f"Failed to start tmux session: {result.stderr}", file=sys.stderr)
-            sys.exit(1)
-
-        print(f"Tmux session '{session_name}' started successfully")
-
         # Initialize Redis tracking
         client = DestoRedisClient()
         if client.is_connected():
             manager = DestoManager(client)
+            from datetime import datetime
 
-            # Create session and job in Redis (similar to TmuxManager.start_tmux_session)
-            session, job = manager.start_session_with_job(
-                session_name=session_name,
-                command=command,
-                script_path=command,
-                keep_alive=False,  # Default for scheduled jobs
-            )
+            from src.desto.redis.models import SessionStatus
 
-            # Start Redis monitoring
-            start_redis_monitoring(session_name, manager)
-            print(f"Redis tracking initialized for session '{session_name}'")
+            # Try to find an existing scheduled session with this name
+            existing_session = None
+            try:
+                existing_session = manager.session_manager.get_session_by_name(session_name)
+            except Exception as e:
+                logger.warning(f"[SCHEDULED WRAPPER] Could not check for existing session: {e}")
 
-            # Keep the script running to maintain monitoring
-            # This process will exit when the session ends
-            while True:
-                time.sleep(60)  # Check every minute if session still exists
-                result = subprocess.run(
-                    ["tmux", "list-sessions", "-F", "#{session_name}"],
-                    capture_output=True,
-                    text=True,
+            if existing_session:
+                if getattr(existing_session, "status", None) == SessionStatus.SCHEDULED:
+                    # Re-use the scheduled session: update status and start_time
+                    session = existing_session
+                    logger.info(
+                        f"[SCHEDULED WRAPPER] Found existing scheduled session '{session_name}' (id={session.session_id}), updating to RUNNING"
+                    )
+                else:
+                    # Existing session is not scheduled, create a new SCHEDULED session
+                    logger.info(
+                        f"[SCHEDULED WRAPPER] Existing session found but not SCHEDULED, creating new session '{session_name}' in Redis with status SCHEDULED"
+                    )
+                    session, job = manager.start_session_with_job(
+                        session_name=session_name,
+                        command=command,
+                        script_path=command,
+                        keep_alive=False,  # Default for scheduled jobs
+                        status=SessionStatus.SCHEDULED,
+                    )
+            else:
+                # No session exists, create a new SCHEDULED session
+                logger.info(f"[SCHEDULED WRAPPER] No existing session found, creating session '{session_name}' in Redis with status SCHEDULED")
+                session, job = manager.start_session_with_job(
+                    session_name=session_name,
+                    command=command,
+                    script_path=command,
+                    keep_alive=False,  # Default for scheduled jobs
+                    status=SessionStatus.SCHEDULED,
                 )
-                if result.returncode != 0 or session_name not in result.stdout:
-                    print(f"Session '{session_name}' has ended - exiting monitor")
-                    break
 
-        else:
-            print("Redis not available - session will run without tracking", file=sys.stderr)
+            # Now, always update to RUNNING and set start_time
+            logger.info(f"[SCHEDULED WRAPPER] Updating session '{session_name}' status to RUNNING and launching tmux")
+            session.status = SessionStatus.RUNNING
+            session.start_time = datetime.now()
+            session_id = session.session_id
+            session_key = f"desto:session:{session_id}"
+            logger.info(
+                f"[SCHEDULED WRAPPER] Session object: id={session_id}, name={session_name}, status={session.status}, start_time={session.start_time}"
+            )
+            manager.session_manager._update_session(session)
+            logger.info(f"[SCHEDULED WRAPPER] Session '{session_name}' status set to RUNNING, start_time set to {session.start_time.isoformat()}")
 
+            # Log job info if available
+            if "job" in locals():
+                logger.info(
+                    f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}"
+                )
+
+            # Log the tmux command to be run
+            tmux_cmd = ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", command]
+            logger.info(f"[SCHEDULED WRAPPER] Running tmux command: {tmux_cmd}")
+
+            # Start the tmux session
+            logger.debug(f"[SCHEDULED WRAPPER] Starting scheduled tmux session: {session_name}")
+            result = subprocess.run(tmux_cmd, capture_output=True, text=True)
+
+            logger.info(f"[SCHEDULED WRAPPER] tmux stdout: {result.stdout}")
+            logger.info(f"[SCHEDULED WRAPPER] tmux stderr: {result.stderr}")
+            logger.info(f"[SCHEDULED WRAPPER] tmux returncode: {result.returncode}")
+
+            if result.returncode != 0:
+                logger.error(f"[SCHEDULED WRAPPER] Failed to start tmux session: {result.stderr}")
+                sys.exit(1)
+
+            logger.info(f"[SCHEDULED WRAPPER] Tmux session '{session_name}' started successfully")
     except ImportError as e:
-        print(f"Could not import Redis modules: {e}", file=sys.stderr)
-        # Still start the session even without Redis
-        subprocess.run(["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", command])
-    except Exception as e:
-        print(f"Error starting scheduled session: {e}", file=sys.stderr)
+        print(f"[SCHEDULED WRAPPER] ImportError: {e}")
+        logger.error(f"Import error: {e}. Ensure you have the destomodule installed.")
         sys.exit(1)
 
 

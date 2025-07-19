@@ -12,6 +12,7 @@ class SessionStatus(Enum):
     RUNNING = "running"
     FINISHED = "finished"
     FAILED = "failed"
+    SCHEDULED = "scheduled"
 
 
 class JobStatus(Enum):

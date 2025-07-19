@@ -104,7 +104,7 @@ class TmuxManager:
     def check_sessions(self):
         """Check the status of existing tmux sessions with detailed information."""
         active_sessions = {}
-        logger.debug("Checking tmux sessions")
+
         result = subprocess.run(
             [
                 "tmux",
@@ -140,8 +140,6 @@ class TmuxManager:
                 session_count += 1
 
             logger.debug(f"Found {session_count} active tmux sessions")
-        else:
-            logger.debug("No active tmux sessions found or tmux not running")
 
         return active_sessions
 
@@ -189,8 +187,27 @@ class TmuxManager:
         Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
         Only appends 'tail -f /dev/null' if keep_alive is True.
+        Enhanced: Checks Redis for existing session with SCHEDULED status and notifies user if found.
         """
-        # Check if session already exists
+        # Check Redis for any session with the same name and SCHEDULED status (block before tmux check)
+        if self.desto_manager:
+            from desto.redis.models import SessionStatus
+
+            all_sessions = self.desto_manager.session_manager.list_all_sessions()
+            for session in all_sessions:
+                status = getattr(session, "status", None)
+                name = getattr(session, "session_name", None)
+                logger.info(f"Checking Redis session: {name} with status {status}")
+                # Accept both enum and string for status
+                if name == session_name and (status == SessionStatus.SCHEDULED or (isinstance(status, str) and str(status).lower() == "scheduled")):
+                    msg = (
+                        f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
+                    )
+                    logger.error(msg)
+                    ui.notification(msg, type="negative")
+                    return
+
+        # Check if tmux session already exists
         existing_sessions = self.check_sessions()
         if session_name in existing_sessions:
             msg = f"Session '{session_name}' already exists. Please choose a different name."
@@ -287,7 +304,8 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
         Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
         """
         sessions_status = self.check_sessions()
-        logger.debug(f"Updating UI with {len(sessions_status)} active sessions")
+        if len(sessions_status):
+            logger.debug(f"Updating UI with {len(sessions_status)} active sessions")
 
         self.clear_sessions_container()
         self.add_to_sessions_container(lambda: self.add_sessions_table(sessions_status, self.ui))

@@ -303,53 +303,58 @@ class HistoryTab:
         self.running_jobs_label = None
 
     def get_session_history(self, days=7):
-        """Get session history from Redis and include scheduled jobs"""
+        """Get session history from Redis, deduplicate scheduled/real sessions, and show correct status/durations."""
         history = []
+        session_map = {}  # session_name -> session_info
+        scheduled_map = {}  # session_name -> scheduled_info
         try:
-            # Debug: print all keys to see what's in Redis
             all_keys = list(self.tmux_manager.redis_client.redis.scan_iter(match="desto:session:*"))
             logger.debug(f"Found {len(all_keys)} session keys in Redis")
 
             for key in all_keys:
                 try:
-                    # Extract session ID from key (remove "desto:session:" prefix)
                     session_id = key.replace("desto:session:", "")
                     session_data = self.tmux_manager.redis_client.redis.hgetall(key)
-
                     if session_data:
-                        # Convert bytes to strings for Redis data
                         session_info = {
                             k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
                         }
-
-                        # Use the actual session name from the data, not the UUID from the key
                         display_session_name = session_info.get("session_name", session_id)
+                        status = session_info.get("status", "unknown").lower()
+                        start_time_str = session_info.get("start_time")
+                        end_time_str = session_info.get("end_time")
 
-                        # Get duration from session data or calculate it
+                        # If session is scheduled but not started, store in scheduled_map
+                        if status == "scheduled" and not start_time_str:
+                            scheduled_map[display_session_name] = {
+                                **session_info,
+                                "session_name": display_session_name,
+                                "status": "Scheduled",
+                                "job_status": "scheduled",
+                                "duration": "N/A",
+                                "job_elapsed": "N/A",
+                                "start_time": "N/A",
+                                "end_time": "N/A",
+                            }
+                            continue
+
+                        # Calculate session duration
                         duration_str = session_info.get("duration")
                         if not duration_str or duration_str == "unknown":
-                            # Calculate duration if not already stored
-                            start_time_str = session_info.get("start_time")
                             if start_time_str:
                                 try:
                                     from datetime import datetime
 
                                     start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
-
-                                    # Use end_time if available, otherwise current time
-                                    end_time_str = session_info.get("end_time")
                                     if end_time_str:
                                         end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
                                     else:
                                         end_time = datetime.now()
-
                                     duration = end_time - start_time
-                                    # Format duration nicely
                                     total_seconds = int(duration.total_seconds())
                                     hours = total_seconds // 3600
                                     minutes = (total_seconds % 3600) // 60
                                     seconds = total_seconds % 60
-
                                     if hours > 0:
                                         duration_str = f"{hours}h {minutes}m {seconds}s"
                                     elif minutes > 0:
@@ -368,9 +373,7 @@ class HistoryTab:
                         job_ids = [jid for jid in job_ids_str.split(",") if jid]
                         if job_ids:
                             latest_job_id = job_ids[-1]
-                            # Try to use JobManager if available
                             job_manager = None
-                            # Try to get job_manager from tmux_manager if possible
                             if hasattr(self.tmux_manager, "job_manager"):
                                 job_manager = self.tmux_manager.job_manager
                             elif hasattr(self.tmux_manager, "redis_client") and hasattr(self.tmux_manager.redis_client, "job_manager"):
@@ -382,8 +385,8 @@ class HistoryTab:
                                     logger.error(f"Error using JobManager.get_job_duration for {display_session_name}: {e}")
                                     job_elapsed = "N/A"
                             else:
-                                # Fallback: keep as N/A
                                 job_elapsed = "N/A"
+
                         session_info.update(
                             {
                                 "session_name": display_session_name,
@@ -391,116 +394,32 @@ class HistoryTab:
                                 "job_elapsed": job_elapsed,
                             }
                         )
-                        history.append(session_info)
+                        session_map[display_session_name] = session_info
                         logger.debug(f"Added session: {display_session_name} with data: {session_info}")
                 except Exception as e:
                     logger.error(f"Error processing session key {key}: {e}")
                     continue
 
-            # --- SCHEDULED JOBS PATCH ---
-            # Add scheduled jobs from atq to the history list as pseudo-sessions
-            if hasattr(self.tmux_manager, "get_scheduled_jobs"):
-                try:
-                    scheduled_jobs = self.tmux_manager.get_scheduled_jobs()
-                    for job in scheduled_jobs:
-                        # Compose a pseudo-session dict for the UI
-                        from desto.redis.models import JobStatus
-
-                        # Create a meaningful but concise session name
-                        command = job.get("command", "Unknown command")
-                        job_id = job.get("id", "unknown")
-
-                        # Extract just the script name from the command if it's a file path
-                        if "/" in command:
-                            # Extract filename from path (e.g., "/path/to/script.sh" -> "script.sh")
-                            script_name = command.split("/")[-1]
-                            if script_name:
-                                command = script_name
-
-                        # Keep it concise - truncate if still too long
-                        if len(command) > 40:
-                            command = command[:37] + "..."
-
-                        session_name = f"📅 {command} (Job {job_id})"
-
-                        scheduled_entry = {
-                            "session_name": session_name,
-                            "status": JobStatus.SCHEDULED.value,
-                            "job_status": JobStatus.SCHEDULED.value,
-                            "start_time": job.get("datetime", ""),
-                            "end_time": "",
-                            "duration": "N/A",
-                            "job_elapsed": "N/A",
-                            "scheduled_job_id": job.get("id", ""),
-                            "user": job.get("user", ""),
-                            "command": command,
-                            "is_scheduled": True,  # Mark as scheduled job
-                        }
-
-                        # Check if this scheduled job already has a running session with the same name
-                        # by looking for sessions that match the tmux session name pattern
-                        extracted_session_name = None
-                        if "tmux new-session -d -s" in job.get("command", ""):
-                            # Extract session name from tmux command
-                            try:
-                                import re
-
-                                tmux_match = re.search(r"tmux new-session -d -s (\S+)", job.get("command", ""))
-                                if tmux_match:
-                                    extracted_session_name = tmux_match.group(1).strip("'\"")
-                            except Exception:
-                                pass
-
-                        # If we found a session name, check if it exists in history already as running/finished
-                        session_already_exists = False
-                        if extracted_session_name:
-                            for existing_session in history:
-                                if existing_session.get("session_name") == extracted_session_name and existing_session.get("status") in [
-                                    "running",
-                                    "finished",
-                                    "failed",
-                                ]:
-                                    session_already_exists = True
-                                    break
-
-                        # Only add the scheduled job to history if it hasn't started running yet
-                        if not session_already_exists:
-                            history.append(scheduled_entry)
-
-                except Exception as e:
-                    logger.error(f"Error fetching scheduled jobs for history: {e}")
-
         except Exception as e:
             logger.error(f"Error getting session history: {e}")
             return []
 
-        # --- PATCH: Update scheduled job pseudo-entries with real status from Redis if available ---
-        # Build a lookup of real session/job statuses by session_name (from Redis)
-        real_status_lookup = {}
-        for entry in history:
-            # Only consider real (non-scheduled) sessions
-            if not entry.get("is_scheduled"):
-                real_status_lookup[entry.get("session_name")] = entry.get("job_status") or entry.get("status")
+        # Only show scheduled entry if no real session exists for that name
+        for sname, sched in scheduled_map.items():
+            if sname not in session_map:
+                history.append(sched)
+        # Add all real sessions
+        history.extend(session_map.values())
 
-        # Update scheduled job pseudo-entries if a real session/job exists with a final status
-        for entry in history:
-            if entry.get("is_scheduled"):
-                # Try to extract the session name from the pseudo-entry (matches tmux session name)
-                # The pseudo-entry session_name is like: "📅 script.sh (Job 123)"
-                # We'll try to match by command/script name (best effort)
-                command = entry.get("command")
-                # Look for a real session with the same command/script name
-                for real_name, real_status in real_status_lookup.items():
-                    if command and command in real_name:
-                        # If the real session is finished or failed, update the pseudo-entry
-                        if real_status in ["finished", "failed", "Finished", "Failed"]:
-                            entry["status"] = real_status.capitalize()
-                            entry["job_status"] = real_status.lower()
-                        break
+        # Sort by start time (newest first, scheduled entries with N/A at the end)
+        def sort_key(x):
+            st = x.get("start_time", "")
+            if st == "N/A":
+                return "0000-00-00T00:00:00"
+            return st
 
-        # Sort by start time (newest first)
-        history.sort(key=lambda x: x.get("start_time", ""), reverse=True)
-        logger.debug(f"Returning {len(history)} sessions (including scheduled jobs)")
+        history.sort(key=sort_key, reverse=True)
+        logger.debug(f"Returning {len(history)} sessions (deduplicated)")
         return history
 
     def build(self):

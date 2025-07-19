@@ -18,15 +18,17 @@ class SessionManager:
         self.redis = redis_client
         self._monitoring_threads = {}
 
-    def create_session(self, session_name: str, tmux_session_name: str, keep_alive: bool = False) -> DestoSession:
-        """Create a new session."""
+    def create_session(
+        self, session_name: str, tmux_session_name: str, keep_alive: bool = False, status: SessionStatus = SessionStatus.STARTING
+    ) -> DestoSession:
+        """Create a new session. Status can be STARTING or SCHEDULED."""
         session = DestoSession(
             session_name=session_name,
             tmux_session_name=tmux_session_name,
             keep_alive=keep_alive,
             start_time=datetime.now(),
             last_heartbeat=datetime.now(),
-            status=SessionStatus.STARTING,
+            status=status,
         )
 
         # Store in Redis

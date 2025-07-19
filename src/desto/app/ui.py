@@ -533,6 +533,10 @@ class UserInterfaceManager:
         import shutil
         from datetime import datetime
 
+        from desto.redis.client import DestoRedisClient  # noqa
+        from desto.redis.desto_manager import DestoManager  # noqa
+        from desto.redis.models import SessionStatus  # noqa
+
         date_val = date_input.value
         time_val = time_input.value
         session_name = self.session_name_input.value.strip() if hasattr(self, "session_name_input") else ""
@@ -570,10 +574,21 @@ class UserInterfaceManager:
                 # Check if log file exists to determine if we should append or create new
                 append_mode = Path(log_file_path).exists()
 
-                # Add Redis session start tracking for scheduled scripts
-                session_start_cmd = self.tmux_manager.get_session_start_command(session_name, f"Chain: {len(self.chain_queue)} scripts")
-                if session_start_cmd:
-                    cmd_parts.append(session_start_cmd)
+                # Add Redis session with SCHEDULED status for scheduled scripts
+                from desto.redis.client import DestoRedisClient
+                from desto.redis.desto_manager import DestoManager
+                from desto.redis.models import SessionStatus
+
+                redis_client = DestoRedisClient()
+                if redis_client.is_connected():
+                    manager = DestoManager(redis_client)
+                    manager.start_session_with_job(
+                        session_name=session_name,
+                        command=f"Chain: {len(self.chain_queue)} scripts",
+                        script_path=f"Chain: {len(self.chain_queue)} scripts",
+                        keep_alive=False,
+                        status=SessionStatus.SCHEDULED,
+                    )
 
                 # Add initial info block using printf for better compatibility
                 if append_mode:
@@ -648,6 +663,18 @@ class UserInterfaceManager:
             info_block = self.get_log_info_block(script_file_path, session_name, scheduled_dt)
             job_completion_cmd = self.tmux_manager.get_job_completion_command(session_name)
             exec_cmd = self.build_execution_command(script_file_path, arguments)
+
+            # Add Redis session with SCHEDULED status for scheduled scripts (fix for single script scheduling)
+            redis_client = DestoRedisClient()
+            if redis_client.is_connected():
+                manager = DestoManager(redis_client)
+                manager.start_session_with_job(
+                    session_name=session_name,
+                    command=exec_cmd,
+                    script_path=str(script_file_path),
+                    keep_alive=False,
+                    status=SessionStatus.SCHEDULED,
+                )
 
             # Add Redis session start tracking for scheduled scripts
             session_start_cmd = self.tmux_manager.get_session_start_command(session_name, exec_cmd)
