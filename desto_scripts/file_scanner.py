@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from loguru import logger
+
 
 def calculate_file_hash(file_path, algorithm="md5"):
     """Calculate hash of a file."""
@@ -18,7 +20,7 @@ def calculate_file_hash(file_path, algorithm="md5"):
                 hash_obj.update(chunk)
         return hash_obj.hexdigest()
     except Exception as e:
-        print(f"Error calculating hash for {file_path}: {e}")
+        logger.error(f"Error calculating hash for {file_path}: {e}")
         return None
 
 
@@ -62,9 +64,7 @@ def scan_directory(directory, extensions=None):
             except Exception as e:
                 print(f"   ❌ Error processing {file_path}: {e}")
 
-    print(
-        f"✅ Found {len(files)} files, total size: {total_size / (1024 * 1024):.2f} MB"
-    )
+    print(f"✅ Found {len(files)} files, total size: {total_size / (1024 * 1024):.2f} MB")
     return files
 
 
@@ -145,9 +145,7 @@ def main():
     if "--ext" in sys.argv:
         ext_index = sys.argv.index("--ext")
         if ext_index + 1 < len(sys.argv):
-            extensions = [
-                f".{ext.lstrip('.')}" for ext in sys.argv[ext_index + 1].split(",")
-            ]
+            extensions = [f".{ext.lstrip('.')}" for ext in sys.argv[ext_index + 1].split(",")]
             print(f"Filtering for extensions: {extensions}")
 
     start_time = time.time()

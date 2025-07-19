@@ -62,9 +62,7 @@ def scan_directory(directory, extensions=None):
             except Exception as e:
                 print(f"   ❌ Error processing {file_path}: {e}")
 
-    print(
-        f"✅ Found {len(files)} files, total size: {total_size / (1024 * 1024):.2f} MB"
-    )
+    print(f"✅ Found {len(files)} files, total size: {total_size / (1024 * 1024):.2f} MB")
     return files
 
 
@@ -145,9 +143,7 @@ def main():
     if "--ext" in sys.argv:
         ext_index = sys.argv.index("--ext")
         if ext_index + 1 < len(sys.argv):
-            extensions = [
-                f".{ext.lstrip('.')}" for ext in sys.argv[ext_index + 1].split(",")
-            ]
+            extensions = [f".{ext.lstrip('.')}" for ext in sys.argv[ext_index + 1].split(",")]
             print(f"Filtering for extensions: {extensions}")
 
     start_time = time.time()

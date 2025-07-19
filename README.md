@@ -19,6 +19,7 @@ The key features are:
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
+- ✨ **\*NEW!\*** ✨ **Session history:** Optional Redis integration for persistent session tracking and history.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
   
   
@@ -51,12 +52,6 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
 4. Click "Launch"! 🎬
 
 <img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
-</details>
-
-<details>
-<summary><strong>🟢 Keep Alive</strong></summary>
-
-🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
 </details>
 
 <details>

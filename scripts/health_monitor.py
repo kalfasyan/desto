@@ -17,11 +17,7 @@ def check_service(name, url, timeout=5):
         response = requests.get(url, timeout=timeout)
         response_time = (time.time() - start_time) * 1000
 
-        status = (
-            "✅ UP"
-            if response.status_code == 200
-            else f"⚠️ STATUS {response.status_code}"
-        )
+        status = "✅ UP" if response.status_code == 200 else f"⚠️ STATUS {response.status_code}"
         print(f"   {name}: {status} ({response_time:.0f}ms)")
 
         return {
@@ -110,11 +106,7 @@ def main():
             "error": "💥",
             "degraded": "⚠️",
         }.get(result["status"], "❓")
-        response_time = (
-            f" ({result['response_time_ms']}ms)"
-            if result.get("response_time_ms")
-            else ""
-        )
+        response_time = f" ({result['response_time_ms']}ms)" if result.get("response_time_ms") else ""
         print(f"   {status_emoji} {result['service']}{response_time}")
 
     # Generate JSON report if requested

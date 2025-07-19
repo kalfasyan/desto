@@ -58,9 +58,7 @@ class TestCliMain:
         mock_manager_class.return_value = mock_manager
 
         with patch("builtins.print") as mock_print:
-            with patch(
-                "desto.cli.utils.format_duration", side_effect=lambda x: f"{x}s"
-            ):
+            with patch("desto.cli.utils.format_duration", side_effect=lambda x: f"{x}s"):
                 cli_main()
 
                 mock_manager.list_sessions.assert_called_once()
@@ -72,9 +70,7 @@ class TestCliMain:
     @patch("desto.cli.main.app", side_effect=ImportError("typer not found"))
     @patch("sys.argv", ["desto-cli", "start", "test_session", "echo", "hello"])
     @patch("desto.cli.session_manager.CLISessionManager")
-    def test_cli_main_no_typer_start_command_success(
-        self, mock_manager_class, mock_app
-    ):
+    def test_cli_main_no_typer_start_command_success(self, mock_manager_class, mock_app):
         """Test CLI main fallback start command success."""
         mock_manager = Mock()
         mock_manager.start_session.return_value = True
@@ -90,9 +86,7 @@ class TestCliMain:
     @patch("desto.cli.main.app", side_effect=ImportError("typer not found"))
     @patch("sys.argv", ["desto-cli", "start", "test_session", "echo", "hello"])
     @patch("desto.cli.session_manager.CLISessionManager")
-    def test_cli_main_no_typer_start_command_failure(
-        self, mock_manager_class, mock_app
-    ):
+    def test_cli_main_no_typer_start_command_failure(self, mock_manager_class, mock_app):
         """Test CLI main fallback start command failure."""
         mock_manager = Mock()
         mock_manager.start_session.return_value = False

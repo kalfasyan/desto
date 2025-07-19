@@ -56,9 +56,7 @@ def update_version_file(new_version):
     version_file = Path("src/desto/_version.py")
     content = version_file.read_text()
 
-    new_content = re.sub(
-        r'__version__ = ["\'][^"\']+["\']', f'__version__ = "{new_version}"', content
-    )
+    new_content = re.sub(r'__version__ = ["\'][^"\']+["\']', f'__version__ = "{new_version}"', content)
 
     version_file.write_text(new_content)
     print(f"Updated {version_file} to version {new_version}")
@@ -67,9 +65,7 @@ def update_version_file(new_version):
 def main():
     """Main function."""
     parser = argparse.ArgumentParser(description="Bump desto package version")
-    parser.add_argument(
-        "bump_type", choices=["major", "minor", "patch"], help="Type of version bump"
-    )
+    parser.add_argument("bump_type", choices=["major", "minor", "patch"], help="Type of version bump")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -93,11 +89,7 @@ def main():
             print("\nNext steps:")
             print("1. Review the changes")
             print("2. Run: uv build --wheel")
-            print(
-                "3. Run: git add . && git commit -m 'Bump version to {}'".format(
-                    new_version
-                )
-            )
+            print("3. Run: git add . && git commit -m 'Bump version to {}'".format(new_version))
             print("4. Run: git tag v{}".format(new_version))
 
     except Exception as e:

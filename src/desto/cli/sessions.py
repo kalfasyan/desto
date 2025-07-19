@@ -66,9 +66,7 @@ console = Console()
 
 @sessions_app.command("list")
 def list_sessions(
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed information"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed information"),
 ):
     """List all active tmux sessions."""
     manager = CLISessionManager()
@@ -110,15 +108,8 @@ def list_sessions(
 def start_session(
     session_name: str = typer.Argument(..., help="Name for the tmux session"),
     command: str = typer.Argument(..., help="Command to execute in the session"),
-    keep_alive: bool = typer.Option(
-        False, "--keep-alive", "-k", help="Keep session alive after command finishes"
-    ),
-    logs_dir: Optional[Path] = typer.Option(
-        None, "--logs-dir", help="Custom logs directory"
-    ),
-    scripts_dir: Optional[Path] = typer.Option(
-        None, "--scripts-dir", help="Custom scripts directory"
-    ),
+    logs_dir: Optional[Path] = typer.Option(None, "--logs-dir", help="Custom logs directory"),
+    scripts_dir: Optional[Path] = typer.Option(None, "--scripts-dir", help="Custom scripts directory"),
 ):
     """Start a new tmux session with a command."""
     try:
@@ -129,10 +120,8 @@ def start_session(
             console.print(f"[red]Error: Session '{session_name}' already exists.[/red]")
             raise typer.Exit(1)
 
-        if manager.start_session(session_name, command, keep_alive):
-            console.print(
-                f"[green]✅ Session '{session_name}' started successfully[/green]"
-            )
+        if manager.start_session(session_name, command):
+            console.print(f"[green]✅ Session '{session_name}' started successfully[/green]")
             console.print(f"[dim]Command: {command}[/dim]")
             console.print(f"[dim]Logs: {manager.get_log_file(session_name)}[/dim]")
         else:
@@ -146,9 +135,7 @@ def start_session(
 
 @sessions_app.command("kill")
 def kill_session(
-    session_name: Optional[str] = typer.Argument(
-        None, help="Name of the session to kill"
-    ),
+    session_name: Optional[str] = typer.Argument(None, help="Name of the session to kill"),
     all_sessions: bool = typer.Option(False, "--all", "-a", help="Kill all sessions"),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation prompt"),
 ):
@@ -174,13 +161,9 @@ def kill_session(
         success_count, total_count, errors = manager.kill_all_sessions()
 
         if success_count == total_count:
-            console.print(
-                f"[green]✅ Successfully killed all {total_count} session(s)[/green]"
-            )
+            console.print(f"[green]✅ Successfully killed all {total_count} session(s)[/green]")
         else:
-            console.print(
-                f"[yellow]⚠️  Killed {success_count}/{total_count} sessions[/yellow]"
-            )
+            console.print(f"[yellow]⚠️  Killed {success_count}/{total_count} sessions[/yellow]")
             for error in errors:
                 console.print(f"[red]  • {error}[/red]")
 
@@ -196,17 +179,13 @@ def kill_session(
                 return
 
         if manager.kill_session(session_name):
-            console.print(
-                f"[green]✅ Session '{session_name}' killed successfully[/green]"
-            )
+            console.print(f"[green]✅ Session '{session_name}' killed successfully[/green]")
         else:
             console.print(f"[red]❌ Failed to kill session '{session_name}'[/red]")
             raise typer.Exit(1)
 
     else:
-        console.print(
-            "[red]Error: Must specify either a session name or --all flag.[/red]"
-        )
+        console.print("[red]Error: Must specify either a session name or --all flag.[/red]")
         raise typer.Exit(1)
 
 
@@ -232,46 +211,32 @@ def attach_session(
 @sessions_app.command("logs")
 def view_logs(
     session_name: str = typer.Argument(..., help="Name of the session"),
-    lines: Optional[int] = typer.Option(
-        None, "--lines", "-n", help="Number of lines to show from the end"
-    ),
-    follow: bool = typer.Option(
-        False, "--follow", "-f", help="Follow log output (like tail -f)"
-    ),
+    lines: Optional[int] = typer.Option(None, "--lines", "-n", help="Number of lines to show from the end"),
+    follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output (like tail -f)"),
 ):
     """View logs for a session."""
     manager = CLISessionManager()
 
     log_file = manager.get_log_file(session_name)
     if not log_file.exists():
-        console.print(
-            f"[red]Error: No log file found for session '{session_name}'[/red]"
-        )
+        console.print(f"[red]Error: No log file found for session '{session_name}'[/red]")
         console.print(f"[dim]Expected location: {log_file}[/dim]")
         raise typer.Exit(1)
 
     if follow:
-        console.print(
-            f"[blue]Following logs for session '{session_name}' (Press Ctrl+C to exit)...[/blue]"
-        )
+        console.print(f"[blue]Following logs for session '{session_name}' (Press Ctrl+C to exit)...[/blue]")
         # This will replace the current process with tail -f
         if not manager.follow_log(session_name):
-            console.print(
-                f"[red]❌ Failed to follow logs for session '{session_name}'[/red]"
-            )
+            console.print(f"[red]❌ Failed to follow logs for session '{session_name}'[/red]")
             raise typer.Exit(1)
     else:
         content = manager.get_log_content(session_name, lines)
         if content is None:
-            console.print(
-                f"[red]Error: Could not read log file for session '{session_name}'[/red]"
-            )
+            console.print(f"[red]Error: Could not read log file for session '{session_name}'[/red]")
             raise typer.Exit(1)
 
         if not content.strip():
-            console.print(
-                f"[yellow]Log file for session '{session_name}' is empty.[/yellow]"
-            )
+            console.print(f"[yellow]Log file for session '{session_name}' is empty.[/yellow]")
         else:
             console.print(f"[dim]--- Logs for session '{session_name}' ---[/dim]")
             console.print(content)
@@ -279,9 +244,7 @@ def view_logs(
 
 @sessions_app.command("status")
 def session_status(
-    session_name: Optional[str] = typer.Argument(
-        None, help="Name of specific session to check"
-    ),
+    session_name: Optional[str] = typer.Argument(None, help="Name of specific session to check"),
 ):
     """Show detailed status for a session or all sessions."""
     manager = CLISessionManager()
