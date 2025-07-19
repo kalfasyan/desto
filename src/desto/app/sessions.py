@@ -66,6 +66,217 @@ class TmuxManager:
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
+    def get_all_sessions_status(self):
+        """
+        Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it.
+        """
+        sessions = {}
+        try:
+            # Get all session keys from Redis
+            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
+            for key in all_keys:
+                try:
+                    session_id = key.replace("desto:session:", "")
+                    session_data = self.redis_client.redis.hgetall(key)
+                    if session_data:
+                        session_info = {
+                            k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
+                        }
+                        # Use session_name if present, else fallback to id
+                        display_session_name = session_info.get("session_name", session_id)
+                        sessions[display_session_name] = session_info
+                except Exception as e:
+                    logger.error(f"Error processing session key {key}: {e}")
+                    continue
+        except Exception as e:
+            logger.error(f"Error getting all sessions from Redis: {e}")
+        # Add active tmux sessions not in Redis (edge case)
+        active_tmux = self.check_sessions()
+        for sname, sdata in active_tmux.items():
+            if sname not in sessions:
+                sessions[sname] = sdata
+        return sessions
+
+    def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None):
+        """
+        Render the stats cards and control buttons (Refresh, Clear History, Clear Logs) as in the history tab, but independent of history_tab.
+        """
+        from nicegui import ui
+
+        # --- Control Buttons (Refresh, Clear History, Clear Logs) ---
+        with ui.row().style("width: 100%; justify-content: space-between; align-items: center; margin-bottom: 20px;"):
+            ui.label("Sessions Dashboard").style("font-size: 1.5em; font-weight: bold;")
+            with ui.row().style("gap: 10px;"):
+                ui.button("Refresh", icon="refresh", on_click=self.update_sessions_status).props("flat")
+                ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
+                ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
+
+        # --- Stats Cards (Total, Finished, Failed, Running) ---
+        total_sessions = len(sessions_status)
+        finished_jobs = 0
+        failed_jobs = 0
+        running_jobs = 0
+        for session_name, session in sessions_status.items():
+            job_status = None
+            if self.desto_manager:
+                try:
+                    job_status = self.desto_manager.get_job_status(session_name)
+                except Exception:
+                    pass
+            if job_status == "finished":
+                finished_jobs += 1
+            elif job_status == "failed":
+                failed_jobs += 1
+            else:
+                running_jobs += 1
+
+        with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label(str(total_sessions)).style("font-size: 2em; font-weight: bold; color: #2196F3;")
+                ui.label("Total Sessions").style("color: #666; font-size: 0.9em;")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label(str(finished_jobs)).style("font-size: 2em; font-weight: bold; color: #4CAF50;")
+                ui.label("Finished").style("color: #666; font-size: 0.9em;")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label(str(failed_jobs)).style("font-size: 2em; font-weight: bold; color: #F44336;")
+                ui.label("Failed").style("color: #666; font-size: 0.9em;")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label(str(running_jobs)).style("font-size: 2em; font-weight: bold; color: #FF9800;")
+                ui.label("Running").style("color: #666; font-size: 0.9em;")
+
+    def confirm_clear_history(self):
+        """
+        Show confirmation dialog before clearing session history. Pauses updates while dialog is open.
+        """
+        from nicegui import ui
+
+        if self.pause_updates:
+            self.pause_updates()
+
+        def close_dialog():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
+            ui.label("This action cannot be undone.").style("color: #666; margin-bottom: 20px;")
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
+                ui.button("Cancel", on_click=close_dialog).props("color=grey")
+                ui.button("Clear History", color="red", on_click=lambda: [self.clear_session_history(), close_dialog()]).props("icon=delete_forever")
+        dialog.open()
+
+    def clear_session_history(self):
+        """
+        Clear all session history from Redis.
+        """
+        try:
+            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
+            if not all_keys:
+                ui.notification("No session history to clear", type="info")
+                return
+            deleted_count = 0
+            for key in all_keys:
+                try:
+                    self.redis_client.redis.delete(key)
+                    deleted_count += 1
+                except Exception as e:
+                    logger.error(f"Error deleting session key {key}: {e}")
+            if deleted_count > 0:
+                msg = f"Successfully cleared {deleted_count} session record(s) from history"
+                logger.info(msg)
+                ui.notification(msg, type="positive")
+                self.update_sessions_status()
+            else:
+                ui.notification("No sessions were cleared", type="warning")
+        except Exception as e:
+            error_msg = f"Error clearing session history: {e}"
+            logger.error(error_msg)
+            ui.notification(error_msg, type="negative")
+
+    def confirm_clear_logs(self):
+        """
+        Show confirmation dialog before clearing log files. Pauses updates while dialog is open.
+        """
+        from nicegui import ui
+
+        log_dir = self.LOG_DIR
+        log_files = []
+        if log_dir.exists():
+            log_files = list(log_dir.glob("*.log"))
+        if not log_files:
+            ui.notification("No log files found to clear", type="info")
+            return
+        if self.pause_updates:
+            self.pause_updates()
+
+        def close_dialog():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
+            ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
+            ui.label(str(log_dir)).style("font-family: monospace; background: #f5f5f5; padding: 5px; border-radius: 3px; margin-bottom: 15px;")
+            if len(log_files) <= 5:
+                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
+                for log_file in log_files:
+                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
+            else:
+                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
+                for log_file in log_files[:3]:
+                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
+                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; color: #666; font-size: 0.9em;")
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
+                ui.button("Cancel", on_click=close_dialog).props("color=grey")
+                ui.button("Clear Log Files", color="orange", on_click=lambda: [self.clear_log_files(), close_dialog()]).props("icon=folder_delete")
+        dialog.open()
+
+    def clear_log_files(self):
+        """
+        Clear all log files from the logs directory.
+        """
+        log_dir = self.LOG_DIR
+        if not log_dir.exists():
+            ui.notification("Logs directory not found", type="warning")
+            return
+        try:
+            log_files = list(log_dir.glob("*.log"))
+            finished_files = list(log_dir.glob("*.finished"))
+            all_files = log_files + finished_files
+            if not all_files:
+                ui.notification("No log files found to clear", type="info")
+                return
+            deleted_count = 0
+            errors = []
+            for file_path in all_files:
+                try:
+                    file_path.unlink()
+                    deleted_count += 1
+                    logger.info(f"Deleted log file: {file_path}")
+                except Exception as e:
+                    error_msg = f"Failed to delete {file_path.name}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.error(error_msg)
+            if deleted_count > 0:
+                msg = f"Successfully deleted {deleted_count} log file(s)"
+                if errors:
+                    msg += f" ({len(errors)} errors)"
+                logger.info(msg)
+                ui.notification(msg, type="positive")
+                self.update_sessions_status()
+            if errors:
+                error_summary = "; ".join(errors[:3])
+                if len(errors) > 3:
+                    error_summary += f" (+{len(errors) - 3} more)"
+                ui.notification(f"Errors: {error_summary}", type="warning")
+        except Exception as e:
+            error_msg = f"Error clearing log files: {e}"
+            logger.error(error_msg)
+            ui.notification(error_msg, type="negative")
+
     def _start_redis_monitoring(self, session_name):
         """Monitor tmux session and update Redis"""
 
@@ -281,7 +492,6 @@ class TmuxManager:
             # Track in Redis using new manager if available
             if self.desto_manager:
                 session, job = self.desto_manager.start_session_with_job(session_name=session_name, command=command, script_path=command)
-                self._start_redis_monitoring(session_name)
                 logger.debug(f"Redis tracking started for session '{session_name}'")
 
         except subprocess.CalledProcessError as e:
@@ -294,16 +504,22 @@ class TmuxManager:
             logger.error(msg)
             ui.notification(msg, type="negative")
 
-    def update_sessions_status(self):
+    def update_sessions_status(self, ui_manager=None):
         """
         Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
+        Also renders the stats cards and control buttons above the table, as in the history tab.
+        Shows all sessions (active, finished, failed, scheduled) by aggregating from Redis, not just active tmux sessions.
         """
-        sessions_status = self.check_sessions()
-        if len(sessions_status):
-            logger.debug(f"Updating UI with {len(sessions_status)} active sessions")
+        sessions_status = self.get_all_sessions_status()
+        logger.debug(f"Updating UI with {len(sessions_status)} total sessions (all states)")
 
         self.clear_sessions_container()
-        self.add_to_sessions_container(lambda: self.add_sessions_table(sessions_status, self.ui))
+
+        def render():
+            self.render_sessions_controls_and_stats(sessions_status, ui_manager)
+            self.add_sessions_table(sessions_status, self.ui)
+
+        self.add_to_sessions_container(render)
 
     def kill_tmux_session(self, session_name):
         """
@@ -370,84 +586,194 @@ class TmuxManager:
 
     def add_sessions_table(self, sessions_status, ui):
         """
-        Adds the sessions table to the UI.
+        Adds the sessions table to the UI, using the history tab's columns plus an Actions column.
         """
-        header_style = "width: 150px; font-size: 1.2em; font-weight: bold;"
-        cell_style = "width: 150px; font-size: 1.2em;"
 
-        with ui.row().style("margin-bottom: 10px;"):
-            ui.label("Session ID").style(header_style)
-            ui.label("Name").style(header_style)
-            ui.label("Created").style(header_style)
-            ui.label("Elapsed").style(header_style)
-            ui.label("Attached").style(header_style)
-            ui.label("Status").style(header_style)
-            ui.label("Actions").style(header_style)
+        # Table header
+        with ui.row().style(
+            "width: 100%; min-width: 1000px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
+        ):
+            ui.label("Session Name").style("flex: 2; min-width: 150px;")
+            ui.label("Status").style("flex: 1; min-width: 100px;")
+            ui.label("Job Duration").style("flex: 1; min-width: 120px;")
+            ui.label("Session Duration").style("flex: 1; min-width: 130px;")
+            ui.label("Started").style("flex: 2; min-width: 140px;")
+            ui.label("Finished").style("flex: 2; min-width: 140px;")
+            ui.label("Actions").style("flex: 1; min-width: 120px;")
 
+        # --- Deduplicate scheduled and real sessions as in the history tab ---
+        # Build maps for real and scheduled sessions
+        session_map = {}  # session_name -> session_info (real sessions)
+        scheduled_map = {}  # session_name -> session_info (scheduled only)
         for session_name, session in sessions_status.items():
-            created_time = session["created"]
-            elapsed_seconds = self.get_script_run_time(created_time, session_name)
-            hours, remainder = divmod(elapsed_seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            elapsed_str = f"{hours}:{minutes:02}:{seconds:02}"
+            # Use Redis status fields
+            status_field = session.get("status", "").lower()
+            job_status_field = session.get("job_status", "").lower()
+            # Consider a session 'real' if status/job_status is running/finished/failed
+            if status_field in ("running", "finished", "failed") or job_status_field in ("running", "finished", "failed"):
+                session_map[session_name] = session
+            elif status_field == "scheduled" or job_status_field == "scheduled":
+                scheduled_map[session_name] = session
 
-            # Get job status from Redis if available, otherwise fall back to file markers
-            status = "Running"  # Default status
+        # Only show scheduled entry if no real session exists for that name
+        display_sessions = dict(session_map)
+        for sname, sched in scheduled_map.items():
+            if sname not in display_sessions:
+                display_sessions[sname] = sched
 
-            if self.desto_manager:
-                try:
-                    job_status = self.desto_manager.get_job_status(session_name)
-                    logger.debug(f"Redis job status for {session_name}: {job_status}")
-
-                    if job_status in ["finished", "failed"]:
-                        status = "Finished" if job_status == "finished" else "Failed"
-                    elif job_status == "running":
-                        status = "Running"
-                    else:
-                        # Check if tmux session is still active
-                        # If tmux session exists but no job status, it might be starting
-                        status = "Running"
-                except Exception as e:
-                    logger.debug(f"Error getting job status for {session_name}: {e}")
-                    # Fall back to file-based checking
-                    finished_marker = self.LOG_DIR / f"{session_name}.finished"
-                    failed_marker = self.LOG_DIR / f"{session_name}.failed"
-                    if finished_marker.exists():
-                        status = "Finished"
-                    elif failed_marker.exists():
-                        status = "Failed"
-                    else:
-                        status = "Running"
+        for session_name, session in display_sessions.items():
+            # Determine status for display
+            status = "unknown"
+            status_color = "#FF9800"
+            job_status = session.get("job_status", "") or session.get("status", "")
+            status_field = (session.get("status", "") or "").lower()
+            job_status_field = (session.get("job_status", "") or "").lower()
+            if job_status_field == "finished" or status_field == "finished":
+                status = "✅ Finished"
+                status_color = "#4CAF50"
+            elif job_status_field == "failed" or status_field == "failed":
+                status = "❌ Failed"
+                status_color = "#F44336"
+            elif job_status_field == "running" or status_field == "running":
+                status = "🟡 Running"
+                status_color = "#FF9800"
+            elif job_status_field == "scheduled" or status_field == "scheduled":
+                status = "📅 Scheduled"
+                status_color = "#9C27B0"
             else:
-                # Fall back to file-based status checking when Redis unavailable
-                finished_marker = self.LOG_DIR / f"{session_name}.finished"
-                failed_marker = self.LOG_DIR / f"{session_name}.failed"
-                if finished_marker.exists():
-                    status = "Finished"
-                elif failed_marker.exists():
-                    status = "Failed"
-                else:
-                    status = "Running"
+                status = "🟡 Running"
+                status_color = "#FF9800"
 
-            # For finished sessions, check if tmux session should be killed
-            if status in ["Finished", "Failed"] and session_name in sessions_status:
-                logger.debug(f"Session {session_name} is {status} but tmux session still exists")
+            # Times and durations
+            created_time = session.get("created")
+            start_time = session.get("start_time")
+            end_time = session.get("end_time")
+            # Fallback for start_time
+            if not start_time and created_time:
+                start_time = datetime.fromtimestamp(created_time).isoformat()
 
-            with ui.row().style("align-items: center; margin-bottom: 10px;"):
-                ui.label(session["id"]).style(cell_style)
-                ui.label(session_name).style(cell_style)
-                ui.label(datetime.fromtimestamp(created_time).strftime("%Y-%m-%d %H:%M:%S")).style(cell_style)
-                ui.label(elapsed_str).style(cell_style)
-                ui.label("Yes" if session["attached"] else "No").style(cell_style)
-                ui.label(status).style(cell_style)
-                ui.button(
-                    "Kill",
-                    on_click=lambda s=session_name: self.confirm_kill_session(s),
-                ).props("color=red flat")
-                ui.button(
-                    "View Log",
-                    on_click=lambda s=session_name: self.view_log(s, ui),
-                ).props("color=blue flat")
+            # Format start time
+            if start_time:
+                try:
+                    dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
+                    formatted_start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    formatted_start_time = str(start_time)[:19] if len(str(start_time)) > 19 else str(start_time)
+            else:
+                formatted_start_time = "Unknown"
+
+            # Format end time
+            if end_time:
+                try:
+                    dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+                    formatted_end_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    formatted_end_time = str(end_time)[:19] if len(str(end_time)) > 19 else str(end_time)
+            else:
+                formatted_end_time = "Running" if job_status == "running" else "N/A"
+
+            # --- Job Duration (script execution time) ---
+            job_duration = "N/A"
+            # Try to calculate from start_time and end_time
+            if start_time and end_time:
+                try:
+                    start_dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
+                    end_dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+                    elapsed_seconds = int((end_dt - start_dt).total_seconds())
+                    if elapsed_seconds >= 0:
+                        hours, remainder = divmod(elapsed_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        job_duration = (
+                            f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+                        )
+                except Exception:
+                    pass
+            # Fallback to job_elapsed or elapsed fields
+            if job_duration == "N/A":
+                job_duration = session.get("job_elapsed", session.get("elapsed", "N/A"))
+
+            # --- Session Duration (total session time) ---
+            logger.debug(f"Session '{session_name}': full session dict = {session}")
+            # Always use Redis 'start_time' as the canonical session start time
+            session_duration = None
+            if start_time:
+                try:
+                    start_dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
+                    if end_time:
+                        end_dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
+                        elapsed_seconds = int((end_dt - start_dt).total_seconds())
+                        logger.debug(f"Session '{session_name}': calculated elapsed_seconds from start_time and end_time = {elapsed_seconds}")
+                    else:
+                        now_dt = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
+                        elapsed_seconds = int((now_dt - start_dt).total_seconds())
+                        logger.debug(f"Session '{session_name}': calculated elapsed_seconds from now - start_time = {elapsed_seconds}")
+                    if elapsed_seconds >= 0:
+                        hours, remainder = divmod(elapsed_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        session_duration = (
+                            f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+                        )
+                        logger.debug(f"Session '{session_name}': formatted session_duration = {session_duration}")
+                    else:
+                        session_duration = "N/A"
+                except Exception as e:
+                    logger.warning(f"Session '{session_name}': error calculating session_duration from start_time: {e}")
+                    session_duration = "N/A"
+            else:
+                logger.debug(f"Session '{session_name}': no start_time found, setting session_duration = 'N/A'")
+                session_duration = "N/A"
+            logger.info(f"Session '{session_name}': FINAL session_duration = {session_duration}")
+
+            def format_duration(duration_str):
+                if duration_str in ["N/A", "unknown", "Ongoing"]:
+                    return duration_str
+                if ":" in str(duration_str):
+                    try:
+                        if "day" in str(duration_str):
+                            parts = str(duration_str).split(", ")
+                            days_part = parts[0]
+                            time_part = parts[1] if len(parts) > 1 else "0:00:00"
+                            days = int(days_part.split()[0])
+                        else:
+                            days = 0
+                            time_part = str(duration_str)
+                        time_components = time_part.split(":")
+                        if len(time_components) >= 3:
+                            hours = int(time_components[0]) + (days * 24)
+                            minutes = int(time_components[1])
+                            seconds = int(float(time_components[2]))
+                            if hours > 0:
+                                return f"{hours}h {minutes}m {seconds}s"
+                            elif minutes > 0:
+                                return f"{minutes}m {seconds}s"
+                            else:
+                                return f"{seconds}s"
+                    except Exception:
+                        pass
+                return str(duration_str)
+
+            job_duration = format_duration(job_duration)
+            session_duration = format_duration(session_duration)
+
+            with ui.row().style(
+                "width: 100%; min-width: 1000px; padding: 10px 12px; border-bottom: 1px solid #eee; "
+                "align-items: center; hover:background-color: #f9f9f9;"
+            ):
+                ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
+                ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
+                ui.label(job_duration).style("flex: 1; min-width: 120px; color: #666;")
+                ui.label(session_duration).style("flex: 1; min-width: 130px; color: #666;")
+                ui.label(formatted_start_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
+                ui.label(formatted_end_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
+                with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
+                    ui.button(
+                        "Kill",
+                        on_click=lambda s=session_name: self.confirm_kill_session(s),
+                    ).props("color=red flat")
+                    ui.button(
+                        "View Log",
+                        on_click=lambda s=session_name: self.view_log(s, ui),
+                    ).props("color=blue flat")
 
     def view_log(self, session_name, ui):
         """
