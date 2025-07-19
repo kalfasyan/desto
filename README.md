@@ -55,12 +55,6 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
 </details>
 
 <details>
-<summary><strong>🟢 Keep Alive</strong></summary>
-
-🟢 **Keep Alive**: Want your session to stay open after your script finishes? Just toggle the switch. This adds `tail -f /dev/null` at the end, so you can keep the session active and continue viewing logs, even after your script completes.
-</details>
-
-<details>
 <summary><strong>✍️ Write new scripts and save them</strong></summary>
 
 If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :) Choose between bash and Python templates with syntax highlighting and smart defaults.

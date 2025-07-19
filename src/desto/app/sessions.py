@@ -182,11 +182,10 @@ class TmuxManager:
     def get_script_file(self, script_name):
         return self.SCRIPTS_DIR / script_name
 
-    def start_tmux_session(self, session_name, command, instance_logger, keep_alive=False):
+    def start_tmux_session(self, session_name, command, instance_logger):
         """
         Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
-        Only appends 'tail -f /dev/null' if keep_alive is True.
         Enhanced: Checks Redis for existing session with SCHEDULED status and notifies user if found.
         """
         # Check Redis for any session with the same name and SCHEDULED status (block before tmux check)
@@ -248,15 +247,13 @@ class TmuxManager:
 
         # Create a robust bash command that ensures logging and keep-alive work regardless of script outcome
         pre_script_commands = " && ".join(cmd_parts) if cmd_parts else ""
-
         bash_script = f"""
-{pre_script_commands}
-({command}) >> {quoted_log_file} 2>&1
-SCRIPT_EXIT_CODE=$?
-printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(date)" >> {quoted_log_file}
-{self.get_job_completion_command(session_name, use_variable=True)}
-{f"tail -f /dev/null >> {quoted_log_file} 2>&1" if keep_alive else ""}
-""".strip()
+    {pre_script_commands}
+    ({command}) >> {quoted_log_file} 2>&1
+    SCRIPT_EXIT_CODE=$?
+    printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(date)" >> {quoted_log_file}
+    {self.get_job_completion_command(session_name, use_variable=True)}
+    """.strip()
 
         full_command_for_tmux = bash_script
 
@@ -283,9 +280,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
 
             # Track in Redis using new manager if available
             if self.desto_manager:
-                session, job = self.desto_manager.start_session_with_job(
-                    session_name=session_name, command=command, script_path=command, keep_alive=keep_alive
-                )
+                session, job = self.desto_manager.start_session_with_job(session_name=session_name, command=command, script_path=command)
                 self._start_redis_monitoring(session_name)
                 logger.debug(f"Redis tracking started for session '{session_name}'")
 
@@ -434,7 +429,7 @@ printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(d
                 else:
                     status = "Running"
 
-            # For finished sessions, check if tmux session should be killed (if keep_alive wasn't used)
+            # For finished sessions, check if tmux session should be killed
             if status in ["Finished", "Failed"] and session_name in sessions_status:
                 logger.debug(f"Session {session_name} is {status} but tmux session still exists")
 

@@ -121,15 +121,8 @@ class TestStartCommand:
         assert "started successfully" in result.stdout
         mock_session_manager.start_session.assert_called_with("test_session", "echo hello", False)
 
-    def test_start_session_with_keep_alive(self, runner, mock_session_manager):
-        """Test starting a session with keep-alive flag."""
-        mock_session_manager.session_exists.return_value = False
-        mock_session_manager.start_session.return_value = True
 
-        result = runner.invoke(sessions_app, ["start", "test_session", "echo hello", "--keep-alive"])
 
-        assert result.exit_code == 0
-        mock_session_manager.start_session.assert_called_with("test_session", "echo hello", True)
 
     def test_start_session_already_exists(self, runner, mock_session_manager):
         """Test starting a session that already exists."""

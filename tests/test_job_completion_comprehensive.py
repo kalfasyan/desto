@@ -180,7 +180,7 @@ echo "Chain completion marker" >> {log_file}
         mock_logger = Mock()
 
         # Call the method
-        self.tmux_manager.start_tmux_session(session_name, command, mock_logger, keep_alive=True)
+        self.tmux_manager.start_tmux_session(session_name, command, mock_logger)
 
         # Verify subprocess.run was called
         self.assertTrue(mock_subprocess.called, "subprocess.run was not called")
@@ -191,7 +191,6 @@ echo "Chain completion marker" >> {log_file}
 
         # Verify the command structure includes important elements
         self.assertIn("SCRIPT_EXIT_CODE=$?", tmux_command, "Exit code capture missing")
-        self.assertIn("tail -f /dev/null", tmux_command, "Keep-alive missing")
         self.assertIn("SCRIPT STARTING", tmux_command, "Start logging missing")
         self.assertIn("SCRIPT FINISHED", tmux_command, "End logging missing")
 

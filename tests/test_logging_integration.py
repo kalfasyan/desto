@@ -39,7 +39,7 @@ def test_logging_integration():
         session_name = "integration_test"
         command = f"bash {test_script}"
 
-        tmux_manager.start_tmux_session(session_name, command, mock_logger, keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command, mock_logger)
 
         # Wait for completion
         import time
@@ -62,7 +62,7 @@ def test_logging_integration():
         logger.info("\n📝 Running second session...")
         command2 = "echo 'Second session test'"
 
-        tmux_manager.start_tmux_session(session_name, command2, mock_logger, keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command2, mock_logger)
         time.sleep(3)
 
         if log_file.exists():

@@ -27,7 +27,6 @@ class UserInterfaceManager:
         self.session_name_input = None  # Reference to session name input
         self.arguments_input = None  # Reference to arguments input
         self.script_preview_editor = None  # Reference to script preview editor
-        self.keep_alive_switch_new = None  # Reference to keep alive switch
         self.ignore_next_edit = False
         self.chain_queue = []  # List of (script_path, arguments)
 
@@ -364,38 +363,6 @@ class UserInterfaceManager:
             ui.button("Save", on_click=do_save_as_new)
         name_dialog.open()
 
-    async def run_session_with_keep_alive(self, session_name, script_path, arguments, keep_alive):
-        # Build the basic execution command - Use proper logging method for job completion tracking
-        exec_cmd = self.build_execution_command(script_path, arguments)
-
-        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
-        ui.notification(f"Started session '{session_name}'.", type="positive")
-
-    async def run_chain_queue(self, session_name, arguments, keep_alive):
-        if not self.chain_queue:
-            ui.notification("Chain queue is empty.", type="warning")
-            return
-
-        session_name = session_name.strip() or f"chain_{os.getpid()}"
-
-        # Build a single command that runs all scripts in sequence with proper error handling
-        chain_commands = []
-        for script, args in self.chain_queue:
-            script_name = Path(script).name
-            exec_cmd = self.build_execution_command(script, args)
-            # Add a separator echo before each script
-            chain_commands.append(f"echo '---- Running {script_name} ----'")
-            chain_commands.append(exec_cmd)
-
-        # Join all commands with proper error handling (use ; so all scripts run even if some fail)
-        full_chain_cmd = "; ".join(chain_commands)
-
-        # Use the proper logging method for chains to get job completion tracking
-        self.tmux_manager.start_tmux_session(session_name, full_chain_cmd, logger, keep_alive)
-        ui.notification(f"Started chained session '{session_name}'.", type="positive")
-        self.chain_queue.clear()
-        self.refresh_chain_queue_display()
-
     def chain_current_script(self):
         script_name = self.script_path_select.value
         arguments = self.arguments_input.value
@@ -425,7 +392,7 @@ class UserInterfaceManager:
         info_lines.append("")  # Blank line
         return "\\n".join(info_lines)
 
-    def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=False, session_start_cmd=None):
+    def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=None):
         """Build a properly formatted logging command that appends to existing logs."""
 
         # Check if log file exists to determine if we should append or create new
@@ -478,10 +445,6 @@ class UserInterfaceManager:
             # Fallback if tmux_manager not available
             cmd_parts.append(job_completion_cmd)
 
-        # Add keep-alive if requested
-        if keep_alive:
-            cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
-
         # Join with semicolons after the main script execution to ensure subsequent commands run
         if len(cmd_parts) >= 3:
             # Everything up to and including script execution
@@ -498,13 +461,6 @@ class UserInterfaceManager:
                 return f"{script_execution}; {post_cmd}"
         else:
             return " && ".join(cmd_parts)
-
-    async def run_session_with_save_check(self, session_name, script_path, arguments, keep_alive):
-        # Build the basic execution command - TmuxManager will handle all logging
-        exec_cmd = self.build_execution_command(script_path, arguments)
-
-        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
-        ui.notification(f"Scheduled session '{session_name}' started.", type="positive")
 
     def schedule_launch(self):
         """Open a dialog to schedule the script launch at a specific date and time."""
@@ -541,7 +497,6 @@ class UserInterfaceManager:
         time_val = time_input.value
         session_name = self.session_name_input.value.strip() if hasattr(self, "session_name_input") else ""
         arguments = self.arguments_input.value if hasattr(self, "arguments_input") else "."
-        keep_alive = self.keep_alive_switch_new.value if hasattr(self, "keep_alive_switch_new") else False
 
         if not date_val or not time_val or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
@@ -586,7 +541,6 @@ class UserInterfaceManager:
                         session_name=session_name,
                         command=f"Chain: {len(self.chain_queue)} scripts",
                         script_path=f"Chain: {len(self.chain_queue)} scripts",
-                        keep_alive=False,
                         status=SessionStatus.SCHEDULED,
                     )
 
@@ -615,10 +569,6 @@ class UserInterfaceManager:
 
                 # Add job completion marker
                 cmd_parts.append(job_completion_cmd)
-
-                # Add keep-alive if requested
-                if keep_alive:
-                    cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
 
                 # Join all parts with &&
                 tmux_cmd = " && ".join(cmd_parts)
@@ -672,7 +622,6 @@ class UserInterfaceManager:
                     session_name=session_name,
                     command=exec_cmd,
                     script_path=str(script_file_path),
-                    keep_alive=False,
                     status=SessionStatus.SCHEDULED,
                 )
 
@@ -680,9 +629,7 @@ class UserInterfaceManager:
             session_start_cmd = self.tmux_manager.get_session_start_command(session_name, exec_cmd)
 
             # Use the new logging command builder
-            tmux_cmd = self.build_logging_command(
-                log_file_path, info_block, exec_cmd, job_completion_cmd, keep_alive=True, session_start_cmd=session_start_cmd
-            )
+            tmux_cmd = self.build_logging_command(log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=session_start_cmd)
 
             # Use the wrapper script for proper Redis tracking of scheduled jobs
             wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"

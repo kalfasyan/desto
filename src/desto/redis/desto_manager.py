@@ -19,14 +19,13 @@ class DestoManager:
         self.job_manager = JobManager(redis_client)
 
     def start_session_with_job(
-        self, session_name: str, command: str, script_path: str, keep_alive: bool = False, status=None
+        self, session_name: str, command: str, script_path: str, status=None
     ) -> Tuple[DestoSession, DestoJob]:
         """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""
         session_status = status if status is not None else SessionStatus.STARTING
         session = self.session_manager.create_session(
             session_name=session_name,
             tmux_session_name=session_name,  # Use same name for tmux
-            keep_alive=keep_alive,
             status=session_status,
         )
 

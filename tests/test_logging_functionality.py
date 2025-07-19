@@ -55,7 +55,7 @@ class TestTmuxManagerLogging:
         command = "echo 'Hello World'"
 
         # Start session
-        tmux_manager.start_tmux_session(session_name, command, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command, Mock())
 
         # Wait for command to complete
         time.sleep(3)
@@ -80,7 +80,7 @@ class TestTmuxManagerLogging:
 
         # First session
         command1 = "echo 'First session'"
-        tmux_manager.start_tmux_session(session_name, command1, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command1, Mock())
         time.sleep(3)
 
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
@@ -93,7 +93,7 @@ class TestTmuxManagerLogging:
 
         # Second session (same name - should append, not overwrite)
         command2 = "echo 'Second session'"
-        tmux_manager.start_tmux_session(session_name, command2, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command2, Mock())
         time.sleep(3)
 
         # Check that both sessions are in the log
@@ -119,7 +119,7 @@ class TestTmuxManagerLogging:
         command = "echo 'Test completed'"
 
         # Start session
-        tmux_manager.start_tmux_session(session_name, command, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command, Mock())
 
         # Wait for command to complete
         time.sleep(3)
@@ -143,12 +143,12 @@ class TestTmuxManagerLogging:
 
         # First session
         command1 = "echo 'First run'"
-        tmux_manager.start_tmux_session(session_name, command1, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command1, Mock())
         time.sleep(2)
 
         # Second session with same name - should append to existing log
         command2 = "echo 'Second run'"
-        tmux_manager.start_tmux_session(session_name, command2, Mock(), keep_alive=False)
+        tmux_manager.start_tmux_session(session_name, command2, Mock())
         time.sleep(2)
 
         # Check that log contains both runs
@@ -158,30 +158,6 @@ class TestTmuxManagerLogging:
         assert "First run" in log_content, "First session output should be in log"
         assert "Second run" in log_content, "Second session output should be in log"
         assert "---- NEW SESSION" in log_content, "Session separator should be present"
-
-    def test_keep_alive_functionality(self, tmux_manager, temp_dirs):
-        """Test that keep_alive sessions stay running after the command completes."""
-        session_name = "test_keep_alive"
-        command = "echo 'Keep alive test'"
-
-        # Start session with keep_alive=True
-        tmux_manager.start_tmux_session(session_name, command, Mock(), keep_alive=True)
-
-        # Wait for command to complete
-        time.sleep(3)
-
-        # Check if tmux session is still running
-        try:
-            result = subprocess.run(["tmux", "list-sessions", "-f", "#{session_name}", "-F", "#{session_name}"], capture_output=True, text=True)
-
-            # If keep_alive is working, the session should still be listed
-            assert session_name in result.stdout, "Keep-alive session should still be running"
-
-            # Clean up the session
-            subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except subprocess.CalledProcessError:
-            # tmux might not be available in test environment
-            pytest.skip("tmux not available in test environment")
 
     def test_log_file_paths(self, tmux_manager, temp_dirs):
         """Test that log file paths are correct."""
@@ -196,7 +172,7 @@ class TestTmuxManagerLogging:
         """Clean up any tmux sessions that might be left running."""
         try:
             # Kill any test sessions that might be running
-            test_sessions = ["test_session", "test_keep_alive", "path_test"]
+            test_sessions = ["test_session", "path_test"]
             for session in test_sessions:
                 subprocess.run(["tmux", "kill-session", "-t", session], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:

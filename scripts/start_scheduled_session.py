@@ -131,7 +131,6 @@ def main():
                         session_name=session_name,
                         command=command,
                         script_path=command,
-                        keep_alive=False,  # Default for scheduled jobs
                         status=SessionStatus.SCHEDULED,
                     )
             else:
@@ -141,7 +140,6 @@ def main():
                     session_name=session_name,
                     command=command,
                     script_path=command,
-                    keep_alive=False,  # Default for scheduled jobs
                     status=SessionStatus.SCHEDULED,
                 )
 
@@ -163,8 +161,39 @@ def main():
                     f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}"
                 )
 
-            # Log the tmux command to be run
-            tmux_cmd = ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", command]
+            # Compose the wrapped command to run in tmux
+            # Find mark_job_finished.py script path
+            import shutil
+            from pathlib import Path
+
+            script_path = Path(__file__).parent / "mark_job_finished.py"
+            if not script_path.exists():
+                # Try project root
+                script_path = Path(__file__).parent.parent / "scripts" / "mark_job_finished.py"
+            if not script_path.exists():
+                # Try CWD (Docker)
+                script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
+            if not script_path.exists():
+                logger.error(f"[SCHEDULED WRAPPER] Could not find mark_job_finished.py script!")
+                sys.exit(1)
+
+            # Use python3 or uv run python if available
+            python_cmd = "python3"
+            if shutil.which("uv"):
+                python_cmd = "uv run python"
+
+            # Build the log file path in Python
+            log_file = _log_dir / f"{session_name}.log"
+            # Compose the bash command as a single string, always exit after job completion
+            bash_cmd = (
+                f"{command}; "
+                f"SCRIPT_EXIT_CODE=$?; "
+                f"printf '\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n' \"$(date)\" >> '{log_file}'; "
+                f"{python_cmd} '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                "exit $SCRIPT_EXIT_CODE"
+            )
+
+            tmux_cmd = ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", bash_cmd]
             logger.info(f"[SCHEDULED WRAPPER] Running tmux command: {tmux_cmd}")
 
             # Start the tmux session

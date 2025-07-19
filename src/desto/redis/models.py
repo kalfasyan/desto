@@ -77,7 +77,6 @@ class DestoSession:
     status: SessionStatus = SessionStatus.STARTING
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    keep_alive: bool = False
     last_heartbeat: Optional[datetime] = None
     job_ids: List[str] = field(default_factory=list)
 
@@ -90,7 +89,6 @@ class DestoSession:
             "status": self.status.value,
             "start_time": self.start_time.isoformat() if self.start_time else "",
             "end_time": self.end_time.isoformat() if self.end_time else "",
-            "keep_alive": str(self.keep_alive),
             "last_heartbeat": self.last_heartbeat.isoformat() if self.last_heartbeat else "",
             "job_ids": ",".join(self.job_ids),
         }
@@ -108,7 +106,6 @@ class DestoSession:
             status=SessionStatus(data.get("status", "starting")),
             start_time=datetime.fromisoformat(data["start_time"]) if data.get("start_time") else None,
             end_time=datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None,
-            keep_alive=data.get("keep_alive", "").lower() == "true",
             last_heartbeat=datetime.fromisoformat(data["last_heartbeat"]) if data.get("last_heartbeat") else None,
             job_ids=data.get("job_ids", "").split(",") if data.get("job_ids") else [],
         )

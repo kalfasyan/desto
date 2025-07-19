@@ -25,36 +25,6 @@ except ImportError as e:
 class TestBugFixValidation(unittest.TestCase):
     """Test that the specific bugs we fixed stay fixed"""
 
-    def test_jobs_with_keep_alive_show_finished_status(self):
-        """
-        CRITICAL: Jobs with keep-alive should show 'Finished' status when job completes,
-        even if the tmux session is still running (due to tail -f /dev/null).
-
-        This was the main reported issue.
-        """
-        # Create mock Redis client
-        mock_redis_client = Mock(spec=DestoRedisClient)
-        mock_redis_client.redis = Mock()
-        mock_redis_client.get_session_key.return_value = "desto:session:keep_alive_test"
-
-        # Simulate a keep-alive session where:
-        # - The tmux session is still running (status: running)
-        # - But the actual job/script has finished (job_status: finished)
-        mock_redis_client.redis.hgetall.return_value = {
-            b"session_name": b"keep_alive_test",
-            b"status": b"running",  # Session still running (keep-alive)
-            b"job_status": b"finished",  # Job completed successfully
-            b"job_exit_code": b"0",
-            b"job_finished_time": b"2025-07-12T07:15:49.335093",
-            b"start_time": b"2025-07-12T07:15:44.278179",
-        }
-
-        status_tracker = SessionStatusTracker(mock_redis_client)
-        job_status = status_tracker.get_job_status("keep_alive_test")
-
-        # This MUST return "finished" to fix the reported issue
-        self.assertEqual(job_status, "finished", "Jobs with keep-alive must show 'Finished' when job completes")
-
     def test_log_messages_panel_functionality_exists(self):
         """
         CRITICAL: LogSection must exist and function correctly for the

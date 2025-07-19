@@ -66,7 +66,7 @@ class TestDuplicateSessionValidation:
         # Mock ui.notification to avoid import issues
         with patch("src.desto.app.sessions.ui.notification") as mock_notification:
             # Start first session
-            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock(), keep_alive=False)
+            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
 
             # Wait for session to start
             time.sleep(1)
@@ -76,7 +76,7 @@ class TestDuplicateSessionValidation:
             assert session_name in sessions, "First session should be created successfully"
 
             # Attempt to start duplicate session
-            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock(), keep_alive=False)
+            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
 
             # Check that error was logged
             # Note: We can't easily check mock_logger.error since it's created in the fixture
@@ -107,9 +107,9 @@ class TestDuplicateSessionValidation:
 
         # Mock ui.notification to avoid import issues
         with patch("src.desto.app.sessions.ui.notification") as mock_notification:
-            # Start first session (simulating a chain) with keep_alive to ensure it stays running
+            # Start first session (simulating a chain)
             chain_command = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
-            tmux_manager.start_tmux_session(session_name, chain_command, Mock(), keep_alive=True)
+            tmux_manager.start_tmux_session(session_name, chain_command, Mock())
 
             # Wait for session to start
             time.sleep(2)
@@ -120,7 +120,7 @@ class TestDuplicateSessionValidation:
 
             # Attempt to start another chain with the same session name
             chain_command2 = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
-            tmux_manager.start_tmux_session(session_name, chain_command2, Mock(), keep_alive=False)
+            tmux_manager.start_tmux_session(session_name, chain_command2, Mock())
 
             # Check that duplicate session validation triggered
             negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
@@ -153,7 +153,7 @@ class TestDuplicateSessionValidation:
                     mock_subprocess.return_value.returncode = 0
 
                     # Start first session
-                    tmux_manager.start_tmux_session(session_name1, "echo 'test1'", Mock(), keep_alive=False)
+                    tmux_manager.start_tmux_session(session_name1, "echo 'test1'", Mock())
 
                     # Check that positive notification was called
                     positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
@@ -163,7 +163,7 @@ class TestDuplicateSessionValidation:
                     mock_notification.reset_mock()
 
                     # Start second session (different name)
-                    tmux_manager.start_tmux_session(session_name2, "echo 'test2'", Mock(), keep_alive=False)
+                    tmux_manager.start_tmux_session(session_name2, "echo 'test2'", Mock())
 
                     # Check that positive notification was called again
                     positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]

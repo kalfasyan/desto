@@ -828,8 +828,50 @@ class ScriptManagerTab:
         self.script_path_select = None
         self.arguments_input = None
         self.script_preview_editor = None
-        self.keep_alive_switch_new = None
         self.script_edited = {"changed": False}
+
+    async def _launch_single_script(self, session_name, selected_script, arguments):
+        if not session_name or not selected_script or selected_script == "No scripts found":
+            ui.notification("Please enter a session name and select a script.", type="warning")
+            return
+        actual_filename = self.ui_manager.extract_script_filename(selected_script)
+        script_path = self.ui_manager.tmux_manager.SCRIPTS_DIR / actual_filename
+        if not script_path.is_file():
+            ui.notification(f"Script file not found: {actual_filename}", type="warning")
+            return
+        exec_cmd = self.ui_manager.build_execution_command(script_path, arguments)
+        try:
+            self.ui_manager.tmux_manager.start_tmux_session(session_name, exec_cmd, logger)
+            ui.notification(f"Launched session '{session_name}' for script '{actual_filename}'", type="positive")
+        except Exception as e:
+            logger.error(f"Failed to launch session: {e}")
+            ui.notification(f"Failed to launch session: {e}", type="negative")
+
+    async def _launch_chained_scripts(self, session_name):
+        if not session_name:
+            ui.notification("Please enter a session name for the chain.", type="warning")
+            return
+        chain = self.ui_manager.chain_queue
+        if not chain:
+            ui.notification("Chain queue is empty.", type="warning")
+            return
+        # Build a single shell command that runs all scripts in order, stopping on error
+        commands = []
+        for idx, (script_path, arguments) in enumerate(chain):
+            script_path_obj = Path(script_path)
+            if not script_path_obj.is_file():
+                ui.notification(f"Script file not found in chain: {script_path_obj.name}", type="warning")
+                return
+            exec_cmd = self.ui_manager.build_execution_command(script_path_obj, arguments)
+            commands.append(f"({exec_cmd})")
+        # Join with '&&' to stop on first failure
+        full_cmd = " && ".join(commands)
+        try:
+            self.ui_manager.tmux_manager.start_tmux_session(session_name, full_cmd, logger)
+            ui.notification(f"Launched chained session '{session_name}' with {len(chain)} scripts", type="positive")
+        except Exception as e:
+            logger.error(f"Failed to launch chained session: {e}")
+            ui.notification(f"Failed to launch chained session: {e}", type="negative")
 
     def build(self):
         """Build the script manager tab UI."""
@@ -912,10 +954,6 @@ class ScriptManagerTab:
                     icon="delete",
                 )
 
-            # Keep Alive switch
-            self.keep_alive_switch_new = ui.switch("Keep Alive").style("margin-top: 10px;")
-            self.ui_manager.keep_alive_switch_new = self.keep_alive_switch_new
-
             # Launch logic: warn if unsaved changes
             async def launch_with_save_check():
                 if self.script_edited["changed"]:
@@ -924,21 +962,15 @@ class ScriptManagerTab:
                         type="warning",
                     )
                     return
-                # If there are scripts in the chain queue, launch the chain
+                session_name = self.session_name_input.value.strip() if self.session_name_input else ""
+                arguments = self.arguments_input.value if self.arguments_input else ""
+                # Launch chain if present, else single script
                 if self.ui_manager.chain_queue:
-                    await self.ui_manager.run_chain_queue(
-                        self.session_name_input.value,
-                        self.arguments_input.value,
-                        self.keep_alive_switch_new.value,
-                    )
+                    await self._launch_chained_scripts(session_name)
                     self.ui_manager.chain_queue.clear()
                 else:
-                    await self.ui_manager.run_session_with_keep_alive(
-                        self.session_name_input.value,
-                        str(self.ui_manager.tmux_manager.SCRIPTS_DIR / self.ui_manager.extract_script_filename(self.script_path_select.value)),
-                        self.arguments_input.value,
-                        self.keep_alive_switch_new.value,
-                    )
+                    selected_script = self.script_path_select.value if self.script_path_select else ""
+                    await self._launch_single_script(session_name, selected_script, arguments)
 
             with ui.row().style("width: 100%; gap: 10px; margin-top: 10px;"):
                 ui.button(

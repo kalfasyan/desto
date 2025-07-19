@@ -108,7 +108,6 @@ def list_sessions(
 def start_session(
     session_name: str = typer.Argument(..., help="Name for the tmux session"),
     command: str = typer.Argument(..., help="Command to execute in the session"),
-    keep_alive: bool = typer.Option(False, "--keep-alive", "-k", help="Keep session alive after command finishes"),
     logs_dir: Optional[Path] = typer.Option(None, "--logs-dir", help="Custom logs directory"),
     scripts_dir: Optional[Path] = typer.Option(None, "--scripts-dir", help="Custom scripts directory"),
 ):
@@ -121,7 +120,7 @@ def start_session(
             console.print(f"[red]Error: Session '{session_name}' already exists.[/red]")
             raise typer.Exit(1)
 
-        if manager.start_session(session_name, command, keep_alive):
+        if manager.start_session(session_name, command):
             console.print(f"[green]✅ Session '{session_name}' started successfully[/green]")
             console.print(f"[dim]Command: {command}[/dim]")
             console.print(f"[dim]Logs: {manager.get_log_file(session_name)}[/dim]")

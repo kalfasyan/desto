@@ -43,7 +43,7 @@ class CLISessionManager:
             logger.error(f"Failed to create log/scripts directory: {e}")
             raise
 
-    def start_session(self, session_name: str, command: str, keep_alive: bool = False) -> bool:
+    def start_session(self, session_name: str, command: str) -> bool:
         """
         Start a new session using the Redis-based SessionManager and launch the command in tmux.
         Also removes any existing .finished marker file for test compatibility.
@@ -71,7 +71,7 @@ class CLISessionManager:
                 return False
 
         # Create session in Redis
-        session = session_manager.create_session(session_name, tmux_session_name=session_name, keep_alive=keep_alive)
+        session = session_manager.create_session(session_name, tmux_session_name=session_name)
         session_manager.start_session(session.session_id)
 
         # Launch the actual command in tmux (for CLI usability)
@@ -93,10 +93,7 @@ class CLISessionManager:
                 return False
 
         redir = ">>" if append_mode else ">"
-        if keep_alive:
-            full_command = f"{command} {redir} {quoted_log_file} 2>&1; tail -f /dev/null {redir} {quoted_log_file} 2>&1"
-        else:
-            full_command = f"{command} {redir} {quoted_log_file} 2>&1"
+        full_command = f"{command} {redir} {quoted_log_file} 2>&1"
 
         try:
             subprocess.run(
