@@ -155,6 +155,21 @@ def main():
             manager.session_manager._update_session(session)
             logger.info(f"[SCHEDULED WRAPPER] Session '{session_name}' status set to RUNNING, start_time set to {session.start_time.isoformat()}")
 
+            # Patch: Set the first job's start_time to match the session's start_time
+            # This ensures job and session durations are measured from the same moment
+            if hasattr(session, "job_ids") and session.job_ids:
+                first_job_id = session.job_ids.split(",")[0] if isinstance(session.job_ids, str) else session.job_ids[0]
+                if first_job_id:
+                    job_key = f"desto:job:{first_job_id}"
+                    # Update job's start_time in Redis
+                    redis_client = manager.client if hasattr(manager, "client") else None
+                    if redis_client is None:
+                        from src.desto.redis.client import DestoRedisClient
+
+                        redis_client = DestoRedisClient()
+                    redis_client.redis.hset(job_key, "start_time", session.start_time.isoformat())
+                    logger.info(f"[SCHEDULED WRAPPER] Set job {first_job_id} start_time to session start_time {session.start_time.isoformat()}")
+
             # Log job info if available
             if "job" in locals():
                 logger.info(
@@ -163,7 +178,6 @@ def main():
 
             # Compose the wrapped command to run in tmux
             # Find mark_job_finished.py script path
-            import shutil
             from pathlib import Path
 
             script_path = Path(__file__).parent / "mark_job_finished.py"
@@ -174,13 +188,8 @@ def main():
                 # Try CWD (Docker)
                 script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
             if not script_path.exists():
-                logger.error(f"[SCHEDULED WRAPPER] Could not find mark_job_finished.py script!")
+                logger.error("[SCHEDULED WRAPPER] Could not find mark_job_finished.py script!")
                 sys.exit(1)
-
-            # Use python3 or uv run python if available
-            python_cmd = "python3"
-            if shutil.which("uv"):
-                python_cmd = "uv run python"
 
             # Build the log file path in Python
             log_file = _log_dir / f"{session_name}.log"
@@ -189,7 +198,7 @@ def main():
                 f"{command}; "
                 f"SCRIPT_EXIT_CODE=$?; "
                 f"printf '\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n' \"$(date)\" >> '{log_file}'; "
-                f"{python_cmd} '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
                 "exit $SCRIPT_EXIT_CODE"
             )
 
@@ -201,7 +210,6 @@ def main():
             result = subprocess.run(tmux_cmd, capture_output=True, text=True)
 
             logger.info(f"[SCHEDULED WRAPPER] tmux stdout: {result.stdout}")
-            logger.info(f"[SCHEDULED WRAPPER] tmux stderr: {result.stderr}")
             logger.info(f"[SCHEDULED WRAPPER] tmux returncode: {result.returncode}")
 
             if result.returncode != 0:
