@@ -102,6 +102,7 @@ class TmuxManager:
         If session_name is not provided, attempts to find the session by at_job_id in Redis.
         """
         from nicegui import ui
+
         from desto.redis.at_job_manager import AtJobManager
 
         try:
@@ -126,26 +127,6 @@ class TmuxManager:
                 ui.notification(f"Failed to cancel scheduled job {at_job_id}", type="negative")
         except Exception as e:
             ui.notification(f"Failed to cancel scheduled job {at_job_id}: {e}", type="negative")
-
-    def schedule_at_job(self, session_name, command, time_spec):
-        """
-        Schedule a job using AtJobManager, store at_job_id in Redis session metadata.
-        """
-        from nicegui import ui
-        from desto.redis.at_job_manager import AtJobManager
-
-        at_job_id = AtJobManager.schedule(command, time_spec)
-        if at_job_id:
-            ui.notification(f"Scheduled job for session '{session_name}' at job ID {at_job_id}", type="positive")
-            # Store at_job_id in session metadata
-            if self.desto_manager:
-                session_obj = self.desto_manager.session_manager.get_session_by_name(session_name)
-                if session_obj:
-                    session_obj.status = "scheduled"
-                    session_obj.at_job_id = str(at_job_id)
-                    self.desto_manager.session_manager._update_session(session_obj)
-        else:
-            ui.notification(f"Failed to schedule job for session '{session_name}'", type="negative")
 
     def is_tmux_session_active(self, session_name: str) -> bool:
         """Check if a tmux session with the given name exists."""
