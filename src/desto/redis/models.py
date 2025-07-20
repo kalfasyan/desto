@@ -79,6 +79,7 @@ class DestoSession:
     end_time: Optional[datetime] = None
     last_heartbeat: Optional[datetime] = None
     job_ids: List[str] = field(default_factory=list)
+    tmux_active: bool = False  # New field: is the tmux session active?
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Redis storage."""
@@ -91,6 +92,7 @@ class DestoSession:
             "end_time": self.end_time.isoformat() if self.end_time else "",
             "last_heartbeat": self.last_heartbeat.isoformat() if self.last_heartbeat else "",
             "job_ids": ",".join(self.job_ids),
+            "tmux_active": str(self.tmux_active),
         }
 
     @classmethod
@@ -108,4 +110,5 @@ class DestoSession:
             end_time=datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None,
             last_heartbeat=datetime.fromisoformat(data["last_heartbeat"]) if data.get("last_heartbeat") else None,
             job_ids=data.get("job_ids", "").split(",") if data.get("job_ids") else [],
+            tmux_active=(str(data.get("tmux_active", "False")).lower() == "true"),
         )

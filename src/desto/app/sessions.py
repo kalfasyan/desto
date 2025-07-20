@@ -66,6 +66,15 @@ class TmuxManager:
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
+    def is_tmux_session_active(self, session_name: str) -> bool:
+        """Check if a tmux session with the given name exists."""
+        try:
+            result = subprocess.run(["tmux", "has-session", "-t", session_name], capture_output=True, text=True)
+            return result.returncode == 0
+        except Exception as e:
+            logger.error(f"Error checking tmux session '{session_name}': {e}")
+            return False
+
     def get_all_sessions_status(self):
         """
         Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it.
@@ -591,7 +600,7 @@ class TmuxManager:
 
         # Table header
         with ui.row().style(
-            "width: 100%; min-width: 1000px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
+            "width: 100%; min-width: 1100px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
         ):
             ui.label("Session Name").style("flex: 2; min-width: 150px;")
             ui.label("Status").style("flex: 1; min-width: 100px;")
@@ -599,6 +608,7 @@ class TmuxManager:
             ui.label("Session Duration").style("flex: 1; min-width: 130px;")
             ui.label("Started").style("flex: 2; min-width: 140px;")
             ui.label("Finished").style("flex: 2; min-width: 140px;")
+            ui.label("Tmux Active").style("flex: 1; min-width: 100px;")
             ui.label("Actions").style("flex: 1; min-width: 120px;")
 
         # --- Deduplicate scheduled and real sessions as in the history tab ---
@@ -644,13 +654,16 @@ class TmuxManager:
                 status = "🟡 Running"
                 status_color = "#FF9800"
 
+            # Tmux active status: always check live tmux for accuracy
+            tmux_active = self.is_tmux_session_active(session_name)
+
             # Times and durations
             created_time = session.get("created")
             start_time = session.get("start_time")
             end_time = session.get("end_time")
             # Fallback for start_time
             if not start_time and created_time:
-                start_time = datetime.fromtimestamp(created_time).isoformat()
+                start_time = datetime.fromtimestamp(float(created_time)).isoformat()
 
             # Format start time
             if start_time:
@@ -756,7 +769,7 @@ class TmuxManager:
             session_duration = format_duration(session_duration)
 
             with ui.row().style(
-                "width: 100%; min-width: 1000px; padding: 10px 12px; border-bottom: 1px solid #eee; "
+                "width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #eee; "
                 "align-items: center; hover:background-color: #f9f9f9;"
             ):
                 ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
@@ -765,6 +778,10 @@ class TmuxManager:
                 ui.label(session_duration).style("flex: 1; min-width: 130px; color: #666;")
                 ui.label(formatted_start_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
                 ui.label(formatted_end_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
+                # Tmux Active column
+                icon = "check_circle" if tmux_active else "cancel"
+                color = "#4CAF50" if tmux_active else "#F44336"
+                ui.icon(icon).style(f"flex: 1; min-width: 100px; color: {color}; font-size: 1.5em; text-align: center;")
                 with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                     ui.button(
                         "Kill",
