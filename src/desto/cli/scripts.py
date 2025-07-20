@@ -9,7 +9,7 @@ from typing import List, Optional
 try:
     import typer
     from rich.console import Console
-    from rich.prompt import Confirm, Prompt
+    from rich.prompt import Confirm
     from rich.syntax import Syntax
     from rich.table import Table
 

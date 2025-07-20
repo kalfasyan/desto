@@ -141,9 +141,3 @@ class DestoManager:
             result[session.session_name] = session_data
 
         return result
-
-    def cleanup_old_data(self, hours_old: int = 24):
-        """Clean up old session and job data."""
-        # This would be implemented to scan and clean old Redis keys
-        # For now, Redis expiration handles this automatically
-        pass

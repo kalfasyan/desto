@@ -193,15 +193,59 @@ def main():
 
             # Build the log file path in Python
             log_file = _log_dir / f"{session_name}.log"
-            # Compose the bash command as a single string, always exit after job completion
-            bash_cmd = (
-                f"{command}; "
-                f"SCRIPT_EXIT_CODE=$?; "
-                # Use double quotes so $SCRIPT_EXIT_CODE is expanded
-                f"printf \"\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n\" \"$(date)\" >> '{log_file}'; "
-                f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
-                "exit $SCRIPT_EXIT_CODE"
-            )
+
+            # Determine if this is a chain (multiple scripts separated by '&&')
+            # For simplicity, if '&&' is in the command, treat as chain
+            is_chain = '&&' in command
+            def extract_script_name(parts):
+                # Try to find a part that looks like a script file
+                from pathlib import Path as _Path
+                for p in parts:
+                    if p.endswith('.py') or p.endswith('.sh') or (p.startswith("'./") and len(p) > 3):
+                        return _Path(p.strip("'\"")).name
+                # Fallback: look for first arg after 'python3' or 'bash'
+                for i, p in enumerate(parts):
+                    if p in ('python3', 'bash') and i+1 < len(parts):
+                        return _Path(parts[i+1].strip("'\"")).name
+                # Fallback: last part
+                return _Path(parts[-1]).name if parts else "script"
+
+            if is_chain:
+                # Split the command into scripts (naive split on '&&')
+                script_cmds = [c.strip() for c in command.split('&&')]
+                total_scripts = len(script_cmds)
+                marked_cmds = []
+                # Add SCRIPT STARTING marker with timestamp before the first script
+                starting_marker = f"printf \"\\n=== SCRIPT STARTING at %s ===\\n\" \"$(date)\" >> '{log_file}'"
+                marked_cmds.append(starting_marker)
+                for idx, scmd in enumerate(script_cmds):
+                    parts = scmd.split()
+                    script_name = extract_script_name(parts)
+                    marker = f"printf \"\\n=== Running script {idx+1} of {total_scripts}: {script_name} ===\\n\" >> '{log_file}'"
+                    # Run the script and append its output to the log file
+                    run_script = f"({scmd}) >> '{log_file}' 2>&1"
+                    marked_cmds.append(f"{marker} && {run_script}")
+                chained_cmd = " && ".join(marked_cmds)
+                bash_cmd = (
+                    f"{chained_cmd}; "
+                    f"SCRIPT_EXIT_CODE=$?; "
+                    f"printf \"\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n\" \"$(date)\" >> '{log_file}'; "
+                    f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                    "exit $SCRIPT_EXIT_CODE"
+                )
+            else:
+                parts = command.split()
+                script_name = extract_script_name(parts)
+                starting_marker = f"printf \"\\n=== SCRIPT STARTING at %s ===\\n\" \"$(date)\" >> '{log_file}'"
+                marker = f"printf \"\\n=== Running script: {script_name} ===\\n\" >> '{log_file}'"
+                run_script = f"({command}) >> '{log_file}' 2>&1"
+                bash_cmd = (
+                    f"{starting_marker} && {marker} && {run_script}; "
+                    f"SCRIPT_EXIT_CODE=$?; "
+                    f"printf \"\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n\" \"$(date)\" >> '{log_file}'; "
+                    f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                    "exit $SCRIPT_EXIT_CODE"
+                )
 
             tmux_cmd = ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", bash_cmd]
             logger.info(f"[SCHEDULED WRAPPER] Running tmux command: {tmux_cmd}")

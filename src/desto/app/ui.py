@@ -514,119 +514,42 @@ class UserInterfaceManager:
             # Format time for 'at' (e.g., 'HH:MM YYYY-MM-DD')
             at_time_str = scheduled_dt.strftime("%H:%M %Y-%m-%d")
 
-            # If chain queue is not empty, schedule the chain
-            if self.chain_queue:
-                log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-                info_block = self.get_log_info_block(self.chain_queue[0][0], session_name, scheduled_dt)
-                job_completion_cmd = self.tmux_manager.get_job_completion_command(session_name)
-
-                # Build the chain command with proper logging
-                cmd_parts = []
-
-                # Check if log file exists to determine if we should append or create new
-                append_mode = Path(log_file_path).exists()
-
-                # Add Redis session with SCHEDULED status for scheduled scripts
-                from desto.redis.client import DestoRedisClient
-                from desto.redis.desto_manager import DestoManager
-                from desto.redis.models import SessionStatus
-
-                redis_client = DestoRedisClient()
-                if redis_client.is_connected():
-                    manager = DestoManager(redis_client)
+            # Add Redis session with SCHEDULED status for scheduled scripts
+            redis_client = DestoRedisClient()
+            if redis_client.is_connected():
+                manager = DestoManager(redis_client)
+                if self.chain_queue:
                     manager.start_session_with_job(
                         session_name=session_name,
                         command=f"Chain: {len(self.chain_queue)} scripts",
                         script_path=f"Chain: {len(self.chain_queue)} scripts",
                         status=SessionStatus.SCHEDULED,
                     )
-
-                # Add initial info block using printf for better compatibility
-                if append_mode:
-                    cmd_parts.append(f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> '{log_file_path}'")
-                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} >> '{log_file_path}'")
                 else:
-                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} > '{log_file_path}'")
-
-                # Add each script in the chain with proper logging
-                for idx, (script, args) in enumerate(self.chain_queue):
-                    script_name = Path(script).name
-                    # Add separator for each script
-                    separator = f"printf '\\n---- NEW SCRIPT (%s) -----\\n' '{script_name}' >> '{log_file_path}'"
-                    # Add pre-script logging
-                    pre_script_log = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
-                    # Build execution command
-                    exec_cmd = self.build_execution_command(script, args)
-                    # FIXED: Group execution command to ensure proper logging
-                    run_script = f"({exec_cmd}) >> '{log_file_path}' 2>&1"
-                    # Add post-script logging using printf for consistency
-                    post_script_log = f"printf '\\n=== SCRIPT FINISHED at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
-
-                    cmd_parts.extend([separator, pre_script_log, run_script, post_script_log])
-
-                # Add job completion marker
-                cmd_parts.append(job_completion_cmd)
-
-                # Join all parts with &&
-                tmux_cmd = " && ".join(cmd_parts)
-
-                # Use the wrapper script for proper Redis tracking of scheduled jobs
-                wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
-
-                # If wrapper script doesn't exist, fall back to direct tmux command
-                if wrapper_script_path.exists():
-                    # Use wrapper script that handles Redis tracking
-                    scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
-                else:
-                    # Fallback to direct tmux command (original behavior)
-                    scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
-
-                # Schedule with 'at'
-                at_shell_cmd = f"echo {shlex.quote(scheduled_cmd)} | at {shlex.quote(at_time_str)}"
-
-                result = subprocess.run(
-                    at_shell_cmd,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                if result.returncode == 0:
-                    ui.notification(
-                        f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
-                        type="info",
+                    actual_filename = self.extract_script_filename(self.script_path_select.value)
+                    script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
+                    exec_cmd = self.build_execution_command(script_file_path, arguments)
+                    manager.start_session_with_job(
+                        session_name=session_name,
+                        command=exec_cmd,
+                        script_path=str(script_file_path),
+                        status=SessionStatus.SCHEDULED,
                     )
-                    self.chain_queue.clear()
-                    self.refresh_chain_queue_display()
-                    schedule_dialog.close()
-                else:
-                    error_label.text = f"Failed to schedule: {result.stderr}"
-                return
 
-            # Otherwise, schedule a single script as before
-            actual_filename = self.extract_script_filename(self.script_path_select.value)
-            script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
-            log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-            info_block = self.get_log_info_block(script_file_path, session_name, scheduled_dt)
-            job_completion_cmd = self.tmux_manager.get_job_completion_command(session_name)
-            exec_cmd = self.build_execution_command(script_file_path, arguments)
-
-            # Add Redis session with SCHEDULED status for scheduled scripts (fix for single script scheduling)
-            redis_client = DestoRedisClient()
-            if redis_client.is_connected():
-                manager = DestoManager(redis_client)
-                manager.start_session_with_job(
-                    session_name=session_name,
-                    command=exec_cmd,
-                    script_path=str(script_file_path),
-                    status=SessionStatus.SCHEDULED,
-                )
-
-            # Add Redis session start tracking for scheduled scripts
-            session_start_cmd = self.tmux_manager.get_session_start_command(session_name, exec_cmd)
-
-            # Use the new logging command builder
-            tmux_cmd = self.build_logging_command(log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=session_start_cmd)
+            # Build the execution command(s) for the wrapper (no info block, no separator, no printf)
+            if self.chain_queue:
+                # Build a single shell command that runs all scripts in order, stopping on error
+                commands = []
+                for idx, (script, args) in enumerate(self.chain_queue):
+                    exec_cmd = self.build_execution_command(script, args)
+                    commands.append(exec_cmd)
+                # Join with '&&' to stop on error
+                tmux_cmd = " && ".join(f"{cmd}" for cmd in commands)
+            else:
+                actual_filename = self.extract_script_filename(self.script_path_select.value)
+                script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
+                exec_cmd = self.build_execution_command(script_file_path, arguments)
+                tmux_cmd = exec_cmd
 
             # Use the wrapper script for proper Redis tracking of scheduled jobs
             wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
@@ -649,10 +572,18 @@ class UserInterfaceManager:
                 text=True,
             )
             if result.returncode == 0:
-                ui.notification(
-                    f"Script scheduled for {scheduled_dt} as session '{session_name}'",
-                    type="info",
-                )
+                if self.chain_queue:
+                    ui.notification(
+                        f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
+                        type="info",
+                    )
+                    self.chain_queue.clear()
+                    self.refresh_chain_queue_display()
+                else:
+                    ui.notification(
+                        f"Script scheduled for {scheduled_dt} as session '{session_name}'",
+                        type="info",
+                    )
                 schedule_dialog.close()
             else:
                 error_label.text = f"Failed to schedule: {result.stderr}"
