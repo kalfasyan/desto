@@ -170,7 +170,7 @@ class TmuxManager:
 
     def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None):
         """
-        Render the stats cards and control buttons (Refresh, Clear History, Clear Logs) as in the history tab, but independent of history_tab.
+        Render the stats cards and control buttons (Refresh, Clear History, Clear Logs)
         """
         from nicegui import ui
 

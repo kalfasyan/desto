@@ -10,7 +10,7 @@ import psutil
 from loguru import logger
 from nicegui import ui
 
-from .ui_elements import HistoryTab, LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
+from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
 class UserInterfaceManager:
@@ -20,7 +20,6 @@ class UserInterfaceManager:
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
         self.new_script_tab = NewScriptTab(tmux_manager, self)
-        self.history_tab = HistoryTab(tmux_manager)  # ADD THIS LINE
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.script_path_select = None  # Reference to the script select component
@@ -144,7 +143,6 @@ class UserInterfaceManager:
                     with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
-                        history_tab = ui.tab("History", icon="history")  # ADD THIS LINE
                 with splitter.after:
                     with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
                         with ui.tab_panel(scripts_tab):
@@ -156,8 +154,6 @@ class UserInterfaceManager:
                             ):
                                 self.new_script_tab.build()
 
-                        with ui.tab_panel(history_tab):
-                            self.history_tab.build()
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
