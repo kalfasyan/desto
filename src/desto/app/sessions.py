@@ -15,6 +15,34 @@ from desto.redis.pubsub import SessionPubSub
 
 
 class TmuxManager:
+
+    def confirm_cancel_scheduled_job_by_id(self, at_job_id):
+        """
+        Show a confirmation dialog before canceling a scheduled job by at_job_id.
+        Pauses updates while dialog is open.
+        """
+        from nicegui import ui
+
+        if self.pause_updates:
+            self.pause_updates()
+
+        def do_cancel():
+            self.cancel_scheduled_job(at_job_id)
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        def cancel():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
+                ui.button("Cancel", on_click=cancel).props("color=grey")
+                ui.button("Confirm Cancel", color="red", on_click=do_cancel).props("icon=delete_forever")
+        dialog.open()
     def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
         if not ui_instance or not instance_logger:
             raise ValueError("ui_instance and instance_logger are required")
@@ -65,6 +93,58 @@ class TmuxManager:
         self.use_redis = self.redis_client.is_connected()
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
+
+
+    def cancel_scheduled_job(self, at_job_id, session_name=None):
+        """
+        Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
+        If session_name is not provided, attempts to find the session by at_job_id in Redis.
+        """
+        from nicegui import ui
+        from desto.redis.at_job_manager import AtJobManager
+
+        try:
+            success = AtJobManager.cancel(str(at_job_id))
+            if success:
+                ui.notification(f"Cancelled scheduled job {at_job_id}", type="positive")
+                # Try to update status in Redis
+                session_obj = None
+                if session_name and self.desto_manager:
+                    session_obj = self.desto_manager.session_manager.get_session_by_name(session_name)
+                elif self.desto_manager:
+                    # Try to find session by at_job_id
+                    for s in self.desto_manager.session_manager.list_all_sessions():
+                        if getattr(s, "at_job_id", None) == str(at_job_id):
+                            session_obj = s
+                            break
+                if session_obj:
+                    session_obj.status = "failed"
+                    session_obj.at_job_id = None
+                    self.desto_manager.session_manager._update_session(session_obj)
+            else:
+                ui.notification(f"Failed to cancel scheduled job {at_job_id}", type="negative")
+        except Exception as e:
+            ui.notification(f"Failed to cancel scheduled job {at_job_id}: {e}", type="negative")
+
+    def schedule_at_job(self, session_name, command, time_spec):
+        """
+        Schedule a job using AtJobManager, store at_job_id in Redis session metadata.
+        """
+        from nicegui import ui
+        from desto.redis.at_job_manager import AtJobManager
+
+        at_job_id = AtJobManager.schedule(command, time_spec)
+        if at_job_id:
+            ui.notification(f"Scheduled job for session '{session_name}' at job ID {at_job_id}", type="positive")
+            # Store at_job_id in session metadata
+            if self.desto_manager:
+                session_obj = self.desto_manager.session_manager.get_session_by_name(session_name)
+                if session_obj:
+                    session_obj.status = "scheduled"
+                    session_obj.at_job_id = str(at_job_id)
+                    self.desto_manager.session_manager._update_session(session_obj)
+        else:
+            ui.notification(f"Failed to schedule job for session '{session_name}'", type="negative")
 
     def is_tmux_session_active(self, session_name: str) -> bool:
         """Check if a tmux session with the given name exists."""
@@ -573,6 +653,132 @@ class TmuxManager:
 
         dialog.open()
 
+    def confirm_kill_all_sessions(self):
+        """
+        Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates.
+        """
+        from nicegui import ui
+
+        if self.pause_updates:
+            self.pause_updates()  # Pause the global timer
+
+        sessions_status = self.check_sessions()
+        session_count = len(sessions_status)
+
+        # Get scheduled jobs
+        scheduled_jobs = self.get_scheduled_jobs()
+        job_count = len(scheduled_jobs)
+
+        if session_count == 0 and job_count == 0:
+            msg = "No active sessions or scheduled jobs to clear."
+            self.logger.info(msg)
+            self.ui.notification(msg, type="info")
+            if self.resume_updates:
+                self.resume_updates()
+            return
+
+        # Get session status from Redis
+        running_sessions = []
+        finished_sessions = []
+
+        for session_name in sessions_status.keys():
+            try:
+                job_status = self.desto_manager.get_job_status(session_name)
+                if job_status in ["finished", "failed"]:
+                    finished_sessions.append(session_name)
+                else:
+                    running_sessions.append(session_name)
+            except Exception as e:
+                self.logger.warning(f"Could not get status for session {session_name}: {e}")
+                # Assume running if we can't determine status
+                running_sessions.append(session_name)
+
+        running_count = len(running_sessions)
+        finished_count = len(finished_sessions)
+
+        def do_kill_all():
+            session_success, session_total, job_success, job_total, error_messages = self.kill_all_sessions_and_jobs()
+
+            results = []
+            if session_total > 0:
+                if session_success == session_total:
+                    results.append(f"Successfully cleared all {session_total} sessions")
+                else:
+                    results.append(f"Cleared {session_success}/{session_total} sessions")
+
+            if job_total > 0:
+                if job_success == job_total:
+                    results.append(f"Successfully cancelled all {job_total} scheduled jobs")
+                else:
+                    results.append(f"Cancelled {job_success}/{job_total} scheduled jobs")
+
+            if not results:
+                results.append("No items to clear")
+
+            msg = ". ".join(results) + "."
+
+            if error_messages:
+                msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
+                self.logger.warning(msg)
+                self.ui.notification(msg, type="warning")
+            else:
+                self.logger.info(msg)
+                self.ui.notification(msg, type="positive")
+
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        def cancel_kill_all():
+            self.logger.debug("User cancelled kill all sessions operation")
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
+            self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+
+            # Build warning text
+            warning_parts = []
+            if session_count > 0:
+                if running_count > 0 and finished_count > 0:
+                    warning_parts.append(f"{session_count} sessions ({running_count} running, {finished_count} finished)")
+                elif running_count > 0:
+                    warning_parts.append(f"{running_count} RUNNING sessions")
+                else:
+                    warning_parts.append(f"{finished_count} finished sessions")
+
+            if job_count > 0:
+                warning_parts.append(f"{job_count} scheduled jobs")
+
+            warning_text = "This will clear:\n• " + "\n• ".join(warning_parts)
+            if running_count > 0:
+                warning_text += "\n\n⚠️ This may interrupt active processes!"
+
+            self.ui.label(warning_text).style("margin-bottom: 15px; white-space: pre-line;")
+
+            # Show running sessions
+            if running_count > 0:
+                self.ui.label("Running sessions:").style("font-weight: bold; margin-bottom: 5px;")
+                for session in running_sessions[:5]:  # Show max 5 sessions
+                    self.ui.label(f"• {session}").style("margin-left: 10px; color: #d32f2f;")
+                if len(running_sessions) > 5:
+                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style("margin-left: 10px; color: #666;")
+
+            # Show scheduled jobs
+            if job_count > 0:
+                self.ui.label("Scheduled jobs:").style("font-weight: bold; margin-bottom: 5px; margin-top: 10px;")
+                for job in scheduled_jobs[:5]:  # Show max 5 jobs
+                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style("margin-left: 10px; color: #ff9800;")
+                if len(scheduled_jobs) > 5:
+                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style("margin-left: 10px; color: #666;")
+
+            with self.ui.row().style("margin-top: 20px; gap: 10px;"):
+                self.ui.button("Cancel", on_click=cancel_kill_all).props("color=grey")
+                self.ui.button("Clear All Jobs", color="red", on_click=do_kill_all).props("icon=delete_forever")
+
+        dialog.open()
+
     def get_script_run_time(self, created_time, session_name):
         """
         Returns the elapsed time for a session using Redis data.
@@ -611,25 +817,14 @@ class TmuxManager:
             ui.label("Tmux Active").style("flex: 1; min-width: 100px;")
             ui.label("Actions").style("flex: 1; min-width: 120px;")
 
-        # --- Deduplicate scheduled and real sessions as in the history tab ---
-        # Build maps for real and scheduled sessions
-        session_map = {}  # session_name -> session_info (real sessions)
-        scheduled_map = {}  # session_name -> session_info (scheduled only)
+        # --- Only show non-scheduled sessions in the main table ---
+        display_sessions = {}
         for session_name, session in sessions_status.items():
-            # Use Redis status fields
             status_field = session.get("status", "").lower()
             job_status_field = session.get("job_status", "").lower()
-            # Consider a session 'real' if status/job_status is running/finished/failed
-            if status_field in ("running", "finished", "failed") or job_status_field in ("running", "finished", "failed"):
-                session_map[session_name] = session
-            elif status_field == "scheduled" or job_status_field == "scheduled":
-                scheduled_map[session_name] = session
-
-        # Only show scheduled entry if no real session exists for that name
-        display_sessions = dict(session_map)
-        for sname, sched in scheduled_map.items():
-            if sname not in display_sessions:
-                display_sessions[sname] = sched
+            if status_field == "scheduled" or job_status_field == "scheduled":
+                continue  # Skip scheduled sessions
+            display_sessions[session_name] = session
 
         for session_name, session in display_sessions.items():
             # Determine status for display
@@ -656,6 +851,16 @@ class TmuxManager:
 
             # Tmux active status: always check live tmux for accuracy
             tmux_active = self.is_tmux_session_active(session_name)
+
+            # If tmux is not active, session cannot be 'Running'
+            if not tmux_active and (status_field == "running" or job_status_field == "running"):
+                # If session is finished, keep as finished, else mark as failed
+                if status_field == "finished" or job_status_field == "finished":
+                    status = "✅ Finished"
+                    status_color = "#4CAF50"
+                else:
+                    status = "❌ Failed (tmux closed)"
+                    status_color = "#F44336"
 
             # Times and durations
             created_time = session.get("created")
@@ -706,8 +911,6 @@ class TmuxManager:
                 job_duration = session.get("job_elapsed", session.get("elapsed", "N/A"))
 
             # --- Session Duration (total session time) ---
-            logger.debug(f"Session '{session_name}': full session dict = {session}")
-            # Always use Redis 'start_time' as the canonical session start time
             session_duration = None
             if start_time:
                 try:
@@ -715,27 +918,21 @@ class TmuxManager:
                     if end_time:
                         end_dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
                         elapsed_seconds = int((end_dt - start_dt).total_seconds())
-                        logger.debug(f"Session '{session_name}': calculated elapsed_seconds from start_time and end_time = {elapsed_seconds}")
                     else:
                         now_dt = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
                         elapsed_seconds = int((now_dt - start_dt).total_seconds())
-                        logger.debug(f"Session '{session_name}': calculated elapsed_seconds from now - start_time = {elapsed_seconds}")
                     if elapsed_seconds >= 0:
                         hours, remainder = divmod(elapsed_seconds, 3600)
                         minutes, seconds = divmod(remainder, 60)
                         session_duration = (
                             f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
                         )
-                        logger.debug(f"Session '{session_name}': formatted session_duration = {session_duration}")
                     else:
                         session_duration = "N/A"
-                except Exception as e:
-                    logger.warning(f"Session '{session_name}': error calculating session_duration from start_time: {e}")
+                except Exception:
                     session_duration = "N/A"
             else:
-                logger.debug(f"Session '{session_name}': no start_time found, setting session_duration = 'N/A'")
                 session_duration = "N/A"
-            logger.info(f"Session '{session_name}': FINAL session_duration = {session_duration}")
 
             def format_duration(duration_str):
                 if duration_str in ["N/A", "unknown", "Ongoing"]:
@@ -783,14 +980,51 @@ class TmuxManager:
                 color = "#4CAF50" if tmux_active else "#F44336"
                 ui.icon(icon).style(f"flex: 1; min-width: 100px; color: {color}; font-size: 1.5em; text-align: center;")
                 with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
-                    ui.button(
-                        "Kill",
-                        on_click=lambda s=session_name: self.confirm_kill_session(s),
-                    ).props("color=red flat")
+                    if tmux_active:
+                        ui.button(
+                            "Kill",
+                            on_click=lambda s=session_name: self.confirm_kill_session(s),
+                        ).props("color=red flat")
+                    else:
+                        ui.button(
+                            "Kill",
+                            on_click=lambda: ui.notification("Cannot kill: no active tmux session for this entry.", type="warning"),
+                        ).props("color=red flat disabled")
                     ui.button(
                         "View Log",
                         on_click=lambda s=session_name: self.view_log(s, ui),
                     ).props("color=blue flat")
+
+        # --- Scheduled Jobs Table (from atq) ---
+        scheduled_jobs = self.get_scheduled_jobs()
+        if scheduled_jobs:
+            with ui.row().style("margin-top: 40px; margin-bottom: 10px;"):
+                ui.label("Scheduled Jobs (from atq)").style("font-size: 1.2em; font-weight: bold;")
+
+            # Table header for scheduled jobs
+            with ui.row().style(
+                "width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"
+            ):
+                ui.label("Job ID").style("flex: 1; min-width: 80px;")
+                ui.label("Scheduled Time").style("flex: 2; min-width: 220px;")
+                ui.label("User").style("flex: 1; min-width: 100px;")
+                ui.label("Actions").style("flex: 1; min-width: 120px;")
+
+            for job in scheduled_jobs:
+                job_id = job.get("id", "?")
+                scheduled_time = job.get("datetime", "?")
+                user = job.get("user", "?")
+                with ui.row().style(
+                    "width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"
+                ):
+                    ui.label(str(job_id)).style("flex: 1; min-width: 80px; font-weight: 500;")
+                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 220px; color: #666;")
+                    ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
+                    with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
+                        ui.button(
+                            "Cancel",
+                            on_click=lambda j=job_id: self.confirm_cancel_scheduled_job_by_id(j),
+                        ).props("color=red flat")
 
     def view_log(self, session_name, ui):
         """
