@@ -840,8 +840,12 @@ class ScriptManagerTab:
             ui.notification(f"Script file not found: {actual_filename}", type="warning")
             return
         exec_cmd = self.ui_manager.build_execution_command(script_path, arguments)
+
+        # Only write a visible script start marker to the log for immediate launches
+        script_marker = f"echo '=== Running script: {script_path.name} ==='"
         try:
-            self.ui_manager.tmux_manager.start_tmux_session(session_name, exec_cmd, logger)
+            full_cmd = f"{script_marker} && ({exec_cmd})"
+            self.ui_manager.tmux_manager.start_tmux_session(session_name, full_cmd, logger)
             ui.notification(f"Launched session '{session_name}' for script '{actual_filename}'", type="positive")
         except Exception as e:
             logger.error(f"Failed to launch session: {e}")
@@ -857,16 +861,20 @@ class ScriptManagerTab:
             return
         # Build a single shell command that runs all scripts in order, stopping on error
         commands = []
-        for idx, (script_path, arguments) in enumerate(chain):
-            script_path_obj = Path(script_path)
-            if not script_path_obj.is_file():
-                ui.notification(f"Script file not found in chain: {script_path_obj.name}", type="warning")
-                return
-            exec_cmd = self.ui_manager.build_execution_command(script_path_obj, arguments)
-            commands.append(f"({exec_cmd})")
-        # Join with '&&' to stop on first failure
-        full_cmd = " && ".join(commands)
         try:
+            total_scripts = len(chain)
+            for idx, (script_path, arguments) in enumerate(chain):
+                script_path_obj = Path(script_path)
+                if not script_path_obj.is_file():
+                    ui.notification(f"Script file not found in chain: {script_path_obj.name}", type="warning")
+                    return
+                script_name = script_path_obj.name
+                # Add a marker before each script
+                marker = f"echo '=== Running script {idx+1} of {total_scripts}: {script_name} ==='"
+                exec_cmd = self.ui_manager.build_execution_command(script_path_obj, arguments)
+                commands.append(f"{marker} && ({exec_cmd})")
+            # Join with '&&' to stop on first failure
+            full_cmd = " && ".join(commands)
             self.ui_manager.tmux_manager.start_tmux_session(session_name, full_cmd, logger)
             ui.notification(f"Launched chained session '{session_name}' with {len(chain)} scripts", type="positive")
         except Exception as e:

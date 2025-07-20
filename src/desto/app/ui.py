@@ -390,7 +390,7 @@ class UserInterfaceManager:
         if now_str:
             info_lines.append(f"# Scheduled for: {now_str}")
         info_lines.append("")  # Blank line
-        return "\\n".join(info_lines)
+        return "\n".join(info_lines)
 
     def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=None):
         """Build a properly formatted logging command that appends to existing logs."""
@@ -431,9 +431,6 @@ class UserInterfaceManager:
         # Add the actual script execution with output redirection and proper error handling
         cmd_parts.append(f"({exec_cmd}) >> '{log_file_path}' 2>&1")
         cmd_parts.append("SCRIPT_EXIT_CODE=$?")
-
-        # Add post-script logging (update to include exit code)
-        cmd_parts.append(f"printf '\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n' \"$(date)\" >> '{log_file_path}'")
 
         # Add job completion marker (update to use variable)
         # Extract session name from log file path

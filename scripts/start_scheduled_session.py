@@ -197,7 +197,8 @@ def main():
             bash_cmd = (
                 f"{command}; "
                 f"SCRIPT_EXIT_CODE=$?; "
-                f"printf '\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n' \"$(date)\" >> '{log_file}'; "
+                # Use double quotes so $SCRIPT_EXIT_CODE is expanded
+                f"printf \"\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n\" \"$(date)\" >> '{log_file}'; "
                 f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
                 "exit $SCRIPT_EXIT_CODE"
             )
