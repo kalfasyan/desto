@@ -15,7 +15,6 @@ from desto.redis.pubsub import SessionPubSub
 
 
 class TmuxManager:
-
     def confirm_cancel_scheduled_job_by_id(self, at_job_id):
         """
         Show a confirmation dialog before canceling a scheduled job by at_job_id.
@@ -38,11 +37,14 @@ class TmuxManager:
                 self.resume_updates()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
+                "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
                 ui.button("Cancel", on_click=cancel).props("color=grey")
                 ui.button("Confirm Cancel", color="red", on_click=do_cancel).props("icon=delete_forever")
         dialog.open()
+
     def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
         if not ui_instance or not instance_logger:
             raise ValueError("ui_instance and instance_logger are required")
@@ -93,7 +95,6 @@ class TmuxManager:
         self.use_redis = self.redis_client.is_connected()
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
-
 
     def cancel_scheduled_job(self, at_job_id, session_name=None):
         """
@@ -1002,9 +1003,7 @@ class TmuxManager:
                 ui.label("Scheduled Jobs (from atq)").style("font-size: 1.2em; font-weight: bold;")
 
             # Table header for scheduled jobs
-            with ui.row().style(
-                "width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"
-            ):
+            with ui.row().style("width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
                 ui.label("Job ID").style("flex: 1; min-width: 80px;")
                 ui.label("Scheduled Time").style("flex: 2; min-width: 220px;")
                 ui.label("User").style("flex: 1; min-width: 100px;")
@@ -1014,9 +1013,7 @@ class TmuxManager:
                 job_id = job.get("id", "?")
                 scheduled_time = job.get("datetime", "?")
                 user = job.get("user", "?")
-                with ui.row().style(
-                    "width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"
-                ):
+                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
                     ui.label(str(job_id)).style("flex: 1; min-width: 80px; font-weight: 500;")
                     ui.label(str(scheduled_time)).style("flex: 2; min-width: 220px; color: #666;")
                     ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
