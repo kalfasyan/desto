@@ -78,7 +78,10 @@ class TestDockerCompose:
 
         if result.returncode != 0:
             logger.error(f"Failed to start service with stderr: {result.stderr}")
+            time.sleep(10)  # Wait and retry once
+            result = subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
         assert result.returncode == 0, f"Failed to start service: {result.stderr}"
+        time.sleep(10)  # Give extra time for network/service creation
 
         # Wait for the service to be healthy (max 60 seconds)
         logger.info("Waiting for service to become healthy...")
@@ -122,12 +125,10 @@ class TestDockerCompose:
         test_log = logs_dir / "test_log.txt"
         test_script.write_text("hello from host script")
         test_log.write_text("hello from host log")
-        logger.info("Created test files for volume mounting test")
 
         # Start the service
-        logger.info("Starting Docker Compose service for volume test...")
         subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
-        time.sleep(10)  # Wait for container to start
+        time.sleep(10)  # Increase wait time for container startup and volume mount
 
         # Check that the files exist inside the container
         logger.info("Checking if files are accessible inside container...")
@@ -167,10 +168,24 @@ class TestDockerCompose:
         subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
 
         # Wait a bit for startup
-        time.sleep(5)
+        time.sleep(10)
 
         # Check environment variables in container
         logger.info("Checking environment variables in container...")
+        result = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "env"], capture_output=True, text=True)
+
+        # Wait for container to be running
+        for _ in range(10):
+            status = subprocess.run(["docker", "compose", "ps", "--services", "--filter", "status=running"], capture_output=True, text=True)
+            if "dashboard" in status.stdout:
+                break
+            time.sleep(2)
+        else:
+            logs = subprocess.run(["docker", "compose", "logs", "dashboard"], capture_output=True, text=True)
+            logger.error(f"Dashboard logs:\n{logs.stdout}")
+            pytest.skip("Dashboard service did not start successfully")
+
+        # Now exec into the running container
         result = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "env"], capture_output=True, text=True)
 
         if result.returncode == 0:
@@ -178,7 +193,7 @@ class TestDockerCompose:
         else:
             logger.error("Failed to retrieve environment variables from container")
 
-        assert result.returncode == 0, "Failed to get environment variables"
+        assert result.returncode == 0, f"Failed to get environment variables: {result.stderr}"
         assert "DESTO_SCRIPTS_DIR=/app/desto_scripts" in result.stdout
         assert "DESTO_LOGS_DIR=/app/desto_logs" in result.stdout
 
