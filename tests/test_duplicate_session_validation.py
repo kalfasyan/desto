@@ -65,35 +65,37 @@ class TestDuplicateSessionValidation:
 
         # Mock ui.notification to avoid import issues
         with patch("src.desto.app.sessions.ui.notification") as mock_notification:
-            # Start first session
-            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
+            # Patch list_all_sessions to return a list
+            with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
+                # Start first session
+                tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
 
-            # Wait for session to start
-            time.sleep(1)
+                # Wait for session to start
+                time.sleep(1)
 
-            # Verify the session exists
-            sessions = tmux_manager.check_sessions()
-            assert session_name in sessions, "First session should be created successfully"
+                # Verify the session exists
+                sessions = tmux_manager.check_sessions()
+                assert session_name in sessions, "First session should be created successfully"
 
-            # Attempt to start duplicate session
-            tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
+                # Attempt to start duplicate session
+                tmux_manager.start_tmux_session(session_name, "sleep 3", Mock())
 
-            # Check that error was logged
-            # Note: We can't easily check mock_logger.error since it's created in the fixture
-            # But we can check that negative notification was called
-            negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
-            assert len(negative_calls) > 0, "Negative notification should be called for duplicate session"
+                # Check that error was logged
+                # Note: We can't easily check mock_logger.error since it's created in the fixture
+                # But we can check that negative notification was called
+                negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
+                assert len(negative_calls) > 0, "Negative notification should be called for duplicate session"
 
-            # Check the error message
-            notification_message = negative_calls[0][0][0]
-            assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
-            assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
+                # Check the error message
+                notification_message = negative_calls[0][0][0]
+                assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
+                assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
 
-            # Clean up
-            try:
-                subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, check=False)
-            except Exception:
-                pass
+                # Clean up
+                try:
+                    subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, check=False)
+                except Exception:
+                    pass
 
     @pytest.mark.skipif(not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available")
     def test_duplicate_session_validation_with_chain(self, tmux_manager, temp_dirs):
@@ -107,35 +109,37 @@ class TestDuplicateSessionValidation:
 
         # Mock ui.notification to avoid import issues
         with patch("src.desto.app.sessions.ui.notification") as mock_notification:
-            # Start first session (simulating a chain)
-            chain_command = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
-            tmux_manager.start_tmux_session(session_name, chain_command, Mock())
+            # Patch list_all_sessions to return a list
+            with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
+                # Start first session (simulating a chain)
+                chain_command = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
+                tmux_manager.start_tmux_session(session_name, chain_command, Mock())
 
-            # Wait for session to start
-            time.sleep(2)
+                # Wait for session to start
+                time.sleep(2)
 
-            # Verify the session exists
-            sessions = tmux_manager.check_sessions()
-            assert session_name in sessions, "First chain session should be created successfully"
+                # Verify the session exists
+                sessions = tmux_manager.check_sessions()
+                assert session_name in sessions, "First chain session should be created successfully"
 
-            # Attempt to start another chain with the same session name
-            chain_command2 = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
-            tmux_manager.start_tmux_session(session_name, chain_command2, Mock())
+                # Attempt to start another chain with the same session name
+                chain_command2 = f"echo '---- Running test_script.sh ----' && bash '{test_script}'"
+                tmux_manager.start_tmux_session(session_name, chain_command2, Mock())
 
-            # Check that duplicate session validation triggered
-            negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
-            assert len(negative_calls) > 0, "Negative notification should be called for duplicate chain session"
+                # Check that duplicate session validation triggered
+                negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
+                assert len(negative_calls) > 0, "Negative notification should be called for duplicate chain session"
 
-            # Check the error message
-            notification_message = negative_calls[0][0][0]
-            assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
-            assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
+                # Check the error message
+                notification_message = negative_calls[0][0][0]
+                assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
+                assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
 
-            # Clean up
-            try:
-                subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, check=False)
-            except Exception:
-                pass
+                # Clean up
+                try:
+                    subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, check=False)
+                except Exception:
+                    pass
 
     def test_non_duplicate_session_allowed(self, tmux_manager):
         """Test that non-duplicate sessions are allowed."""
@@ -147,28 +151,29 @@ class TestDuplicateSessionValidation:
             with patch.object(tmux_manager, "check_sessions") as mock_check_sessions:
                 # Mock that no sessions exist initially
                 mock_check_sessions.return_value = {}
+                # Patch list_all_sessions to return a list
+                with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
+                    # Mock subprocess.run to simulate successful tmux session creation
+                    with patch("src.desto.app.sessions.subprocess.run") as mock_subprocess:
+                        mock_subprocess.return_value.returncode = 0
 
-                # Mock subprocess.run to simulate successful tmux session creation
-                with patch("src.desto.app.sessions.subprocess.run") as mock_subprocess:
-                    mock_subprocess.return_value.returncode = 0
+                        # Start first session
+                        tmux_manager.start_tmux_session(session_name1, "echo 'test1'", Mock())
 
-                    # Start first session
-                    tmux_manager.start_tmux_session(session_name1, "echo 'test1'", Mock())
+                        # Check that positive notification was called
+                        positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
+                        assert len(positive_calls) > 0, "Positive notification should be called for successful session start"
 
-                    # Check that positive notification was called
-                    positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
-                    assert len(positive_calls) > 0, "Positive notification should be called for successful session start"
+                        # Reset mock
+                        mock_notification.reset_mock()
 
-                    # Reset mock
-                    mock_notification.reset_mock()
+                        # Start second session (different name)
+                        tmux_manager.start_tmux_session(session_name2, "echo 'test2'", Mock())
 
-                    # Start second session (different name)
-                    tmux_manager.start_tmux_session(session_name2, "echo 'test2'", Mock())
+                        # Check that positive notification was called again
+                        positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
+                        assert len(positive_calls) > 0, "Positive notification should be called for second successful session start"
 
-                    # Check that positive notification was called again
-                    positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
-                    assert len(positive_calls) > 0, "Positive notification should be called for second successful session start"
-
-                    # Check that no negative notifications were called
-                    negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
-                    assert len(negative_calls) == 0, "No negative notifications should be called for non-duplicate sessions"
+                        # Check that no negative notifications were called
+                        negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
+                        assert len(negative_calls) == 0, "No negative notifications should be called for non-duplicate sessions"

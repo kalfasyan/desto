@@ -117,10 +117,92 @@ def test_redis_required_for_initialization(mock_redis_class, mock_ui, mock_logge
     mock_redis_instance.redis = mock_redis_redis
     mock_redis_class.return_value = mock_redis_instance
 
-    # Should initialize successfully but in limited mode when Redis is not available
-    tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    # Should raise RuntimeError when Redis is not available
+    with pytest.raises(RuntimeError):
+        TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
 
-    # Verify that it operates in limited mode
-    assert tmux_manager.use_redis is False
-    assert tmux_manager.desto_manager is None
-    assert tmux_manager.pubsub is None
+
+@patch("desto.app.sessions.subprocess")
+@patch("desto.app.sessions.DestoRedisClient")
+def test_is_tmux_session_active_true_false(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
+    # Mock Redis to be available
+    mock_redis_instance = Mock()
+    mock_redis_instance.is_connected.return_value = True
+    mock_redis_instance.redis = Mock()
+    mock_redis_class.return_value = mock_redis_instance
+
+    # Simulate tmux session exists
+    mock_subprocess.run.return_value.returncode = 0
+    tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    assert tmux.is_tmux_session_active("test") is True
+
+    # Simulate tmux session does not exist
+    mock_subprocess.run.return_value.returncode = 1
+    assert tmux.is_tmux_session_active("test") is False
+
+
+@patch("desto.app.sessions.subprocess")
+@patch("desto.app.sessions.DestoRedisClient")
+def test_get_all_sessions_status_includes_tmux_and_redis(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
+    # Mock Redis to be available
+    mock_redis_instance = Mock()
+    mock_redis_instance.is_connected.return_value = True
+    mock_redis_instance.redis = Mock()
+    # Simulate Redis returns one session
+    mock_redis_instance.redis.scan_iter.return_value = ["desto:session:1"]
+    mock_redis_instance.redis.hgetall.return_value = {"session_name": "redis_session", "id": "1"}
+    mock_redis_class.return_value = mock_redis_instance
+
+    # Simulate tmux returns one session
+    mock_subprocess.run.return_value.returncode = 0
+    mock_subprocess.run.return_value.stdout = "2:tmux_session:1234567890:1:1::\n"
+    tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    all_sessions = tmux.get_all_sessions_status()
+    assert "redis_session" in all_sessions
+    assert "tmux_session" in all_sessions
+
+
+@patch("desto.app.sessions.DestoRedisClient")
+def test_session_heartbeat_and_finish(mock_redis_class, mock_ui, mock_logger, tmp_path):
+    from desto.redis.session_manager import SessionManager, DestoSession, SessionStatus
+    # Mock Redis
+    mock_redis_instance = Mock()
+    mock_redis_instance.is_connected.return_value = True
+    mock_redis_instance.redis = Mock()
+    # Patch hgetall to return a real dict
+    session_id = "test-id"
+    session_dict = {
+        "session_id": session_id,
+        "session_name": "test",
+        "tmux_session_name": "test",
+        "status": SessionStatus.RUNNING.value,
+        "start_time": "2025-07-21T14:00:00",
+        "last_heartbeat": "2025-07-21T14:00:00",
+    }
+    mock_redis_instance.redis.hgetall.return_value = session_dict
+    mock_redis_class.return_value = mock_redis_instance
+    manager = SessionManager(mock_redis_instance)
+    # Create session
+    session = DestoSession(session_name="test", tmux_session_name="test", status=SessionStatus.RUNNING)
+    session.session_id = session_id
+    manager._update_session(session)
+    # Update heartbeat
+    assert manager.update_heartbeat(session.session_id) is True
+    # Finish session
+    assert manager.finish_session(session.session_id) is True
+    # Fail session
+    assert manager.fail_session(session.session_id, "error") is True
+
+
+@patch("desto.app.sessions.DestoRedisClient")
+def test_clear_sessions_container_calls_ui_clear(mock_redis_class, mock_ui, mock_logger, tmp_path):
+    mock_redis_instance = Mock()
+    mock_redis_instance.is_connected.return_value = True
+    mock_redis_instance.redis = Mock()
+    mock_redis_class.return_value = mock_redis_instance
+    # Patch sessions_container directly
+    tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
+    tmux.sessions_container = Mock()
+    tmux.sessions_container.clear = Mock()
+    tmux.clear_sessions_container()
+    tmux.sessions_container.clear.assert_called()

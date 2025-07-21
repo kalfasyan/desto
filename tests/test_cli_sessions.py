@@ -119,10 +119,7 @@ class TestStartCommand:
 
         assert result.exit_code == 0
         assert "started successfully" in result.stdout
-        mock_session_manager.start_session.assert_called_with("test_session", "echo hello", False)
-
-
-
+        mock_session_manager.start_session.assert_called_with("test_session", "echo hello")
 
     def test_start_session_already_exists(self, runner, mock_session_manager):
         """Test starting a session that already exists."""
