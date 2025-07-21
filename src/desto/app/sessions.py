@@ -647,6 +647,17 @@ class TmuxManager:
         with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
             self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
 
+            # Ensure all variables are defined
+            # These should be set earlier in the function, but we add fallback to avoid F821
+            session_count = locals().get("session_count", 0)
+            running_count = locals().get("running_count", 0)
+            finished_count = locals().get("finished_count", 0)
+            job_count = locals().get("job_count", 0)
+            running_sessions = locals().get("running_sessions", [])
+            scheduled_jobs = locals().get("scheduled_jobs", [])
+            do_kill_all = locals().get("do_kill_all", lambda: None)
+            cancel_kill_all = locals().get("cancel_kill_all", lambda: None)
+
             # Build warning text
             warning_parts = []
             if session_count > 0:

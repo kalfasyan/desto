@@ -32,7 +32,7 @@ class TestCLIIntegration:
         manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
+            patch("desto.cli.session_manager.subprocess.run"),
             patch("desto.redis.session_manager.SessionManager.create_session") as mock_create_session,
             patch("desto.redis.session_manager.SessionManager.start_session") as mock_start_session,
             patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[]),

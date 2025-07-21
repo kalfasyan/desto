@@ -3,6 +3,7 @@
 import os
 import subprocess
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -12,7 +13,6 @@ from desto.cli.session_manager import CLISessionManager
 
 # Add missing imports for Redis session manager and datetime
 from desto.redis.session_manager import SessionManager
-from datetime import datetime
 
 
 @pytest.fixture

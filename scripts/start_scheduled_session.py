@@ -125,7 +125,8 @@ def main():
                 else:
                     # Existing session is not scheduled, create a new SCHEDULED session
                     logger.info(
-                        f"[SCHEDULED WRAPPER] Existing session found but not SCHEDULED, creating new session '{session_name}' in Redis with status SCHEDULED"
+                        f"[SCHEDULED WRAPPER] Existing session found but not SCHEDULED, "
+                        f"creating new session '{session_name}' in Redis with status SCHEDULED"
                     )
                     session, job = manager.start_session_with_job(
                         session_name=session_name,
@@ -173,7 +174,8 @@ def main():
             # Log job info if available
             if "job" in locals():
                 logger.info(
-                    f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}"
+                    f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, "
+                    f"session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}"
                 )
 
             # Compose the wrapped command to run in tmux

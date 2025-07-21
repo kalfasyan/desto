@@ -26,7 +26,6 @@ try:
     client = DestoRedisClient()
     if client.is_connected():
         manager = DestoManager(client)
-        from datetime import datetime
 
         # Mark job as finished/failed and get the job_finished_time from Redis
         if exit_code == 0:

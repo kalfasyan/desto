@@ -3,7 +3,6 @@ import os
 import re
 import shlex
 import socket
-import subprocess
 from pathlib import Path
 
 import psutil
@@ -11,7 +10,6 @@ from loguru import logger
 from nicegui import ui
 
 from desto.redis.at_job_manager import AtJobManager
-from desto.redis.client import DestoRedisClient
 
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
