@@ -11,15 +11,17 @@
 
 The key features are:  
 
-- **One-click session control:** Start, monitor, and stop `tmux` sessions from your browser.
+- **One-click session control:** Launch, monitor, and stop `tmux` sessions from your browser.
 - **🐚 Bash & 🐍 Python support:** Run both bash (`.sh`) and Python (`.py`) scripts seamlessly.
-- **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
 - **Script management:** Use your existing scripts, write new ones, edit, save, or delete them directly in the dashboard.
-- **Script chaining:** Queue multiple scripts to run sequentially in a single session.
-- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
-- **Persistent storage:** Scripts and logs are saved in dedicated folders for easy access.
-- ✨ **\*NEW!\*** ✨ **Session history:** Optional Redis integration for persistent session tracking and history.
+- **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
+- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
+- **Script chaining:** Queue multiple scripts to run sequentially in a single session.
+- **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
+- **Scheduled job control:** Manage scheduled jobs with a dedicated table—cancel any scheduled job with a click.
+- **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
+- **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
   
   
@@ -216,8 +218,8 @@ Check [`pyproject.toml`](pyproject.toml)
    desto
    ```
 
-4. **Open in your browser**  
-   After starting, visit [http://localhost:8809](http://localhost:8809) (or the address shown in your terminal).
+🎉 **Done!**  
+Open your browser and visit: [http://localhost:8809](http://localhost:8809) 🚀
 
 ### Global `desto` Installation as a `uv` Tool (includes CLI)
 
