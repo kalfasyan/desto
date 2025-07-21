@@ -58,5 +58,5 @@ EXPOSE 8809
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8809 || exit 1
 
-# Start the dashboard using uv
-CMD ["uv", "run", "desto"]
+# Start atd in the background, then run the dashboard
+CMD service atd start && uv run desto
