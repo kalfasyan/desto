@@ -10,6 +10,9 @@ import psutil
 from loguru import logger
 from nicegui import ui
 
+from desto.redis.at_job_manager import AtJobManager
+from desto.redis.client import DestoRedisClient
+
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
@@ -536,53 +539,56 @@ class UserInterfaceManager:
             if self.chain_queue:
                 # Build a single shell command that runs all scripts in order, stopping on error
                 commands = []
+                script_paths = []
                 for idx, (script, args) in enumerate(self.chain_queue):
                     exec_cmd = self.build_execution_command(script, args)
                     commands.append(exec_cmd)
-                # Join with '&&' to stop on error
-                tmux_cmd = " && ".join(f"{cmd}" for cmd in commands)
+                    script_paths.append(script)
+                tmux_cmd = " && ".join(commands)
             else:
                 actual_filename = self.extract_script_filename(self.script_path_select.value)
                 script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
                 exec_cmd = self.build_execution_command(script_file_path, arguments)
                 tmux_cmd = exec_cmd
+                script_paths = [str(script_file_path)]
 
             # Use the wrapper script for proper Redis tracking of scheduled jobs
             wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
 
-            # If wrapper script doesn't exist, fall back to direct tmux command
             if wrapper_script_path.exists():
-                # Use wrapper script that handles Redis tracking
                 scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
             else:
-                # Fallback to direct tmux command (original behavior)
                 scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
 
-            at_shell_cmd = f"echo {shlex.quote(scheduled_cmd)} | at {shlex.quote(at_time_str)}"
+            redis_client = DestoRedisClient()
+            at_job_manager = AtJobManager(redis_client)
 
-            result = subprocess.run(
-                at_shell_cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+            # Call AtJobManager.schedule with all metadata fields
+            job_id = at_job_manager.schedule(
+                command=scheduled_cmd,
+                time_spec=at_time_str,
+                session_name=session_name,
+                script_path=script_paths,  # Always a list
+                arguments=arguments,
             )
-            if result.returncode == 0:
+
+            if job_id:
                 if self.chain_queue:
                     ui.notification(
-                        f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
+                        f"Chain scheduled for {scheduled_dt} as session '{session_name}' (Job ID: {job_id})",
                         type="info",
                     )
                     self.chain_queue.clear()
                     self.refresh_chain_queue_display()
                 else:
                     ui.notification(
-                        f"Script scheduled for {scheduled_dt} as session '{session_name}'",
+                        f"Script scheduled for {scheduled_dt} as session '{session_name}' (Job ID: {job_id})",
                         type="info",
                     )
                 schedule_dialog.close()
             else:
-                error_label.text = f"Failed to schedule: {result.stderr}"
+                error_label.text = "Failed to schedule job via AtJobManager."
+
         except Exception as e:
             error_label.text = f"Invalid date/time: {e}"
 

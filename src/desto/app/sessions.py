@@ -1,3 +1,4 @@
+import json
 import os
 import shlex
 import subprocess
@@ -15,36 +16,6 @@ from desto.redis.pubsub import SessionPubSub
 
 
 class TmuxManager:
-    def confirm_cancel_scheduled_job_by_id(self, at_job_id):
-        """
-        Show a confirmation dialog before canceling a scheduled job by at_job_id.
-        Pauses updates while dialog is open.
-        """
-        from nicegui import ui
-
-        if self.pause_updates:
-            self.pause_updates()
-
-        def do_cancel():
-            self.cancel_scheduled_job(at_job_id)
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        def cancel():
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
-                "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
-            )
-            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=cancel).props("color=grey")
-                ui.button("Confirm Cancel", color="red", on_click=do_cancel).props("icon=delete_forever")
-        dialog.open()
-
     def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
         if not ui_instance or not instance_logger:
             raise ValueError("ui_instance and instance_logger are required")
@@ -96,6 +67,38 @@ class TmuxManager:
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
+    def confirm_cancel_scheduled_job_by_id(self, at_job_id):
+        """
+        Show a confirmation dialog before canceling a scheduled job by at_job_id.
+        Pauses updates while dialog is open.
+        """
+        from nicegui import ui
+
+        if self.pause_updates:
+            self.pause_updates()
+
+        def do_cancel():
+            self.cancel_scheduled_job(at_job_id)
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+            # Force UI refresh
+            self.update_sessions_status()
+
+        def cancel():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
+                "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
+                ui.button("Cancel", on_click=cancel).props("color=grey")
+                ui.button("Confirm Cancel", color="red", on_click=do_cancel).props("icon=delete_forever")
+        dialog.open()
+
     def cancel_scheduled_job(self, at_job_id, session_name=None):
         """
         Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
@@ -106,7 +109,8 @@ class TmuxManager:
         from desto.redis.at_job_manager import AtJobManager
 
         try:
-            success = AtJobManager.cancel(str(at_job_id))
+            at_job_manager = AtJobManager(self.redis_client)
+            success = at_job_manager.cancel(str(at_job_id))
             if success:
                 ui.notification(f"Cancelled scheduled job {at_job_id}", type="positive")
                 # Try to update status in Redis
@@ -634,82 +638,6 @@ class TmuxManager:
 
         dialog.open()
 
-    def confirm_kill_all_sessions(self):
-        """
-        Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates.
-        """
-        from nicegui import ui
-
-        if self.pause_updates:
-            self.pause_updates()  # Pause the global timer
-
-        sessions_status = self.check_sessions()
-        session_count = len(sessions_status)
-
-        # Get scheduled jobs
-        scheduled_jobs = self.get_scheduled_jobs()
-        job_count = len(scheduled_jobs)
-
-        if session_count == 0 and job_count == 0:
-            msg = "No active sessions or scheduled jobs to clear."
-            self.logger.info(msg)
-            self.ui.notification(msg, type="info")
-            if self.resume_updates:
-                self.resume_updates()
-            return
-
-        # Get session status from Redis
-        running_sessions = []
-        finished_sessions = []
-
-        for session_name in sessions_status.keys():
-            try:
-                job_status = self.desto_manager.get_job_status(session_name)
-                if job_status in ["finished", "failed"]:
-                    finished_sessions.append(session_name)
-                else:
-                    running_sessions.append(session_name)
-            except Exception as e:
-                self.logger.warning(f"Could not get status for session {session_name}: {e}")
-                # Assume running if we can't determine status
-                running_sessions.append(session_name)
-
-        running_count = len(running_sessions)
-        finished_count = len(finished_sessions)
-
-        def do_kill_all():
-            session_success, session_total, job_success, job_total, error_messages = self.kill_all_sessions_and_jobs()
-
-            results = []
-            if session_total > 0:
-                if session_success == session_total:
-                    results.append(f"Successfully cleared all {session_total} sessions")
-                else:
-                    results.append(f"Cleared {session_success}/{session_total} sessions")
-
-            if job_total > 0:
-                if job_success == job_total:
-                    results.append(f"Successfully cancelled all {job_total} scheduled jobs")
-                else:
-                    results.append(f"Cancelled {job_success}/{job_total} scheduled jobs")
-
-            if not results:
-                results.append("No items to clear")
-
-            msg = ". ".join(results) + "."
-
-            if error_messages:
-                msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
-                self.logger.warning(msg)
-                self.ui.notification(msg, type="warning")
-            else:
-                self.logger.info(msg)
-                self.ui.notification(msg, type="positive")
-
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
         def cancel_kill_all():
             self.logger.debug("User cancelled kill all sessions operation")
             dialog.close()
@@ -980,42 +908,66 @@ class TmuxManager:
                         on_click=lambda s=session_name: self.confirm_clear_session(s, ui),
                     ).props("color=orange flat")
 
-        # --- Scheduled Jobs Table (from atq) ---
+        # --- Scheduled Jobs Table (from atq + Redis metadata) ---
         scheduled_jobs = self.get_scheduled_jobs()
         if scheduled_jobs:
+            from desto.redis.at_job_manager import AtJobManager
+
+            at_job_manager = AtJobManager(self.redis_client)
+
             with ui.row().style("margin-top: 40px; margin-bottom: 10px;"):
-                ui.label("Scheduled Jobs (from atq)").style("font-size: 1.2em; font-weight: bold;")
+                ui.label("Scheduled Jobs (with metadata)").style("font-size: 1.2em; font-weight: bold;")
 
             # Table header for scheduled jobs
-            with ui.row().style("width: 100%; min-width: 900px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
+            with ui.row().style("width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
                 ui.label("Job ID").style("flex: 1; min-width: 80px;")
-                ui.label("Scheduled Time").style("flex: 2; min-width: 220px;")
-                ui.label("Execution Time").style("flex: 2; min-width: 220px;")
+                ui.label("Scheduled Time").style("flex: 2; min-width: 180px;")
                 ui.label("User").style("flex: 1; min-width: 100px;")
+                ui.label("Status").style("flex: 1; min-width: 100px;")
                 ui.label("Actions").style("flex: 1; min-width: 120px;")
 
             for job in scheduled_jobs:
                 job_id = job.get("id", "?")
-                scheduled_time = job.get("datetime", "?")
-                raw_datetime = job.get("raw_datetime", "?")
-                # Format execution time for display
-                try:
-                    from datetime import datetime as dt
+                metadata = at_job_manager.get_job_metadata(str(job_id)) if at_job_manager else None
+                scheduled_time = metadata.get("scheduled_time", job.get("datetime", "?")) if metadata else job.get("datetime", "?")
+                user = metadata.get("user", job.get("user", "?")) if metadata else job.get("user", "?")
+                status = metadata.get("status", "scheduled") if metadata else "scheduled"
 
-                    exec_time = dt.fromisoformat(scheduled_time).strftime("%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    exec_time = raw_datetime
-                # Scheduled Time: use current time for display
-                try:
-                    sched_time_disp = dt.now().strftime("%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    sched_time_disp = "Unknown"
-                user = job.get("user", "?")
-                with ui.row().style("width: 100%; min-width: 900px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
-                    ui.label(str(job_id)).style("flex: 1; min-width: 80px; font-weight: 500;")
-                    ui.label(str(sched_time_disp)).style("flex: 2; min-width: 220px; color: #666;")
-                    ui.label(str(exec_time)).style("flex: 2; min-width: 220px; color: #666;")
+                def show_metadata_dialog(job_id=job_id, metadata=metadata):
+                    if self.pause_updates:
+                        self.pause_updates()
+
+                    def close_dialog():
+                        dialog.close()
+                        if self.resume_updates:
+                            self.resume_updates()
+
+                    with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+                        ui.label(f"Job Metadata for ID: {job_id}").style("font-weight: bold; font-size: 1.1em;")
+                        if metadata:
+                            for k in sorted(metadata.keys()):
+                                v = metadata[k]
+                                if k == "script_path":
+                                    try:
+                                        v_list = json.loads(v) if isinstance(v, str) else v
+                                        v = ", ".join(str(item) for item in v_list)
+                                    except Exception:
+                                        pass
+                                with ui.row():
+                                    ui.label(f"{k}:").style("font-weight: bold; width: 120px;")
+                                    ui.label(str(v)).style("flex: 1;")
+                        else:
+                            ui.label("No metadata found.")
+                        ui.button("Close", on_click=close_dialog)
+                    dialog.open()
+
+                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
+                    ui.button(str(job_id), on_click=show_metadata_dialog, color="primary", icon="info").style(
+                        "flex: 1; min-width: 80px; font-weight: 500;"
+                    )
+                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 180px; color: #666;")
                     ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
+                    ui.label(str(status)).style("flex: 1; min-width: 100px; color: #666;")
                     with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                         ui.button(
                             "Cancel",
