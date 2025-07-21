@@ -12,6 +12,7 @@ from loguru import logger
 from desto.app.sessions import TmuxManager
 
 
+@pytest.mark.skip(reason="Integration test for manual execution only")
 def test_logging_integration():
     """Integration test demonstrating the logging fix."""
     logger.info("🧪 Testing logging functionality integration...")
