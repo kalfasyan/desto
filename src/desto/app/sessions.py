@@ -582,7 +582,6 @@ class TmuxManager:
         Shows all sessions (active, finished, failed, scheduled) by aggregating from Redis, not just active tmux sessions.
         """
         sessions_status = self.get_all_sessions_status()
-        logger.debug(f"Updating UI with {len(sessions_status)} total sessions (all states)")
 
         self.clear_sessions_container()
 
@@ -976,6 +975,10 @@ class TmuxManager:
                         "View Log",
                         on_click=lambda s=session_name: self.view_log(s, ui),
                     ).props("color=blue flat")
+                    ui.button(
+                        "Clear",
+                        on_click=lambda s=session_name: self.confirm_clear_session(s, ui),
+                    ).props("color=orange flat")
 
         # --- Scheduled Jobs Table (from atq) ---
         scheduled_jobs = self.get_scheduled_jobs()
@@ -984,25 +987,122 @@ class TmuxManager:
                 ui.label("Scheduled Jobs (from atq)").style("font-size: 1.2em; font-weight: bold;")
 
             # Table header for scheduled jobs
-            with ui.row().style("width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
+            with ui.row().style("width: 100%; min-width: 900px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
                 ui.label("Job ID").style("flex: 1; min-width: 80px;")
                 ui.label("Scheduled Time").style("flex: 2; min-width: 220px;")
+                ui.label("Execution Time").style("flex: 2; min-width: 220px;")
                 ui.label("User").style("flex: 1; min-width: 100px;")
                 ui.label("Actions").style("flex: 1; min-width: 120px;")
 
             for job in scheduled_jobs:
                 job_id = job.get("id", "?")
                 scheduled_time = job.get("datetime", "?")
+                raw_datetime = job.get("raw_datetime", "?")
+                # Format execution time for display
+                try:
+                    from datetime import datetime as dt
+
+                    exec_time = dt.fromisoformat(scheduled_time).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    exec_time = raw_datetime
+                # Scheduled Time: use current time for display
+                try:
+                    sched_time_disp = dt.now().strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    sched_time_disp = "Unknown"
                 user = job.get("user", "?")
-                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
+                with ui.row().style("width: 100%; min-width: 900px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
                     ui.label(str(job_id)).style("flex: 1; min-width: 80px; font-weight: 500;")
-                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 220px; color: #666;")
+                    ui.label(str(sched_time_disp)).style("flex: 2; min-width: 220px; color: #666;")
+                    ui.label(str(exec_time)).style("flex: 2; min-width: 220px; color: #666;")
                     ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
                     with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                         ui.button(
                             "Cancel",
                             on_click=lambda j=job_id: self.confirm_cancel_scheduled_job_by_id(j),
                         ).props("color=red flat")
+
+    def confirm_clear_session(self, session_name, ui):
+        """
+        Show confirmation dialog before clearing a session (deletes log and removes from Redis).
+        """
+        if self.pause_updates:
+            self.pause_updates()
+
+        def do_clear():
+            self.clear_session(session_name, ui)
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        def cancel():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            ui.label(f"Are you sure you want to clear session '{session_name}'?").style(
+                "font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;"
+            )
+            ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
+            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
+                ui.button("Cancel", on_click=cancel).props("color=grey")
+                ui.button("Clear Session", color="orange", on_click=do_clear).props("icon=delete_forever")
+        dialog.open()
+
+    def clear_session(self, session_name, ui):
+        """
+        Deletes the session's log file and removes the session from Redis, then refreshes the UI.
+        """
+        # Delete log file
+        log_file = self.get_log_file(session_name)
+        log_deleted = False
+        try:
+            if log_file.exists():
+                log_file.unlink()
+                log_deleted = True
+                logger.info(f"Deleted log file for session: {session_name}")
+        except Exception as e:
+            logger.warning(f"Failed to delete log file for session {session_name}: {e}")
+
+        # Remove session from Redis (find correct key)
+        redis_deleted = False
+        try:
+            # Find the correct Redis key for this session
+            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
+            found_key = None
+            for key in all_keys:
+                session_data = self.redis_client.redis.hgetall(key)
+                if session_data:
+                    session_info = {
+                        k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
+                    }
+                    display_session_name = session_info.get("session_name", key.replace("desto:session:", ""))
+                    if display_session_name == session_name:
+                        found_key = key
+                        break
+            if found_key:
+                result = self.redis_client.redis.delete(found_key)
+                if result:
+                    redis_deleted = True
+                    logger.info(f"Deleted Redis session: {session_name} (key: {found_key})")
+            else:
+                logger.warning(f"Could not find Redis key for session '{session_name}'")
+        except Exception as e:
+            logger.warning(f"Failed to delete Redis session {session_name}: {e}")
+
+        # Notify user
+        if log_deleted and redis_deleted:
+            ui.notification(f"Session '{session_name}' cleared (log and Redis entry deleted)", type="positive")
+        elif log_deleted:
+            ui.notification(f"Session '{session_name}' log deleted, but failed to remove from Redis", type="warning")
+        elif redis_deleted:
+            ui.notification(f"Session '{session_name}' removed from Redis, but log file not found/deleted", type="warning")
+        else:
+            ui.notification(f"Failed to clear session '{session_name}' (see logs)", type="negative")
+
+        # Refresh UI
+        self.update_sessions_status(ui)
 
     def view_log(self, session_name, ui):
         """
@@ -1232,7 +1332,6 @@ class TmuxManager:
 
                         jobs.append({"id": job_id, "datetime": formatted_datetime, "raw_datetime": date_time, "user": user, "command": command})
 
-            self.logger.debug(f"Found {len(jobs)} scheduled jobs")
             return jobs
         except Exception as e:
             self.logger.warning(f"Failed to get scheduled jobs: {e}")
