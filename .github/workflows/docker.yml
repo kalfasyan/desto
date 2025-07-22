@@ -9,47 +9,41 @@ on:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      
-    - name: Build Docker image
+
+    - name: Build and start services with Docker Compose
       run: |
-        docker build -t desto:test .
-        
-    - name: Test Docker image
+        docker compose up -d --build
+        sleep 15
+        docker ps
+
+    - name: Basic connectivity test
       run: |
-        # Start container in background
-        docker run -d --name desto-test -p 8809:8809 desto:test
-        
-        # Wait for container to start
-        sleep 10
-        
-        # Check if container is running
-        docker ps | grep desto-test
-        
-        # Basic connectivity test
         curl -f http://localhost:8809 || echo "Container is running but endpoint might not be ready"
-        
-        # Check container logs
-        docker logs desto-test
-        
-        # Stop container
-        docker stop desto-test
-        docker rm desto-test
-        
-    - name: Run Docker integration tests
+
+    - name: Show dashboard logs (for debugging)
       run: |
-        # Set up Python environment for tests
+        docker logs desto-dashboard
+
+    - name: Set up Python environment for integration tests
+      run: |
         python -m pip install --upgrade pip
         pip install uv
         uv sync --extra dev
-        
-        # Run Docker-related tests (excluding actual docker run tests)
-        uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_dockerfile_exists -v
-        uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_dockerignore_exists -v
-        uv run --extra dev pytest tests/test_docker_integration.py::TestDockerIntegration::test_example_scripts_exist -v
+
+    - name: Run Docker integration tests
+      run: |
+        uv run --extra dev pytest tests/test_docker_integration.py -v
+        uv run --extra dev pytest tests/test_docker_compose.py -v
+        uv run --extra dev pytest tests/test_docker_timezone_fix.py -v
+
+    - name: Tear down services
+      if: always()
+      run: |
+        docker compose down -v --remove-orphans

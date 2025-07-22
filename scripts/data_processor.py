@@ -57,18 +57,13 @@ def generate_report(processed, errors, output_dir="./output"):
             "total_files": processed + errors,
             "processed_successfully": processed,
             "errors": errors,
-            "success_rate": f"{(processed / (processed + errors) * 100):.1f}%"
-            if (processed + errors) > 0
-            else "0%",
+            "success_rate": f"{(processed / (processed + errors) * 100):.1f}%" if (processed + errors) > 0 else "0%",
         },
         "python_version": sys.version,
         "script_args": sys.argv[1:] if len(sys.argv) > 1 else [],
     }
 
-    report_file = (
-        Path(output_dir)
-        / f"processing_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    )
+    report_file = Path(output_dir) / f"processing_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 
     with open(report_file, "w") as f:
         json.dump(report, f, indent=2)

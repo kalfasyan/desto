@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -5,15 +6,15 @@ import pytest
 
 from desto.app.sessions import TmuxManager
 
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
+
 
 @patch("desto.app.sessions.ui")
 def test_init_log_dir_creation_error(mock_ui):
     mock_logger = MagicMock()
     with patch.object(Path, "mkdir", side_effect=OSError("fail")):
         with pytest.raises(OSError):
-            TmuxManager(
-                mock_ui, mock_logger, log_dir="/bad/dir", scripts_dir="/bad/dir"
-            )
+            TmuxManager(mock_ui, mock_logger, log_dir="/bad/dir", scripts_dir="/bad/dir")
 
 
 @patch("desto.app.sessions.subprocess")

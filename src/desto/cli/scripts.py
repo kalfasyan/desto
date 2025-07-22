@@ -9,7 +9,7 @@ from typing import List, Optional
 try:
     import typer
     from rich.console import Console
-    from rich.prompt import Confirm, Prompt
+    from rich.prompt import Confirm
     from rich.syntax import Syntax
     from rich.table import Table
 
@@ -430,7 +430,6 @@ def run_script(
     name: str = typer.Argument(..., help="Name of the script to run"),
     args: List[str] = typer.Argument(None, help="Arguments to pass to the script"),
     session_name: Optional[str] = typer.Option(None, "--session", "-s", help="Run in a specific tmux session"),
-    keep_alive: bool = typer.Option(False, "--keep-alive", "-k", help="Keep session alive after script finishes"),
     direct: bool = typer.Option(False, "--direct", "-d", help="Run directly without tmux session"),
 ):
     """Run a script directly or in a tmux session."""
@@ -485,12 +484,9 @@ def run_script(
 
         command_str = " ".join(base_command)
 
-        if manager.start_session(session_name, command_str, keep_alive):
+        if manager.start_session(session_name, command_str):
             icon = get_script_icon(script_type)
             console.print(f"[green]✅ Started {icon} {script_path.name} in session '{session_name}'[/green]")
-
-            if keep_alive:
-                console.print("[dim]Session will stay alive after script finishes[/dim]")
 
             console.print(f"[blue]View logs with: desto-cli sessions logs {session_name}[/blue]")
             console.print(f"[blue]Attach to session: tmux attach -t {session_name}[/blue]")

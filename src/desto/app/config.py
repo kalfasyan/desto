@@ -1,3 +1,4 @@
+import os
 from dataclasses import asdict, dataclass, field
 
 
@@ -60,6 +61,16 @@ class UISettings:
         margin_top: str = "16px"
         margin_bottom: str = "12px"
 
+    @dataclass
+    class RedisSettings:
+        host: str = "localhost"
+        port: int = 6379  # Default Redis port
+        db: int = 0
+        enabled: bool = True  # Allow disabling Redis completely
+        connection_timeout: int = 5  # seconds
+        retry_attempts: int = 3
+        session_history_days: int = 7  # Number of days to keep session history
+
     header: Header = field(default_factory=Header)
     sidebar: Sidebar = field(default_factory=Sidebar)
     labels: Labels = field(default_factory=Labels)
@@ -68,8 +79,18 @@ class UISettings:
     separator: Separator = field(default_factory=Separator)
     script_settings: ScriptSettings = field(default_factory=ScriptSettings)
     main_content: MainContent = field(default_factory=MainContent)
+    redis: RedisSettings = field(default_factory=RedisSettings)
 
-    def __post_init__(self): ...
+    def __post_init__(self):
+        """Override settings with environment variables if available"""
+        # Redis configuration from environment variables
+        self.redis.host = os.getenv("REDIS_HOST", self.redis.host)
+        self.redis.port = int(os.getenv("REDIS_PORT", self.redis.port))
+        self.redis.db = int(os.getenv("REDIS_DB", self.redis.db))
+        self.redis.enabled = os.getenv("REDIS_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+        self.redis.connection_timeout = int(os.getenv("REDIS_CONNECTION_TIMEOUT", self.redis.connection_timeout))
+        self.redis.retry_attempts = int(os.getenv("REDIS_RETRY_ATTEMPTS", self.redis.retry_attempts))
+        self.redis.session_history_days = int(os.getenv("REDIS_SESSION_HISTORY_DAYS", self.redis.session_history_days))
 
 
 config = asdict(UISettings())

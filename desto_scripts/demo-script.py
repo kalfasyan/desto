@@ -19,7 +19,7 @@ def main():
 
     print("\nDesto environment variables:")
     for key, value in os.environ.items():
-        if key.startswith('DESTO'):
+        if key.startswith("DESTO"):
             print(f"  {key}: {value}")
 
     print("\nRunning Python demo tasks...")
@@ -29,7 +29,7 @@ def main():
         "Processing data batch 1",
         "Processing data batch 2",
         "Generating reports",
-        "Cleanup and finalization"
+        "Cleanup and finalization",
     ]
 
     for i, task in enumerate(tasks, 1):
@@ -37,6 +37,7 @@ def main():
         time.sleep(1.5)
 
     print(f"\nDemo completed successfully at: {datetime.now()}")
+
 
 if __name__ == "__main__":
     main()

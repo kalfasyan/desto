@@ -9,279 +9,9 @@ import psutil
 from loguru import logger
 from nicegui import ui
 
+from desto.redis.at_job_manager import AtJobManager
 
-class SystemStatsPanel:
-    def __init__(self, ui_settings):
-        self.ui_settings = ui_settings
-        self.cpu_percent = None
-        self.cpu_bar = None
-        self.show_cpu_cores = None
-        self.cpu_cores_container = None
-        self.cpu_core_labels = []
-        self.cpu_core_bars = []
-        self.memory_percent = None
-        self.memory_bar = None
-        self.memory_available = None
-        self.memory_used = None
-        self.disk_percent = None
-        self.disk_bar = None
-        self.disk_free = None
-        self.disk_used = None
-        self.tmux_cpu = None
-        self.tmux_mem = None
-
-    def build(self):
-        with ui.column():
-            ui.label("System Stats").style(
-                f"font-size: {self.ui_settings['labels']['title_font_size']}; "
-                f"font-weight: {self.ui_settings['labels']['title_font_weight']}; "
-                "margin-bottom: 10px;"
-            )
-            ui.label("CPU Usage (Average)").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
-            with ui.row().style("align-items: center"):
-                ui.icon("memory", size="1.2rem")
-                self.cpu_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
-            self.cpu_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-
-            # CPU Cores toggle and container
-            self.show_cpu_cores = ui.switch("Show CPU Cores", value=False).style("margin-top: 8px;")
-            self.cpu_cores_container = ui.column().style("margin-top: 8px;")
-
-            def toggle_cpu_cores_visibility(e):
-                self.cpu_cores_container.visible = e.args[0]
-                if e.args[0] and not self.cpu_core_labels:
-                    # Initialize CPU cores display if not already done
-                    self._initialize_cpu_cores()
-
-            self.show_cpu_cores.on("update:model-value", toggle_cpu_cores_visibility)
-            self.cpu_cores_container.visible = self.show_cpu_cores.value
-
-            ui.label("Memory Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
-            with ui.row().style("align-items: center"):
-                ui.icon("developer_board", size="1.2rem")
-                self.memory_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
-            self.memory_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.memory_used = ui.label("0 GB Used").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.memory_available = ui.label("0 GB Available").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            ui.label("Disk Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
-            with ui.row().style("align-items: center"):
-                ui.icon("storage", size="1.2rem")
-                self.disk_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
-            self.disk_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.disk_used = ui.label("0 GB Used").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.disk_free = ui.label("0 GB Free").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.tmux_cpu = ui.label("tmux CPU: N/A").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;"
-            )
-            self.tmux_mem = ui.label("tmux MEM: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;")
-
-    def _initialize_cpu_cores(self):
-        """Initialize the CPU cores display."""
-        cpu_count = psutil.cpu_count()
-        max_cols = self.ui_settings.get("cpu_cores", {}).get("max_columns", 4)
-
-        with self.cpu_cores_container:
-            ui.label("CPU Cores").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;")
-
-            # Create cores in rows based on max_columns
-            for i in range(0, cpu_count, max_cols):
-                with ui.row().style("gap: 12px; margin-bottom: 4px;"):
-                    for core_idx in range(i, min(i + max_cols, cpu_count)):
-                        with ui.column().style("align-items: center; min-width: 60px;"):
-                            core_label = ui.label(f"Core {core_idx}").style(
-                                f"font-size: {self.ui_settings.get('cpu_cores', {}).get('core_label_size', '0.9em')}; "
-                                "text-align: center; margin-bottom: 2px;"
-                            )
-                            core_percent = ui.label("0%").style(
-                                f"font-size: {self.ui_settings.get('cpu_cores', {}).get('core_label_size', '0.9em')}; "
-                                "text-align: center; margin-bottom: 2px;"
-                            )
-                            core_bar = ui.linear_progress(value=0, size="xs", show_value=False).style(
-                                f"height: {self.ui_settings.get('cpu_cores', {}).get('bar_height', '6px')};"
-                            )
-
-                            self.cpu_core_labels.append((core_label, core_percent))
-                            self.cpu_core_bars.append(core_bar)
-
-
-class SettingsPanel:
-    def __init__(self, tmux_manager, ui_manager=None):
-        self.tmux_manager = tmux_manager
-        self.ui_manager = ui_manager
-        self.scripts_dir_input = None
-        self.logs_dir_input = None
-
-    def build(self):
-        ui.label("Settings").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
-        self.scripts_dir_input = ui.input(
-            label="Scripts Directory",
-            value=str(self.tmux_manager.SCRIPTS_DIR),
-        ).style("width: 100%; margin-bottom: 10px;")
-        self.logs_dir_input = ui.input(
-            label="Logs Directory",
-            value=str(self.tmux_manager.LOG_DIR),
-        ).style("width: 100%; margin-bottom: 10px;")
-        ui.button("Save", on_click=self.save_settings).style("width: 100%; margin-top: 10px;")
-
-    def save_settings(self):
-        scripts_dir = Path(self.scripts_dir_input.value).expanduser()
-        logs_dir = Path(self.logs_dir_input.value).expanduser()
-        valid = True
-        if not scripts_dir.is_dir():
-            ui.notification("Invalid scripts directory.", type="warning")
-            self.scripts_dir_input.value = str(self.tmux_manager.SCRIPTS_DIR)
-            valid = False
-        if not logs_dir.is_dir():
-            ui.notification("Invalid logs directory.", type="warning")
-            self.logs_dir_input.value = str(self.tmux_manager.LOG_DIR)
-            valid = False
-        if valid:
-            self.tmux_manager.SCRIPTS_DIR = scripts_dir
-            self.tmux_manager.LOG_DIR = logs_dir
-            ui.notification("Directories updated.", type="positive")
-            if self.ui_manager:
-                self.ui_manager.refresh_script_list()
-
-
-class NewScriptPanel:
-    def __init__(self, tmux_manager, ui_manager=None):
-        self.tmux_manager = tmux_manager
-        self.ui_manager = ui_manager
-        self.script_type = {"value": "bash"}
-        self.custom_code = {"value": "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"}
-        self.custom_template_name_input = None
-        self.code_editor = None
-
-    def build(self):
-        # Script type selector
-        ui.select(
-            ["bash", "python"],
-            label="Script Type",
-            value="bash",
-            on_change=self.on_script_type_change,
-        ).style("width: 100%; margin-bottom: 10px;")
-
-        self.code_editor = (
-            ui.codemirror(
-                self.custom_code["value"],
-                language="bash",
-                theme="vscodeLight",
-                on_change=lambda e: self.custom_code.update({"value": e.value}),
-            )
-            .style("width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;")
-            .classes("h-48")
-        )
-        ui.select(self.code_editor.supported_themes, label="Theme").classes("w-32").bind_value(self.code_editor, "theme")
-        self.custom_template_name_input = ui.input(
-            label="Save Script As... (max 15 chars)",
-            placeholder="MyScript",
-            validation={"Too long!": lambda value: len(value) <= 15},
-        ).style("width: 100%; margin-bottom: 8px;")
-        ui.button(
-            "Save",
-            on_click=self.save_custom_script,
-        ).style("width: 28%; margin-bottom: 8px;")
-
-    def on_script_type_change(self, e):
-        """Handle script type selection change."""
-        script_type = e.value
-        self.script_type["value"] = script_type
-
-        if script_type == "python":
-            self.custom_code["value"] = "#!/usr/bin/env python3\n\n# Your Python code here\nprint('Hello from desto!')\n"
-            self.code_editor.language = "python"
-        else:  # bash
-            self.custom_code["value"] = "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
-            self.code_editor.language = "bash"
-
-        self.code_editor.value = self.custom_code["value"]
-
-    def save_custom_script(self):
-        name = self.custom_template_name_input.value.strip()
-        if not name or len(name) > 15:
-            ui.notification("Please enter a name up to 15 characters.", type="info")
-            return
-        safe_name = name.strip().replace(" ", "_")[:15]
-        code = self.custom_code["value"]
-        script_type = self.script_type["value"]
-
-        # Determine file extension and default shebang
-        if script_type == "python":
-            extension = ".py"
-            default_shebang = "#!/usr/bin/env python3\n"
-        else:  # bash
-            extension = ".sh"
-            default_shebang = "#!/bin/bash\n"
-
-        # Add shebang if missing
-        if not code.startswith("#!"):
-            code = default_shebang + code
-
-        script_path = self.tmux_manager.get_script_file(f"{safe_name}{extension}")
-        try:
-            with script_path.open("w") as f:
-                f.write(code)
-            os.chmod(script_path, 0o755)
-            msg = f"Script '{name}' saved to {script_path}."
-            logger.info(msg)
-            ui.notification(msg, type="positive")
-        except Exception as e:
-            msg = f"Failed to save script: {e}"
-            logger.error(msg)
-            ui.notification(msg, type="warning")
-
-        if self.ui_manager:
-            self.ui_manager.refresh_script_list()
-            # Select the new script in the scripts tab and update the preview
-            script_filename = f"{safe_name}{extension}"
-            if hasattr(self.ui_manager, "script_path_select"):
-                self.ui_manager.script_path_select.value = script_filename
-                self.ui_manager.update_script_preview(type("E", (), {"args": script_filename})())
-
-        ui.notification(f"Script '{name}' saved and available in Scripts.", type="positive")
-
-
-class LogPanel:
-    def __init__(self):
-        self.log_display = None
-        self.log_messages = []
-
-    def build(self):
-        show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")
-        log_card = ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;")
-        with log_card:
-            ui.label("Log Messages").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
-            self.log_display = (
-                ui.textarea("")
-                .style("width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;")
-                .props("readonly")
-            )
-
-        def toggle_log_card_visibility(value):
-            if value:
-                log_card.style("opacity: 1; pointer-events: auto;")
-            else:
-                log_card.style("opacity: 0; pointer-events: none;")
-
-        show_logs.on("update:model-value", lambda e: toggle_log_card_visibility(e.args[0]))
-        log_card.visible = show_logs.value
-
-    def update_log_messages(self, message, number_of_lines=20):
-        self.log_messages.append(message)
-
-        if len(self.log_messages) > number_of_lines:
-            self.log_messages.pop(0)
-
-    def refresh_log_display(self):
-        self.log_display.value = "\n".join(self.log_messages)
+from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
 class UserInterfaceManager:
@@ -290,9 +20,13 @@ class UserInterfaceManager:
         self.ui = ui
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
-        self.new_script_panel = NewScriptPanel(tmux_manager, self)
-        self.log_panel = LogPanel()
+        self.new_script_tab = NewScriptTab(tmux_manager, self)
+        self.log_section = LogSection()
+        self.script_manager_tab = ScriptManagerTab(self)
         self.script_path_select = None  # Reference to the script select component
+        self.session_name_input = None  # Reference to session name input
+        self.arguments_input = None  # Reference to arguments input
+        self.script_preview_editor = None  # Reference to script preview editor
         self.ignore_next_edit = False
         self.chain_queue = []  # List of (script_path, arguments)
 
@@ -413,134 +147,14 @@ class UserInterfaceManager:
                 with splitter.after:
                     with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
                         with ui.tab_panel(scripts_tab):
-                            with ui.card().style(
-                                "background-color: #fff; color: #000; padding: 20px; "
-                                "border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"
-                            ):
-                                # Place Session Name, Script, and Arguments side by side
-                                with ui.row().style("width: 100%; gap: 10px; margin-bottom: 10px;"):
-                                    self.session_name_input = ui.input(label="Session Name").style("width: 30%; color: #75a8db;")
-                                    script_files = self.get_script_files()
-                                    self.script_path_select = ui.select(
-                                        options=script_files if script_files else ["No scripts found"],
-                                        label="Script",
-                                        value=script_files[0] if script_files else "No scripts found",
-                                    ).style("width: 35%;")
-                                    self.script_path_select.on("update:model-value", self.update_script_preview)
-                                    self.arguments_input = ui.input(
-                                        label="Arguments",
-                                        value=".",
-                                    ).style("width: 35%;")
-
-                                script_preview_content = ""
-                                if script_files and (self.tmux_manager.SCRIPTS_DIR / script_files[0]).is_file():
-                                    with open(
-                                        self.tmux_manager.SCRIPTS_DIR / script_files[0],
-                                        "r",
-                                    ) as f:
-                                        script_preview_content = f.read()
-
-                                # Track if the script was edited
-                                script_edited = {"changed": False}
-
-                                def on_script_edit(e):
-                                    if not self.ignore_next_edit:
-                                        script_edited["changed"] = True
-                                    else:
-                                        self.ignore_next_edit = False  # Reset after ignoring
-
-                                # Place code editor and theme selection side by side
-                                with ui.row().style("width: 100%; gap: 10px; margin-bottom: 10px;"):
-                                    self.script_preview_editor = (
-                                        ui.codemirror(
-                                            script_preview_content,
-                                            language="bash",
-                                            theme="vscodeLight",
-                                            line_wrapping=True,
-                                            highlight_whitespace=True,
-                                            indent="    ",
-                                            on_change=on_script_edit,
-                                        )
-                                        .style("width: 80%; min-width: 300px; margin-top: 0px;")
-                                        .classes("h-48")
-                                    )
-                                    ui.select(
-                                        self.script_preview_editor.supported_themes,
-                                        label="Theme",
-                                    ).classes("w-32").bind_value(self.script_preview_editor, "theme")
-
-                                # Save/Save as/Delete Buttons
-                                with ui.row().style("gap: 10px; margin-top: 10px;"):
-                                    ui.button(
-                                        "Save",
-                                        on_click=lambda: self.save_current_script(script_edited),
-                                        color="primary",
-                                        icon="save",
-                                    )
-                                    ui.button(
-                                        "Save as",
-                                        on_click=self.save_as_new_dialog,
-                                        color="secondary",
-                                        icon="save",
-                                    )
-                                    ui.button(
-                                        "DELETE",
-                                        color="red",
-                                        on_click=lambda: self.confirm_delete_script(),
-                                        icon="delete",
-                                    )
-
-                                # Keep Alive switch
-                                self.keep_alive_switch_new = ui.switch("Keep Alive").style("margin-top: 10px;")
-
-                                # Launch logic: warn if unsaved changes
-                                async def launch_with_save_check():
-                                    if script_edited["changed"]:
-                                        ui.notification(
-                                            "You have unsaved changes. Please save before launching or use 'Save as New'.",
-                                            type="warning",
-                                        )
-                                        return
-                                    # If there are scripts in the chain queue, launch the chain
-                                    if self.chain_queue:
-                                        await self.run_chain_queue(
-                                            self.session_name_input.value,
-                                            self.arguments_input.value,
-                                            self.keep_alive_switch_new.value,
-                                        )
-                                        self.chain_queue.clear()
-                                    else:
-                                        await self.run_session_with_keep_alive(
-                                            self.session_name_input.value,
-                                            str(self.tmux_manager.SCRIPTS_DIR / self.extract_script_filename(self.script_path_select.value)),
-                                            self.arguments_input.value,
-                                            self.keep_alive_switch_new.value,
-                                        )
-
-                                with ui.row().style("width: 100%; gap: 10px; margin-top: 10px;"):
-                                    ui.button(
-                                        "Launch",
-                                        on_click=launch_with_save_check,  # Pass the async function directly
-                                        icon="rocket_launch",
-                                    )
-                                    ui.button(
-                                        "Schedule",
-                                        color="secondary",
-                                        icon="history",
-                                        on_click=lambda: self.schedule_launch(),
-                                    )
-                                    ui.button(
-                                        "Chain Script",
-                                        color="secondary",
-                                        on_click=self.chain_current_script,
-                                        icon="add_link",
-                                    )
+                            self.script_manager_tab.build()
 
                         with ui.tab_panel(new_script_tab):
                             with ui.card().style(
                                 "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"
                             ):
-                                self.new_script_panel.build()
+                                self.new_script_tab.build()
+
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
             self.refresh_chain_queue_display()
@@ -561,13 +175,13 @@ class UserInterfaceManager:
                 on_click=self.tmux_manager.confirm_kill_all_sessions,
             ).style("width: 200px; margin-top: 15px; margin-bottom: 15px;")
 
-            self.log_panel.build()
+            self.log_section.build()
 
     def update_log_messages(self, message, number_of_lines=20):
-        self.log_panel.update_log_messages(message, number_of_lines)
+        self.log_section.update_log_messages(message, number_of_lines)
 
     def refresh_log_display(self):
-        self.log_panel.refresh_log_display()
+        self.log_section.refresh_log_display()
 
     def update_ui_system_info(self):
         """Update system stats in the UI."""
@@ -580,13 +194,13 @@ class UserInterfaceManager:
         if self.stats_panel.show_cpu_cores.value and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
             try:
                 core_percentages = psutil.cpu_percent(percpu=True, interval=None)
-                for i, (core_percent, core_bar) in enumerate(zip(core_percentages, self.stats_panel.cpu_core_bars)):
-                    if i < len(self.stats_panel.cpu_core_labels):
-                        _, percent_label = self.stats_panel.cpu_core_labels[i]
-                        percent_label.text = f"{core_percent:.1f}%"
-                        core_bar.value = core_percent / 100
-            except Exception:
+                for i, core_percent in enumerate(core_percentages):
+                    if i < len(self.stats_panel.cpu_core_labels) and i < len(self.stats_panel.cpu_core_bars):
+                        self.stats_panel.cpu_core_labels[i].text = f"{core_percent:.1f}%"
+                        self.stats_panel.cpu_core_bars[i].value = core_percent / 100
+            except Exception as e:
                 # If there's an error getting per-core data, just skip the update
+                logger.debug(f"Error updating CPU core data: {e}")
                 pass
 
         memory = psutil.virtual_memory()
@@ -746,37 +360,6 @@ class UserInterfaceManager:
             ui.button("Save", on_click=do_save_as_new)
         name_dialog.open()
 
-    async def run_session_with_keep_alive(self, session_name, script_path, arguments, keep_alive):
-        # Build the basic execution command - TmuxManager will handle all logging
-        exec_cmd = self.build_execution_command(script_path, arguments)
-
-        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
-        ui.notification(f"Started session '{session_name}'.", type="positive")
-
-    async def run_chain_queue(self, session_name, arguments, keep_alive):
-        if not self.chain_queue:
-            ui.notification("Chain queue is empty.", type="warning")
-            return
-
-        session_name = session_name.strip() or f"chain_{os.getpid()}"
-
-        # Build a single command that runs all scripts in sequence
-        chain_commands = []
-        for script, args in self.chain_queue:
-            script_name = Path(script).name
-            exec_cmd = self.build_execution_command(script, args)
-            # Add a separator echo before each script
-            chain_commands.append(f"echo '---- Running {script_name} ----'")
-            chain_commands.append(exec_cmd)
-
-        # Join all commands with &&
-        full_chain_cmd = " && ".join(chain_commands)
-
-        self.tmux_manager.start_tmux_session(session_name, full_chain_cmd, logger, keep_alive)
-        ui.notification(f"Started chained session '{session_name}'.", type="positive")
-        self.chain_queue.clear()
-        self.refresh_chain_queue_display()
-
     def chain_current_script(self):
         script_name = self.script_path_select.value
         arguments = self.arguments_input.value
@@ -804,9 +387,9 @@ class UserInterfaceManager:
         if now_str:
             info_lines.append(f"# Scheduled for: {now_str}")
         info_lines.append("")  # Blank line
-        return "\\n".join(info_lines)
+        return "\n".join(info_lines)
 
-    def build_logging_command(self, log_file_path, info_block, exec_cmd, finished_marker_cmd, keep_alive=False):
+    def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=None):
         """Build a properly formatted logging command that appends to existing logs."""
 
         # Check if log file exists to determine if we should append or create new
@@ -825,11 +408,12 @@ class UserInterfaceManager:
         # Add pre-script logging - use printf for better shell compatibility
         pre_script_log = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
 
-        # Add post-script logging
-        post_script_log = f"printf '\\n=== SCRIPT FINISHED at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
-
         # Build the full command
         cmd_parts = []
+
+        # Add Redis session start tracking first if provided
+        if session_start_cmd:
+            cmd_parts.append(session_start_cmd)
 
         # Add separator if needed
         if separator_cmd:
@@ -841,29 +425,36 @@ class UserInterfaceManager:
         # Add pre-script logging
         cmd_parts.append(pre_script_log)
 
-        # Add the actual script execution with output redirection
-        # FIXED: Group the execution command in parentheses to ensure ALL output gets redirected
-        # This fixes the issue where only the last command in a chain gets logged
+        # Add the actual script execution with output redirection and proper error handling
         cmd_parts.append(f"({exec_cmd}) >> '{log_file_path}' 2>&1")
+        cmd_parts.append("SCRIPT_EXIT_CODE=$?")
 
-        # Add post-script logging
-        cmd_parts.append(post_script_log)
+        # Add job completion marker (update to use variable)
+        # Extract session name from log file path
+        session_name = Path(log_file_path).stem
+        if hasattr(self, "tmux_manager") and hasattr(self.tmux_manager, "get_job_completion_command"):
+            completion_cmd = self.tmux_manager.get_job_completion_command(session_name, use_variable=True)
+            cmd_parts.append(completion_cmd)
+        else:
+            # Fallback if tmux_manager not available
+            cmd_parts.append(job_completion_cmd)
 
-        # Add finished marker
-        cmd_parts.append(finished_marker_cmd)
+        # Join with semicolons after the main script execution to ensure subsequent commands run
+        if len(cmd_parts) >= 3:
+            # Everything up to and including script execution
+            pre_execution = cmd_parts[:-4]  # Before script execution
+            script_execution = cmd_parts[-4]  # The script execution
+            post_execution = cmd_parts[-3:]  # Everything after script execution
 
-        # Add keep-alive if requested
-        if keep_alive:
-            cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
+            pre_cmd = " && ".join(pre_execution) if pre_execution else ""
+            post_cmd = "; ".join(post_execution)  # Use semicolons so they run regardless
 
-        return " && ".join(cmd_parts)
-
-    async def run_session_with_save_check(self, session_name, script_path, arguments, keep_alive):
-        # Build the basic execution command - TmuxManager will handle all logging
-        exec_cmd = self.build_execution_command(script_path, arguments)
-
-        self.tmux_manager.start_tmux_session(session_name, exec_cmd, logger, keep_alive)
-        ui.notification(f"Scheduled session '{session_name}' started.", type="positive")
+            if pre_cmd:
+                return f"{pre_cmd} && {script_execution}; {post_cmd}"
+            else:
+                return f"{script_execution}; {post_cmd}"
+        else:
+            return " && ".join(cmd_parts)
 
     def schedule_launch(self):
         """Open a dialog to schedule the script launch at a specific date and time."""
@@ -892,11 +483,14 @@ class UserInterfaceManager:
         import shutil
         from datetime import datetime
 
+        from desto.redis.client import DestoRedisClient  # noqa
+        from desto.redis.desto_manager import DestoManager  # noqa
+        from desto.redis.models import SessionStatus  # noqa
+
         date_val = date_input.value
         time_val = time_input.value
         session_name = self.session_name_input.value.strip() if hasattr(self, "session_name_input") else ""
         arguments = self.arguments_input.value if hasattr(self, "arguments_input") else "."
-        keep_alive = self.keep_alive_switch_new.value if hasattr(self, "keep_alive_switch_new") else False
 
         if not date_val or not time_val or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
@@ -917,103 +511,82 @@ class UserInterfaceManager:
             # Format time for 'at' (e.g., 'HH:MM YYYY-MM-DD')
             at_time_str = scheduled_dt.strftime("%H:%M %Y-%m-%d")
 
-            # If chain queue is not empty, schedule the chain
-            if self.chain_queue:
-                log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-                info_block = self.get_log_info_block(self.chain_queue[0][0], session_name, scheduled_dt)
-                finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-
-                # Build the chain command with proper logging
-                cmd_parts = []
-
-                # Check if log file exists to determine if we should append or create new
-                append_mode = Path(log_file_path).exists()
-
-                # Add initial info block using printf for better compatibility
-                if append_mode:
-                    cmd_parts.append(f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> '{log_file_path}'")
-                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} >> '{log_file_path}'")
+            # Add Redis session with SCHEDULED status for scheduled scripts
+            redis_client = DestoRedisClient()
+            if redis_client.is_connected():
+                manager = DestoManager(redis_client)
+                if self.chain_queue:
+                    manager.start_session_with_job(
+                        session_name=session_name,
+                        command=f"Chain: {len(self.chain_queue)} scripts",
+                        script_path=f"Chain: {len(self.chain_queue)} scripts",
+                        status=SessionStatus.SCHEDULED,
+                    )
                 else:
-                    cmd_parts.append(f"printf '%s\\n' {repr(info_block)} > '{log_file_path}'")
+                    actual_filename = self.extract_script_filename(self.script_path_select.value)
+                    script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
+                    exec_cmd = self.build_execution_command(script_file_path, arguments)
+                    manager.start_session_with_job(
+                        session_name=session_name,
+                        command=exec_cmd,
+                        script_path=str(script_file_path),
+                        status=SessionStatus.SCHEDULED,
+                    )
 
-                # Add each script in the chain with proper logging
+            # Build the execution command(s) for the wrapper (no info block, no separator, no printf)
+            if self.chain_queue:
+                # Build a single shell command that runs all scripts in order, stopping on error
+                commands = []
+                script_paths = []
                 for idx, (script, args) in enumerate(self.chain_queue):
-                    script_name = Path(script).name
-                    # Add separator for each script
-                    separator = f"printf '\\n---- NEW SCRIPT (%s) -----\\n' '{script_name}' >> '{log_file_path}'"
-                    # Add pre-script logging
-                    pre_script_log = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
-                    # Build execution command
                     exec_cmd = self.build_execution_command(script, args)
-                    # FIXED: Group execution command to ensure proper logging
-                    run_script = f"({exec_cmd}) >> '{log_file_path}' 2>&1"
-                    # Add post-script logging using printf for consistency
-                    post_script_log = f"printf '\\n=== SCRIPT FINISHED at %s ===\\n' \"$(date)\" >> '{log_file_path}'"
+                    commands.append(exec_cmd)
+                    script_paths.append(script)
+                tmux_cmd = " && ".join(commands)
+            else:
+                actual_filename = self.extract_script_filename(self.script_path_select.value)
+                script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
+                exec_cmd = self.build_execution_command(script_file_path, arguments)
+                tmux_cmd = exec_cmd
+                script_paths = [str(script_file_path)]
 
-                    cmd_parts.extend([separator, pre_script_log, run_script, post_script_log])
+            # Use the wrapper script for proper Redis tracking of scheduled jobs
+            wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
 
-                # Add finished marker
-                cmd_parts.append(finished_marker_cmd)
+            if wrapper_script_path.exists():
+                scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
+            else:
+                scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
 
-                # Add keep-alive if requested
-                if keep_alive:
-                    cmd_parts.append(f"tail -f /dev/null >> '{log_file_path}' 2>&1")
+            redis_client = DestoRedisClient()
+            at_job_manager = AtJobManager(redis_client)
 
-                # Join all parts with &&
-                tmux_cmd = " && ".join(cmd_parts)
-                tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
-                # Schedule with 'at'
-                at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
-                import subprocess
+            # Call AtJobManager.schedule with all metadata fields
+            job_id = at_job_manager.schedule(
+                command=scheduled_cmd,
+                time_spec=at_time_str,
+                session_name=session_name,
+                script_path=script_paths,  # Always a list
+                arguments=arguments,
+            )
 
-                result = subprocess.run(
-                    at_shell_cmd,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                if result.returncode == 0:
+            if job_id:
+                if self.chain_queue:
                     ui.notification(
-                        f"Chain scheduled for {scheduled_dt} as session '{session_name}'",
+                        f"Chain scheduled for {scheduled_dt} as session '{session_name}' (Job ID: {job_id})",
                         type="info",
                     )
                     self.chain_queue.clear()
                     self.refresh_chain_queue_display()
-                    schedule_dialog.close()
                 else:
-                    error_label.text = f"Failed to schedule: {result.stderr}"
-                return
-
-            # Otherwise, schedule a single script as before
-            actual_filename = self.extract_script_filename(self.script_path_select.value)
-            script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
-            log_file_path = self.tmux_manager.LOG_DIR / f"{session_name}.log"
-            info_block = self.get_log_info_block(script_file_path, session_name, scheduled_dt)
-            finished_marker_cmd = f"touch '{self.tmux_manager.LOG_DIR}/{session_name}.finished'"
-            exec_cmd = self.build_execution_command(script_file_path, arguments)
-
-            # Use the new logging command builder
-            tmux_cmd = self.build_logging_command(log_file_path, info_block, exec_cmd, finished_marker_cmd, keep_alive=True)
-            tmux_new_session_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
-            at_shell_cmd = f"echo {shlex.quote(tmux_new_session_cmd)} | at {shlex.quote(at_time_str)}"
-            import subprocess
-
-            result = subprocess.run(
-                at_shell_cmd,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if result.returncode == 0:
-                ui.notification(
-                    f"Script scheduled for {scheduled_dt} as session '{session_name}'",
-                    type="info",
-                )
+                    ui.notification(
+                        f"Script scheduled for {scheduled_dt} as session '{session_name}' (Job ID: {job_id})",
+                        type="info",
+                    )
                 schedule_dialog.close()
             else:
-                error_label.text = f"Failed to schedule: {result.stderr}"
+                error_label.text = "Failed to schedule job via AtJobManager."
+
         except Exception as e:
             error_label.text = f"Invalid date/time: {e}"
 

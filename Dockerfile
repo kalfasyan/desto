@@ -7,7 +7,12 @@ RUN apt-get update && apt-get install -y \
     tmux \
     at \
     curl \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Set timezone
+ENV TZ=Europe/Berlin
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Set UV environment variables
 ENV UV_LINK_MODE=copy \
@@ -29,6 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy source code and scripts
 COPY src ./src
+COPY scripts ./scripts
 COPY desto_scripts/. /app/desto_scripts/
 
 # Install the project itself
@@ -52,5 +58,5 @@ EXPOSE 8809
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8809 || exit 1
 
-# Start the dashboard using uv
-CMD ["uv", "run", "desto"]
+# Start atd in the background, then run the dashboard
+CMD service atd start && uv run desto

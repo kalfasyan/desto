@@ -39,6 +39,7 @@ def demonstrate_current_issues():
             print("  2. Only 'Third' appears in log (chain redirect issue)")
             print("  3. 'First' and 'Second' go to stdout, not log")
 
+
 def demonstrate_fixed_version():
     """Demonstrate the fixed version of chain logging."""
     print("\n=== DEMONSTRATING FIXED VERSION ===")
@@ -69,6 +70,7 @@ def demonstrate_fixed_version():
             print("  1. Proper date formatting")
             print("  2. All commands logged correctly")
             print("  3. No stdout leakage")
+
 
 def demonstrate_failure_handling():
     """Demonstrate how to handle failures in chains."""
@@ -119,6 +121,7 @@ def demonstrate_failure_handling():
         if log_file2.exists():
             content2 = log_file2.read_text()
             print(f"Continue-on-failure log:\n{content2}")
+
 
 if __name__ == "__main__":
     demonstrate_current_issues()
