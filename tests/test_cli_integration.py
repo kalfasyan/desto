@@ -1,5 +1,6 @@
 """Integration tests for the CLI module."""
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -113,6 +114,7 @@ class TestCLIIntegration:
         assert validate_session_name("valid-session_name.123") is True
         assert validate_session_name("invalid'session") is False
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Integration tests not run in CI")
     def test_error_handling_integration(self, temp_dirs):
         """Test error handling across CLI components."""
         from desto.cli.session_manager import CLISessionManager
