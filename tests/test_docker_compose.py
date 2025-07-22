@@ -112,6 +112,7 @@ class TestDockerCompose:
             logger.error(f"Service did not become healthy within {max_wait} seconds")
         assert service_healthy, "Service did not become healthy within timeout"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Skip volume test on GitHub Actions due to permission issues")
     def test_docker_compose_volumes(self):
         """Test that volumes are mounted correctly in the container."""
         logger.info("Starting Docker Compose volumes test...")
