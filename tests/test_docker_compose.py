@@ -121,8 +121,19 @@ class TestDockerCompose:
         logs_dir = Path("desto_logs")
         scripts_dir.mkdir(exist_ok=True)
         logs_dir.mkdir(exist_ok=True)
+
         test_script = scripts_dir / "test_script.txt"
         test_log = logs_dir / "test_log.txt"
+
+        # Clean up old files to avoid permission issues
+        for f in [test_script, test_log]:
+            if f.exists():
+                try:
+                    f.unlink()
+                except PermissionError:
+                    f.chmod(0o666)
+                    f.unlink()
+
         test_script.write_text("hello from host script")
         test_log.write_text("hello from host log")
 
