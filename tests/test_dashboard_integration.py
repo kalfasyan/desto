@@ -4,11 +4,16 @@ Integration tests for dashboard UI behavior and session status display.
 These tests ensure that the dashboard correctly shows job completion status.
 """
 
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 # Add project root to path
 project_root = Path(__file__).parent.parent

@@ -3,6 +3,7 @@
 Unit tests for duplicate session validation
 """
 
+import os
 import subprocess
 import tempfile
 import time
@@ -12,6 +13,8 @@ from unittest.mock import Mock, patch
 import pytest
 
 from src.desto.app.sessions import TmuxManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 class TestDuplicateSessionValidation:

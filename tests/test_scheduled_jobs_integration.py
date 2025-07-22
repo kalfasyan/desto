@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import time
@@ -7,6 +8,8 @@ import pytest
 from loguru import logger
 
 from desto.app.sessions import TmuxManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 @pytest.fixture

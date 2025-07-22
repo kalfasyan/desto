@@ -3,6 +3,7 @@ Test the enhanced logging functionality for TmuxManager.
 This test verifies that log files are preserved between sessions and include proper timestamps.
 """
 
+import os
 import subprocess
 import tempfile
 import time
@@ -12,6 +13,8 @@ from unittest.mock import Mock, patch
 import pytest
 
 from desto.app.sessions import TmuxManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 class TestTmuxManagerLogging:

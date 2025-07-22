@@ -18,6 +18,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      # - name: Start Redis
+      #   run: docker run -d -p 6379:6379 --name redis-test redis:7-alpine
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

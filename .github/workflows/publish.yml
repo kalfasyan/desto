@@ -55,3 +55,9 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           print-hash: true
+          
+  redis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Redis
+        run: docker run -d -p 6379:6379 --name redis-test redis:7-alpine

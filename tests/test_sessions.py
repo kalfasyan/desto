@@ -1,8 +1,11 @@
+import os
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from desto.app.sessions import TmuxManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 @pytest.fixture

@@ -3,6 +3,7 @@ Integration test for logging functionality.
 This test can be run manually to verify the logging fix works in practice.
 """
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
@@ -11,6 +12,8 @@ import pytest
 from loguru import logger
 
 from desto.app.sessions import TmuxManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 @pytest.mark.skip(reason="Integration test for manual execution only")

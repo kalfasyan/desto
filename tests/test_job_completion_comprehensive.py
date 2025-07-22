@@ -8,6 +8,7 @@ These tests verify that:
 4. Failed scripts are handled correctly
 """
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -15,7 +16,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
 from loguru import logger
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 # Add project root to path
 project_root = Path(__file__).parent

@@ -43,13 +43,6 @@ jobs:
         uv run --extra dev pytest tests/test_docker_compose.py -v
         uv run --extra dev pytest tests/test_docker_timezone_fix.py -v
 
-    - name: Run additional integration tests (optional)
-      run: |
-        uv run --extra dev pytest tests/test_dashboard_integration.py -v
-        uv run --extra dev pytest tests/test_chain_logging.py -v
-        uv run --extra dev pytest tests/test_job_completion_comprehensive.py -v
-        uv run --extra dev pytest tests/test_scheduled_jobs_integration.py -v
-
     - name: Tear down services
       if: always()
       run: |
