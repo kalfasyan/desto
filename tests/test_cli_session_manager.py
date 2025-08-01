@@ -207,6 +207,93 @@ class TestSessionManagement:
 
             assert result is False
 
+    def test_start_chain_session_creates_redis_and_log(self, tmp_path):
+        # Setup
+        scripts_dir = tmp_path / "scripts"
+        log_dir = tmp_path / "logs"
+        scripts_dir.mkdir()
+        log_dir.mkdir()
+        # Create dummy scripts
+        script1 = scripts_dir / "a.sh"
+        script1.write_text("#!/bin/bash\necho 'A'\n")
+        script1.chmod(0o755)
+        script2 = scripts_dir / "b.sh"
+        script2.write_text("#!/bin/bash\necho 'B'\n")
+        script2.chmod(0o755)
+
+        manager = CLISessionManager(log_dir=log_dir, scripts_dir=scripts_dir)
+        scripts_with_args = [["a.sh"], ["b.sh"]]
+
+        # Patch subprocess and Redis
+        with (
+            patch("desto.cli.session_manager.subprocess.run") as mock_run,
+            patch("desto.redis.session_manager.SessionManager.create_session") as mock_create,
+            patch("desto.redis.session_manager.SessionManager.start_session") as mock_start,
+            patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=None),
+        ):
+            mock_run.return_value.returncode = 0
+            mock_create.return_value = Mock(session_id="id1", session_name="chain_test", metadata={})
+            mock_start.return_value = True
+
+            session_name = manager.start_chain_session(scripts_with_args)
+            assert session_name is not None
+
+            # Check Redis registration
+            mock_create.assert_called()
+            args, kwargs = mock_create.call_args
+            assert "chain" in kwargs.get("metadata", {}).get("type", "chain")
+
+            # Check log file
+            log_file = log_dir / f"{session_name}.log"
+            assert log_file.exists()
+            content = log_file.read_text()
+            assert "# Session:" in content
+            # Do not check for script markers, as they are only written by tmux at runtime
+
+    def test_chain_session_registers_in_redis_and_logs(self, tmp_path):
+        from unittest.mock import Mock, patch
+
+        from desto.cli.session_manager import CLISessionManager
+
+        scripts_dir = tmp_path / "scripts"
+        log_dir = tmp_path / "logs"
+        scripts_dir.mkdir()
+        log_dir.mkdir()
+        script1 = scripts_dir / "a.sh"
+        script1.write_text("#!/bin/bash\necho 'A'\n")
+        script1.chmod(0o755)
+        script2 = scripts_dir / "b.sh"
+        script2.write_text("#!/bin/bash\necho 'B'\n")
+        script2.chmod(0o755)
+
+        manager = CLISessionManager(log_dir=log_dir, scripts_dir=scripts_dir)
+        scripts_with_args = [["a.sh"], ["b.sh"]]
+
+        with (
+            patch("desto.cli.session_manager.subprocess.run") as mock_run,
+            patch("desto.redis.session_manager.SessionManager.create_session") as mock_create,
+            patch("desto.redis.session_manager.SessionManager.start_session") as mock_start,
+            patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=None),
+        ):
+            mock_run.return_value.returncode = 0
+            mock_create.return_value = Mock(session_id="id1", session_name="chain_test", metadata={})
+            mock_start.return_value = True
+
+            session_name = manager.start_chain_session(scripts_with_args)
+            assert session_name is not None
+
+            # Check Redis registration
+            mock_create.assert_called()
+            args, kwargs = mock_create.call_args
+            assert "chain" in kwargs.get("metadata", {}).get("type", "chain")
+
+            # Check log file
+            log_file = log_dir / f"{session_name}.log"
+            assert log_file.exists()
+            content = log_file.read_text()
+            assert "# Session:" in content
+            # Do not check for script markers, as they are only written by tmux at runtime
+
 
 class TestLogManagement:
     """Test log management operations."""

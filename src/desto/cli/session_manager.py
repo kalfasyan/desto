@@ -2,31 +2,27 @@
 CLI-specific session manager using Redis-backed session management.
 """
 
+import getpass
 import os
 import shlex
+import socket
 import subprocess
+import uuid
 from datetime import datetime
 from pathlib import Path
 from subprocess import CalledProcessError
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 
-# Frequently used Redis session management imports
 from desto.redis.client import DestoRedisClient
 from desto.redis.session_manager import SessionManager
 
 
 class CLISessionManager:
-    """Session manager adapted for CLI use without UI dependencies."""
+    """Session manager adapted for CLI use, with full Redis integration and proper logging."""
 
     def __init__(self, log_dir: Optional[Path] = None, scripts_dir: Optional[Path] = None):
-        """
-        Initialize the CLI session manager.
-        Args:
-            log_dir: Directory for storing session logs
-            scripts_dir: Directory containing scripts
-        """
         self.scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         self.logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
 
@@ -35,7 +31,6 @@ class CLISessionManager:
 
         self.sessions: Dict[str, str] = {}
 
-        # Ensure directories exist
         try:
             self.log_dir.mkdir(exist_ok=True)
             self.scripts_dir.mkdir(exist_ok=True)
@@ -43,34 +38,44 @@ class CLISessionManager:
             logger.error(f"Failed to create log/scripts directory: {e}")
             raise
 
+    def _get_redis_and_manager(self):
+        redis_client = DestoRedisClient()
+        session_manager = SessionManager(redis_client)
+        return redis_client, session_manager
+
+    def _build_info_block(self, session_name: str, scripts: List[str]) -> str:
+        username = getpass.getuser()
+        hostname = socket.gethostname()
+        cwd = os.getcwd()
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        info_lines = [
+            f"# Session: {session_name}",
+            f"# User: {username}@{hostname}",
+            f"# Working Directory: {cwd}",
+            f"# Started: {now_str}",
+            f"# Scripts: {', '.join(scripts)}",
+            "",
+        ]
+        return "\n".join(info_lines)
+
     def start_session(self, session_name: str, command: str) -> bool:
         """
         Start a new session using the Redis-based SessionManager and launch the command in tmux.
         Also removes any existing .finished marker file for test compatibility.
         """
-
         # Check for duplicate session in-memory (for test compatibility)
         if session_name in self.sessions:
             logger.error(f"Session '{session_name}' already exists (in-memory check).")
             return False
 
         # Check if session already exists in Redis
-        redis_client = DestoRedisClient()
-        session_manager = SessionManager(redis_client)
+        redis_client, session_manager = self._get_redis_and_manager()
         existing_session = session_manager.get_session_by_name(session_name)
         if existing_session:
-            if hasattr(existing_session, "status") and getattr(existing_session, "status", None) and existing_session.status.value == "scheduled":
-                logger.error(
-                    f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
-                )
-                # If UI notification system is available, trigger it here
-                # Example: self.ui.notification(f"Session '{session_name}' is already scheduled.", type="warning")
-                return False
-            else:
-                logger.error(f"Session '{session_name}' already exists in Redis.")
-                return False
+            logger.error(f"Session '{session_name}' already exists in Redis.")
+            return False
 
-        # Create session in Redis
+        # Create session in Redis with metadata
         session = session_manager.create_session(session_name, tmux_session_name=session_name)
         session_manager.start_session(session.session_id)
 
@@ -113,6 +118,90 @@ class CLISessionManager:
         except Exception as e:
             logger.error(f"Unexpected error starting session '{session_name}': {e}")
             return False
+
+    def start_chain_session(self, scripts_with_args: List[List[str]], continue_on_error: bool = False) -> Optional[str]:
+        """
+        Start a chain session: runs multiple scripts in a single tmux session, logs info blocks, and registers in Redis.
+        scripts_with_args: List of [script_name, arg1, arg2, ...]
+        Returns the session name if started, else None.
+        """
+        session_name = f"chain_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
+        script_names = [" ".join(map(str, s)) for s in scripts_with_args]
+        log_file = self.get_log_file(session_name)
+        quoted_log_file = shlex.quote(str(log_file))
+
+        # Build info block
+        info_block = self._build_info_block(session_name, script_names)
+        # Write info block to log file immediately so it always exists
+        try:
+            log_file.parent.mkdir(exist_ok=True)
+            with log_file.open("w") as f:
+                f.write(info_block + "\n")
+        except Exception as e:
+            logger.error(f"Failed to write info block to log file '{log_file}': {e}")
+            return None
+        cmd_parts = []
+
+        # For each script, add markers and execution
+        for idx, parts in enumerate(scripts_with_args):
+            if not parts:
+                continue
+            script_name, *script_args = parts
+            script_path = None
+            for candidate in [script_name, f"{script_name}.sh", f"{script_name}.py"]:
+                candidate_path = self.get_script_file(candidate)
+                if candidate_path.exists():
+                    script_path = candidate_path
+                    break
+            if not script_path:
+                logger.error(f"Script '{script_name}' not found in {self.scripts_dir}")
+                return None
+            if not os.access(script_path, os.X_OK):
+                script_path.chmod(script_path.stat().st_mode | 0o111)
+            # Determine interpreter
+            if script_path.suffix == ".py":
+                cmd = ["python3", str(script_path)]
+            else:
+                cmd = ["bash", str(script_path)]
+            cmd.extend(script_args)
+            script_cmd = " ".join(shlex.quote(arg) for arg in cmd)
+            # Script info block
+            script_info = f"printf '\\n=== SCRIPT {idx + 1}: {script_path.name} STARTING at %s ===\\n' \"$(date)\" >> {quoted_log_file}"
+            cmd_parts.append(script_info)
+            # Script execution with output redirection
+            cmd_parts.append(f"({script_cmd}) >> {quoted_log_file} 2>&1")
+            cmd_parts.append("SCRIPT_EXIT_CODE=$?")
+            script_end = f'printf \'\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n\' "$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
+            cmd_parts.append(script_end)
+            if not continue_on_error:
+                cmd_parts.append("if [ $SCRIPT_EXIT_CODE -ne 0 ]; then exit $SCRIPT_EXIT_CODE; fi")
+
+        chain_command = " && ".join(cmd_parts) if not continue_on_error else " ; ".join(cmd_parts)
+
+        # Register chain session in Redis
+        redis_client, session_manager = self._get_redis_and_manager()
+        # metadata variable removed as it's not used by SessionManager.create_session
+        session = session_manager.create_session(session_name, tmux_session_name=session_name)
+        session_manager.start_session(session.session_id)
+
+        try:
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", session_name, chain_command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True,
+            )
+            logger.info(f"Chain session '{session_name}' started in tmux and registered in Redis.")
+            self.sessions[session_name] = chain_command
+            return session_name
+        except CalledProcessError as e:
+            error_output = e.stderr.strip() if e.stderr else "No stderr output"
+            logger.error(f"Failed to start chain session '{session_name}' in tmux: {error_output}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error starting chain session '{session_name}': {e}")
+            return None
 
     def list_sessions(self) -> Dict[str, Dict]:
         """

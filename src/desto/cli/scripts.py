@@ -551,3 +551,29 @@ def copy_script(
     except Exception as e:
         console.print(f"[red]Failed to copy script: {e}[/red]")
         raise typer.Exit(1)
+
+
+@scripts_app.command("chain")
+def chain_scripts(
+    scripts: List[str] = typer.Argument(
+        ..., help="Scripts to run in sequence. Each entry can include arguments, e.g. 'myscript.sh arg1 arg2'. Use quotes for scripts with arguments."
+    ),
+    continue_on_error: bool = typer.Option(False, "--continue-on-error", "-c", help="Continue chain if a script fails"),
+):
+    """
+    Run multiple scripts in sequence (chain). Each script can have its own arguments.
+    Example:
+      desto-cli scripts chain "count_files.sh ./mydir" "other_script.py foo bar"
+    """
+    import shlex
+
+    manager = CLISessionManager()
+    # Parse each script+args as a list
+    scripts_with_args = [shlex.split(entry) for entry in scripts]
+    session_name = manager.start_chain_session(scripts_with_args, continue_on_error=continue_on_error)
+    if session_name:
+        console.print(f"[green]✅ Started chain in session '{session_name}'[/green]")
+        console.print(f"[blue]View logs with: desto-cli sessions logs {session_name}[/blue]")
+    else:
+        console.print(f"[red]❌ Failed to start chain session[/red]")
+        raise typer.Exit(1)

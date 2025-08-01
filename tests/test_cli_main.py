@@ -236,3 +236,24 @@ class TestCommandIntegration:
 
         assert result.exit_code == 0
         assert "No active tmux sessions found" in result.stdout
+
+    def test_chain_command_registers_session_and_log(self, runner, tmp_path):
+        from typer.testing import CliRunner
+
+        from desto.cli.main import app
+
+        scripts_dir = tmp_path / "scripts"
+        log_dir = tmp_path / "logs"
+        scripts_dir.mkdir()
+        log_dir.mkdir()
+        (scripts_dir / "a.sh").write_text("#!/bin/bash\necho 'A'\n")
+        (scripts_dir / "a.sh").chmod(0o755)
+        (scripts_dir / "b.sh").write_text("#!/bin/bash\necho 'B'\n")
+        (scripts_dir / "b.sh").chmod(0o755)
+
+        with patch("desto.cli.session_manager.CLISessionManager.start_chain_session") as mock_chain:
+            mock_chain.return_value = "chain_123"
+            runner = CliRunner()
+            result = runner.invoke(app, ["scripts", "chain", "a.sh", "b.sh"])
+            assert result.exit_code == 0
+            mock_chain.assert_called()
