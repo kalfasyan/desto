@@ -171,7 +171,10 @@ class CLISessionManager:
             # Script execution with output redirection
             cmd_parts.append(f"({script_cmd}) >> {quoted_log_file} 2>&1")
             cmd_parts.append("SCRIPT_EXIT_CODE=$?")
-            script_end = f'printf \'\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n\' "$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
+            script_end = (
+                f"printf '\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n' "
+                f'"$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
+            )
             cmd_parts.append(script_end)
             if not continue_on_error:
                 cmd_parts.append("if [ $SCRIPT_EXIT_CODE -ne 0 ]; then exit $SCRIPT_EXIT_CODE; fi")

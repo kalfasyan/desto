@@ -575,5 +575,5 @@ def chain_scripts(
         console.print(f"[green]✅ Started chain in session '{session_name}'[/green]")
         console.print(f"[blue]View logs with: desto-cli sessions logs {session_name}[/blue]")
     else:
-        console.print(f"[red]❌ Failed to start chain session[/red]")
+        console.print("[red]❌ Failed to start chain session[/red]")
         raise typer.Exit(1)
