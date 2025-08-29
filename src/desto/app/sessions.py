@@ -768,13 +768,24 @@ class TmuxManager:
 
             # If tmux is not active, session cannot be 'Running'
             if not tmux_active and (status_field == "running" or job_status_field == "running"):
-                # If session is finished, keep as finished, else mark as failed
-                if status_field == "finished" or job_status_field == "finished":
+                # If Redis indicates the session has already finished (end_time present) or the
+                # job/session status is 'finished', prefer that authoritative state and show
+                # Finished instead of Failed even when tmux is no longer active.
+                if status_field == "finished" or job_status_field == "finished" or session.get("end_time"):
                     status = "✅ Finished"
                     status_color = "#4CAF50"
                 else:
-                    status = "❌ Failed (tmux closed)"
-                    status_color = "#F44336"
+                    # As a fallback, ask the DestoManager whether the session is finished.
+                    try:
+                        if self.desto_manager and self.desto_manager.is_session_finished(session_name):
+                            status = "✅ Finished"
+                            status_color = "#4CAF50"
+                        else:
+                            status = "❌ Failed (tmux closed)"
+                            status_color = "#F44336"
+                    except Exception:
+                        status = "❌ Failed (tmux closed)"
+                        status_color = "#F44336"
 
             # Times and durations
             created_time = session.get("created")
