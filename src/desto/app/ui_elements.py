@@ -1,11 +1,10 @@
+import json
 import os
 from pathlib import Path
 
 import psutil
 from loguru import logger
 from nicegui import ui
-import json
-from pathlib import Path
 
 
 class SystemStatsPanel:

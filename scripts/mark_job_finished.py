@@ -5,8 +5,8 @@ This is called from within tmux sessions when jobs finish.
 """
 
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add the project root to Python path
 project_root = Path(__file__).parent.parent

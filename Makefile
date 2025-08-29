@@ -32,6 +32,9 @@ test:  ## Run tests
 lint:  ## Run linting
 	uv run --extra dev ruff check .
 
+lint-fix:  ## Run linting and auto-fix issues
+	uv run --extra dev ruff check . --fix
+
 build:  ## Build package
 	uv build
 
