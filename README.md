@@ -23,6 +23,7 @@ The key features are:
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
+- **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
   
   
   
