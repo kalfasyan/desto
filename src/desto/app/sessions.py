@@ -1,3 +1,4 @@
+import getpass
 import json
 import os
 import shlex
@@ -67,6 +68,24 @@ class TmuxManager:
 
         logger.info(f"TmuxManager initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
+    def telemetry_event(self, event_name: str, details: dict | None = None) -> None:
+        """Emit a lightweight telemetry/log event as structured JSON.
+
+        This helper intentionally only logs locally (no external network calls).
+        """
+        try:
+            payload = {
+                "event": event_name,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "user": getpass.getuser(),
+                "details": details or {},
+            }
+            # Use a recognizable prefix to make telemetry entries easy to grep
+            logger.info("telemetry: {}".format(json.dumps(payload)))
+        except Exception:
+            # Never raise from telemetry
+            logger.debug("Failed to emit telemetry event", exc_info=True)
+
     def confirm_cancel_scheduled_job_by_id(self, at_job_id):
         """
         Show a confirmation dialog before canceling a scheduled job by at_job_id.
@@ -91,12 +110,23 @@ class TmuxManager:
                 self.resume_updates()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            # Telemetry: dialog opened
+            self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
             ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
                 "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
             )
+
+            def _cancel():
+                cancel()
+                self.telemetry_event("confirm_cancel_scheduled_job.cancel", {"at_job_id": str(at_job_id)})
+
+            def _confirm():
+                do_cancel()
+                self.telemetry_event("confirm_cancel_scheduled_job.confirm", {"at_job_id": str(at_job_id)})
+
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=cancel).props("color=grey")
-                ui.button("Confirm Cancel", color="red", on_click=do_cancel).props("icon=delete_forever")
+                ui.button("Cancel", on_click=_cancel).props("color=grey")
+                ui.button("Confirm Cancel", color="red", on_click=_confirm).props("icon=delete_forever")
         dialog.open()
 
     def cancel_scheduled_job(self, at_job_id, session_name=None):
@@ -234,12 +264,23 @@ class TmuxManager:
                 self.resume_updates()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            self.telemetry_event("confirm_clear_history.open", {})
             ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
             ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
             ui.label("This action cannot be undone.").style("color: #666; margin-bottom: 20px;")
+
+            def _close_and_telemetry_cancel():
+                close_dialog()
+                self.telemetry_event("confirm_clear_history.cancel", {})
+
+            def _clear_and_telemetry_confirm():
+                self.clear_session_history()
+                close_dialog()
+                self.telemetry_event("confirm_clear_history.confirm", {})
+
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
-                ui.button("Cancel", on_click=close_dialog).props("color=grey")
-                ui.button("Clear History", color="red", on_click=lambda: [self.clear_session_history(), close_dialog()]).props("icon=delete_forever")
+                ui.button("Cancel", on_click=_close_and_telemetry_cancel).props("color=grey")
+                ui.button("Clear History", color="red", on_click=_clear_and_telemetry_confirm).props("icon=delete_forever")
         dialog.open()
 
     def clear_session_history(self):
@@ -292,6 +333,7 @@ class TmuxManager:
                 self.resume_updates()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            self.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
             ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
             ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
             ui.label(str(log_dir)).style("font-family: monospace; background: #f5f5f5; padding: 5px; border-radius: 3px; margin-bottom: 15px;")
@@ -304,9 +346,19 @@ class TmuxManager:
                 for log_file in log_files[:3]:
                     ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
                 ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; color: #666; font-size: 0.9em;")
+
+            def _close_logs_cancel():
+                close_dialog()
+                self.telemetry_event("confirm_clear_logs.cancel", {})
+
+            def _confirm_clear_logs():
+                self.clear_log_files()
+                close_dialog()
+                self.telemetry_event("confirm_clear_logs.confirm", {})
+
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=close_dialog).props("color=grey")
-                ui.button("Clear Log Files", color="orange", on_click=lambda: [self.clear_log_files(), close_dialog()]).props("icon=folder_delete")
+                ui.button("Cancel", on_click=_close_logs_cancel).props("color=grey")
+                ui.button("Clear Log Files", color="orange", on_click=_confirm_clear_logs).props("icon=folder_delete")
         dialog.open()
 
     def clear_log_files(self):
@@ -616,88 +668,30 @@ class TmuxManager:
             self.pause_updates()  # Pause the global timer
 
         with self.ui.dialog() as dialog, self.ui.card():
+            # Telemetry: dialog opened
+            self.telemetry_event("confirm_kill_session.open", {"session": session_name})
             self.ui.label(f"Are you sure you want to kill the session '{session_name}'?")
+
+            def _confirm_kill():
+                logger.info(f"User confirmed killing session: {session_name}")
+                self.telemetry_event("confirm_kill_session.confirm", {"session": session_name})
+                self.kill_tmux_session(session_name)
+                dialog.close()
+                self.resume_updates()  # Resume updates after killing
+
+            def _cancel_kill():
+                logger.debug(f"User cancelled killing session: {session_name}")
+                self.telemetry_event("confirm_kill_session.cancel", {"session": session_name})
+                dialog.close()
+                self.resume_updates()  # Resume updates if canceled
+
             with self.ui.row():
-                self.ui.button(
-                    "Yes",
-                    on_click=lambda: [
-                        logger.info(f"User confirmed killing session: {session_name}"),
-                        self.kill_tmux_session(session_name),
-                        dialog.close(),
-                        self.resume_updates(),  # Resume updates after killing
-                    ],
-                ).props("color=red")
-                self.ui.button(
-                    "No",
-                    on_click=lambda: [
-                        logger.debug(f"User cancelled killing session: {session_name}"),
-                        dialog.close(),
-                        self.resume_updates(),  # Resume updates if canceled
-                    ],
-                )
+                self.ui.button("Yes", on_click=_confirm_kill).props("color=red")
+                self.ui.button("No", on_click=_cancel_kill)
 
         dialog.open()
 
-        def cancel_kill_all():
-            self.logger.debug("User cancelled kill all sessions operation")
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
-            self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-
-            # Ensure all variables are defined
-            # These should be set earlier in the function, but we add fallback to avoid F821
-            session_count = locals().get("session_count", 0)
-            running_count = locals().get("running_count", 0)
-            finished_count = locals().get("finished_count", 0)
-            job_count = locals().get("job_count", 0)
-            running_sessions = locals().get("running_sessions", [])
-            scheduled_jobs = locals().get("scheduled_jobs", [])
-            do_kill_all = locals().get("do_kill_all", lambda: None)
-            cancel_kill_all = locals().get("cancel_kill_all", lambda: None)
-
-            # Build warning text
-            warning_parts = []
-            if session_count > 0:
-                if running_count > 0 and finished_count > 0:
-                    warning_parts.append(f"{session_count} sessions ({running_count} running, {finished_count} finished)")
-                elif running_count > 0:
-                    warning_parts.append(f"{running_count} RUNNING sessions")
-                else:
-                    warning_parts.append(f"{finished_count} finished sessions")
-
-            if job_count > 0:
-                warning_parts.append(f"{job_count} scheduled jobs")
-
-            warning_text = "This will clear:\n• " + "\n• ".join(warning_parts)
-            if running_count > 0:
-                warning_text += "\n\n⚠️ This may interrupt active processes!"
-
-            self.ui.label(warning_text).style("margin-bottom: 15px; white-space: pre-line;")
-
-            # Show running sessions
-            if running_count > 0:
-                self.ui.label("Running sessions:").style("font-weight: bold; margin-bottom: 5px;")
-                for session in running_sessions[:5]:  # Show max 5 sessions
-                    self.ui.label(f"• {session}").style("margin-left: 10px; color: #d32f2f;")
-                if len(running_sessions) > 5:
-                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style("margin-left: 10px; color: #666;")
-
-            # Show scheduled jobs
-            if job_count > 0:
-                self.ui.label("Scheduled jobs:").style("font-weight: bold; margin-bottom: 5px; margin-top: 10px;")
-                for job in scheduled_jobs[:5]:  # Show max 5 jobs
-                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style("margin-left: 10px; color: #ff9800;")
-                if len(scheduled_jobs) > 5:
-                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style("margin-left: 10px; color: #666;")
-
-            with self.ui.row().style("margin-top: 20px; gap: 10px;"):
-                self.ui.button("Cancel", on_click=cancel_kill_all).props("color=grey")
-                self.ui.button("Clear All Jobs", color="red", on_click=do_kill_all).props("icon=delete_forever")
-
-        dialog.open()
+    # single-session confirmation shown above; do not open the 'kill all' dialog here
 
     def get_script_run_time(self, created_time, session_name):
         """
@@ -1004,13 +998,23 @@ class TmuxManager:
                 self.resume_updates()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+            self.telemetry_event("confirm_clear_session.open", {"session": session_name})
             ui.label(f"Are you sure you want to clear session '{session_name}'?").style(
                 "font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;"
             )
             ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
+
+            def _cancel_clear_session():
+                cancel()
+                self.telemetry_event("confirm_clear_session.cancel", {"session": session_name})
+
+            def _confirm_clear_session():
+                do_clear()
+                self.telemetry_event("confirm_clear_session.confirm", {"session": session_name})
+
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=cancel).props("color=grey")
-                ui.button("Clear Session", color="orange", on_click=do_clear).props("icon=delete_forever")
+                ui.button("Cancel", on_click=_cancel_clear_session).props("color=grey")
+                ui.button("Clear Session", color="orange", on_click=_confirm_clear_session).props("icon=delete_forever")
         dialog.open()
 
     def clear_session(self, session_name, ui):
