@@ -4,6 +4,8 @@ from pathlib import Path
 import psutil
 from loguru import logger
 from nicegui import ui
+import json
+from pathlib import Path
 
 
 class SystemStatsPanel:
@@ -127,6 +129,21 @@ class SettingsPanel:
         self.ui_manager = ui_manager
         self.scripts_dir_input = None
         self.logs_dir_input = None
+        self.pushbullet_input = None
+        # load persisted config
+        self._config_path = Path.home() / ".desto_config.json"
+        self._load_config()
+
+    def _load_config(self):
+        try:
+            if self._config_path.exists():
+                data = json.loads(self._config_path.read_text())
+                api_key = data.get("pushbullet_api_key")
+                if api_key:
+                    # store on tmux_manager for runtime access
+                    setattr(self.tmux_manager, "pushbullet_api_key", api_key)
+        except Exception:
+            logger.debug("Failed to load persisted config", exc_info=True)
 
     def build(self):
         ui.label("Settings").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
@@ -138,7 +155,50 @@ class SettingsPanel:
             label="Logs Directory",
             value=str(self.tmux_manager.LOG_DIR),
         ).style("width: 100%; margin-bottom: 10px;")
+        # Pushbullet API key input (masked by default)
+        existing_key = getattr(self.tmux_manager, "pushbullet_api_key", os.environ.get("DESTO_PUSHBULLET_API_KEY", ""))
+        # Use password=True to mask the input; allow toggle so user can reveal if needed; disable autocomplete
+        self.pushbullet_input = ui.input(
+            label="Pushbullet API Key",
+            value=existing_key,
+            password=True,
+            password_toggle_button=True,
+            autocomplete=[],
+        ).style("width: 100%; margin-bottom: 10px;")
         ui.button("Save", on_click=self.save_settings).style("width: 100%; margin-top: 10px;")
+
+        # Send test push button
+        def _send_test_push():
+            try:
+                # persist current key temporarily to tmux_manager so notifier can pick it up
+                api_key = self.pushbullet_input.value.strip()
+                setattr(self.tmux_manager, "pushbullet_api_key", api_key)
+                from desto.notifications import PushbulletNotifier
+
+                notifier = PushbulletNotifier(api_key=api_key)
+                # Send a small test push and show the response
+                title = "Desto Test Push"
+                body = f"Test push from Desto at {datetime.utcnow().isoformat()}Z"
+                resp = notifier.notify_with_response(title=title, body=body)
+                # Display the result in a notification and in a small dialog
+                if resp.get("ok"):
+                    ui.notification("Test push sent successfully.", type="positive")
+                else:
+                    ui.notification(f"Test push failed: {resp.get('status_code')} {resp.get('body')}", type="negative")
+                # Show details in a dialog for easier copy/paste
+                with ui.dialog() as d, ui.card():
+                    ui.label("Push response details").style("font-weight: bold; margin-bottom: 8px;")
+                    ui.textarea(json.dumps(resp, indent=2)).props("readonly").style("width: 600px; height: 200px;")
+                    ui.button("Close", on_click=lambda: d.close()).style("margin-top: 8px;")
+                d.open()
+            except Exception as e:
+                logger.exception("Failed to send test push", exc_info=True)
+                ui.notification(f"Exception sending test push: {e}", type="negative")
+
+        # import datetime locally to avoid top-level import
+        from datetime import datetime
+
+        ui.button("Send test push", on_click=_send_test_push).style("width: 100%; margin-top: 8px;")
 
     def save_settings(self):
         scripts_dir = Path(self.scripts_dir_input.value).expanduser()
@@ -155,6 +215,15 @@ class SettingsPanel:
         if valid:
             self.tmux_manager.SCRIPTS_DIR = scripts_dir
             self.tmux_manager.LOG_DIR = logs_dir
+            # persist pushbullet key
+            try:
+                api_key = self.pushbullet_input.value.strip()
+                setattr(self.tmux_manager, "pushbullet_api_key", api_key)
+                # write config
+                cfg = {"pushbullet_api_key": api_key}
+                self._config_path.write_text(json.dumps(cfg))
+            except Exception:
+                logger.debug("Failed to persist config", exc_info=True)
             ui.notification("Directories updated.", type="positive")
             if self.ui_manager:
                 self.ui_manager.refresh_script_list()

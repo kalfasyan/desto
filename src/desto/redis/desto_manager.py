@@ -79,7 +79,35 @@ class DestoManager:
             logger.warning(f"No running job found for session {session_name}")
             return False
 
-        return self.job_manager.finish_job(current_job.job_id, exit_code)
+        # Finish the job via JobManager
+        success = self.job_manager.finish_job(current_job.job_id, exit_code)
+
+        # If finished successfully, try to send a notification (Pushbullet) for redundancy.
+        if success:
+            try:
+                # Import lazily so notifications remain optional and don't add a hard dependency.
+                from desto.notifications import notify_job_finished
+            except Exception:
+                notify_job_finished = None
+
+            if notify_job_finished:
+                try:
+                    # Re-read the job to obtain the authoritative end_time set by JobManager
+                    job = self.job_manager.get_job(current_job.job_id)
+                    finished_at = None
+                    if job and getattr(job, "end_time", None):
+                        end = job.end_time
+                        # end may be a datetime or string
+                        if hasattr(end, "isoformat"):
+                            finished_at = end.isoformat()
+                        else:
+                            finished_at = str(end)
+
+                    notify_job_finished(session_name, exit_code, finished_at)
+                except Exception as e:
+                    logger.debug(f"Failed to send notification for job finish: {e}", exc_info=True)
+
+        return success
 
     def fail_job(self, session_name: str, error_message: str) -> bool:
         """Fail the current job in a session."""
