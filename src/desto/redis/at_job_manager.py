@@ -91,6 +91,43 @@ class AtJobManager:
             if self.redis_client and self.redis_client.is_connected():
                 key = f"desto:atjob:{job_id}"
                 self.redis_client.redis.hmset(key, metadata)
+                # If a session_name was provided, try to link this at job id back to the session record.
+                # First attempt a direct lookup using client's helper; if that fails, fall back to scanning.
+                try:
+                    if session_name:
+                        # Try direct key lookup (some deployments may store sessions keyed by name)
+                        try_key = None
+                        try:
+                            try_key = self.redis_client.get_session_key(session_name)
+                        except Exception:
+                            try_key = None
+
+                        linked = False
+                        if try_key:
+                            try:
+                                sdata = self.redis_client.redis.hgetall(try_key)
+                                if sdata and sdata.get("session_name") == session_name:
+                                    self.redis_client.redis.hset(try_key, "at_job_id", job_id)
+                                    linked = True
+                            except Exception:
+                                linked = False
+
+                        if not linked:
+                            # Fallback: scan all sessions and match by session_name field
+                            for s_key in self.redis_client.redis.scan_iter(match="desto:session:*"):
+                                try:
+                                    sdata = self.redis_client.redis.hgetall(s_key)
+                                    if not sdata:
+                                        continue
+                                    if sdata.get("session_name") == session_name:
+                                        self.redis_client.redis.hset(s_key, "at_job_id", job_id)
+                                        linked = True
+                                        break
+                                except Exception:
+                                    # Non-fatal: continue scanning other keys
+                                    continue
+                except Exception as e:
+                    logger.debug(f"Failed to link at_job_id to session '{session_name}': {e}")
             return job_id
         except Exception as e:
             logger.error(f"Exception during scheduling: {e}")
