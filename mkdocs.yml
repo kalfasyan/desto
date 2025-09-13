@@ -1,0 +1,30 @@
+site_name: desto
+repo_name: kalfasyan/desto
+site_description: "desto — tmux session manager"
+site_url: https://github.com/kalfasyan/desto
+docs_dir: docs
+nav:
+  - Home: index.md
+  - CLI: cli.md
+  - Config: pyproject.md
+
+theme:
+  name: material
+  custom_dir: theme
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.details
+
+extra:
+  social:
+    - icon: github
+      link: https://github.com/kalfasyan/desto
+
+plugins:
+  - search

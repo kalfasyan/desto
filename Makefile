@@ -26,6 +26,9 @@ release-major:  ## Bump major version and create release
 	./scripts/release.sh major
 
 # Development
+test-parallel:  ## Run tests in parallel
+	uv run --extra dev pytest -n auto tests/
+
 test:  ## Run tests
 	uv run --extra dev pytest tests/
 
@@ -44,6 +47,15 @@ clean:  ## Clean build artifacts
 # Quick development tasks
 dev-install:  ## Install package in development mode with dev dependencies
 	uv sync --extra dev
+
+docs-build: docs-sync-readme  ## Install docs dependencies and build the MkDocs documentation site
+	uv sync --extra docs
+	uv run --extra docs mkdocs build -f mkdocs.yml
+
+docs-serve:  ## Install docs dependencies and serve the MkDocs site locally at http://127.0.0.1:8000
+	uv sync --extra docs
+	# Use uv run so the correct project venv and deps are used
+	uv run --extra docs mkdocs serve -f mkdocs.yml
 
 publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
 	@echo "⚠️  Note: Publishing is normally automated via GitHub Actions"
