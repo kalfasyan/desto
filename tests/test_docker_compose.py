@@ -11,6 +11,7 @@ from loguru import logger
 from .docker_test_utils import (
     check_for_existing_containers,
     cleanup_tmux_test_sessions,
+    compose_up_if_needed,
     ensure_docker_available,
     ensure_docker_compose_available,
     safe_docker_cleanup,
@@ -76,11 +77,7 @@ class TestDockerCompose:
     def test_docker_compose_build(self):
         """Test that Docker Compose can build the service."""
         logger.info("Starting Docker Compose build test...")
-
-        # Ensure clean state before build
-        safe_docker_cleanup()
-        wait_for_compose_down()
-
+        # Do NOT tear down existing containers started by fixtures; just build images.
         result = subprocess.run(["docker", "compose", "build"], capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -90,20 +87,36 @@ class TestDockerCompose:
 
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
+        # Ensure services are (back) up for subsequent tests if build interrupted them
+        compose_up_if_needed(timeout=60)
+        wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
+
     def test_docker_compose_up_and_health(self):
         """Test that Docker Compose can start the service and it becomes healthy."""
         logger.info("Starting Docker Compose up and health test...")
-
-        # The class fixture ensures compose is up; just wait for HTTP readiness
-        healthy = wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
+        # Proactively ensure compose is up (idempotent if already running)
+        compose_up_if_needed(timeout=60)
+        # Allow a slightly longer window; cold starts or CI can be slower
+        healthy = wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
         if not healthy:
-            logger.error("Service did not become healthy within timeout")
+            # Dump diagnostic info to help debugging
+            logger.error("Service did not become healthy within timeout; dumping diagnostics")
+            try:
+                ps = subprocess.run(["docker", "compose", "ps"], capture_output=True, text=True)
+                logs_dash = subprocess.run(["docker", "compose", "logs", "dashboard"], capture_output=True, text=True)
+                logger.error(f"Compose ps output:\n{ps.stdout}")
+                logger.error(f"Dashboard logs:\n{logs_dash.stdout}")
+            except Exception as e:
+                logger.error(f"Failed to collect diagnostics: {e}")
         assert healthy, "Service did not become healthy within timeout"
 
     @pytest.mark.skipif(os.getenv("CI") == "true", reason="Skip volume test on GitHub Actions due to permission issues")
     def test_docker_compose_volumes(self):
         """Test that volumes are mounted correctly in the container."""
         logger.info("Starting Docker Compose volumes test...")
+        # Ensure service is running (build test may have rebuilt images)
+        compose_up_if_needed(timeout=60)
+        wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
 
         # Create test files in host directories
         scripts_dir = Path("desto_scripts")
@@ -126,8 +139,8 @@ class TestDockerCompose:
         test_script.write_text("hello from host script")
         test_log.write_text("hello from host log")
 
-        # The class fixture ensures compose is up; give a short moment for mounts
-        time.sleep(0.3)
+        # The class fixture ensures compose is up; allow more time for mounts (slower FS / CI)
+        time.sleep(1.0)
 
         # Check that the files exist inside the container
         logger.info("Checking if files are accessible inside container...")

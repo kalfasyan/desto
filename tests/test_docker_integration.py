@@ -1,6 +1,4 @@
-"""
-Tests for Docker integration functionality.
-"""
+"""Tests for Docker integration functionality."""
 
 import shutil
 import subprocess

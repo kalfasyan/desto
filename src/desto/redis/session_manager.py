@@ -15,12 +15,15 @@ class SessionManager:
     """Manages session lifecycle and tmux operations."""
 
     def __init__(self, redis_client: DestoRedisClient):
+        """Initialize session manager with a Redis client.
+
+        Args:
+            redis_client: Connected `DestoRedisClient` instance used for persistence.
+        """
         self.redis = redis_client
         self._monitoring_threads = {}
 
-    def create_session(
-        self, session_name: str, tmux_session_name: str, status: SessionStatus = SessionStatus.STARTING
-    ) -> DestoSession:
+    def create_session(self, session_name: str, tmux_session_name: str, status: SessionStatus = SessionStatus.STARTING) -> DestoSession:
         """Create a new session. Status can be STARTING or SCHEDULED."""
         session = DestoSession(
             session_name=session_name,

@@ -20,6 +20,11 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.highlight
   - pymdownx.details
+  - pymdownx.snippets:
+      check_paths: true
+      base_path:
+        - docs
+        - .
 
 extra:
   social:
@@ -28,3 +33,9 @@ extra:
 
 plugins:
   - search
+  - include-markdown
+  - htmlproofer:
+      raise_error: true
+      ignore_urls:
+        - localhost
+        - pyproject.toml

@@ -28,6 +28,8 @@ docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "pymdown-extensions>=9.0.0",
+    "mkdocs-include-markdown-plugin>=6.0.0",
+    "mkdocs-htmlproofer-plugin>=1.2.1",
 ]
 
 [project.scripts]
@@ -51,8 +53,17 @@ select = [
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "I",  # isort
+    "D",  # pydocstyle (docstring conventions)
 ]
 ignore = []
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Allow missing module docstrings / top-level items in tests and selected modules
+"tests/*" = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+"src/desto/__init__.py" = ["D104"]
 
 [tool.ruff.format]
 quote-style = "double"
