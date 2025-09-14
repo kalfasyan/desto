@@ -93,7 +93,7 @@ class TestDockerIntegration:
         )
 
     @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
-    def test_docker_compose_health_check(self, temp_scripts_dir, temp_logs_dir):
+    def test_docker_compose_health_check(self, temp_scripts_dir, temp_logs_dir, docker_compose):
         """Test that Docker Compose stack starts with Redis and responds to health checks (fast version)."""
         repo_root = Path(__file__).parent.parent
 
@@ -101,13 +101,10 @@ class TestDockerIntegration:
         if compose_check.returncode != 0:
             pytest.skip("Docker Compose not available")
 
-        from .docker_test_utils import compose_up_if_needed, wait_for_http
+        from .docker_test_utils import wait_for_http, safe_docker_cleanup
 
         try:
-            up_ok = compose_up_if_needed(project_root=repo_root, services=["dashboard", "redis"], timeout=40)
-            if not up_ok:
-                pytest.skip("Docker Compose start failed or timed out")
-
+            # The `docker_compose` fixture ensures compose is running for this session
             healthy = wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
             if not healthy:
                 logs_result = subprocess.run(
@@ -118,9 +115,7 @@ class TestDockerIntegration:
             assert True, "Docker Compose stack is running and responding"
 
         finally:
-            # Use safer/ faster cleanup helper which can skip volume removal
-            from .docker_test_utils import safe_docker_cleanup
-
+            # Respective cleanup (skip volume removal for speed)
             safe_docker_cleanup(project_root=repo_root, remove_volumes=False)
 
     def test_example_scripts_exist(self):

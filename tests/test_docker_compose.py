@@ -32,20 +32,11 @@ class TestDockerCompose:
 
         This reduces repeated compose up/down per test which is slow.
         """
-        project_root = Path(__file__).parent.parent
-        # Ensure compose is up for all tests in the class (start redis + dashboard)
-        import subprocess
-
-        up = subprocess.run(["docker", "compose", "up", "-d"], cwd=project_root, capture_output=True, text=True)
-        if up.returncode != 0:
-            raise RuntimeError(f"docker compose up failed: {up.stderr}")
-
-        # Wait for the service to become responsive (healthchecks may take time)
-        wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
+        # Rely on session-scoped autouse fixture `docker_compose` to have started compose.
+        # Wait briefly for HTTP readiness before running tests
+        wait_for_http("http://localhost:8809", timeout=30, interval=0.5)
         yield
-        # At class teardown, perform a cleanup but avoid removing volumes to speed teardown
-        safe_docker_cleanup(project_root, remove_volumes=False)
-        wait_for_compose_down()
+        # No class-level teardown; session fixture will handle final cleanup.
 
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):

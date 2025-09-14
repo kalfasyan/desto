@@ -21,10 +21,9 @@ The key features are:
 - **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
 - **Scheduled job control:** Manage scheduled jobs with a dedicated table—cancel any scheduled job with a click.
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
+- **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
-- **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
-  
   
   
 <strong>🎬 Demo</strong>
@@ -240,6 +239,9 @@ This installs two executables:
 <details>
 <summary><strong>Quick CLI Usage</strong></summary>
 
+<p align="center">
+  <img src="images/terminal.png" alt="Terminal Screenshot" title="Desto CLI" width="100" style="border:0px solid #ccc; border-radius:1px; margin-bottom:1px;"/>
+</p>
 
 ```bash
 # Check system status
@@ -292,6 +294,7 @@ desto-cli scripts run "my_script" --direct
 ```
 
 </details>
+
 
 **📖 [Full CLI Documentation →](src/desto/cli/README.md)**
 

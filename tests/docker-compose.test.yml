@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 2
+      start_period: 1s
+
+  dashboard:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8809"]
+      interval: 3s
+      timeout: 2s
+      retries: 2
+      start_period: 1s
