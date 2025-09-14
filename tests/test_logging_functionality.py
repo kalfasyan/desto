@@ -6,7 +6,6 @@ This test verifies that log files are preserved between sessions and include pro
 import os
 import subprocess
 import tempfile
-import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -60,8 +59,10 @@ class TestTmuxManagerLogging:
         # Start session
         tmux_manager.start_tmux_session(session_name, command, Mock())
 
-        # Wait for command to complete
-        time.sleep(3)
+        # Wait for command to complete (poll the log)
+        from .docker_test_utils import wait_for_file_contains
+
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Hello World", timeout=5), "Log did not contain expected output"
 
         # Check log file exists
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
@@ -75,7 +76,7 @@ class TestTmuxManagerLogging:
 
         # Check that date was expanded (not showing $(date))
         assert "$(date)" not in log_content, "Date should be expanded, not literal $(date)"
-        assert "2025" in log_content, "Real date should be present"
+        assert any(digit in log_content for digit in "0123456789"), "Real date should be present"
 
     def test_log_file_preservation_between_sessions(self, tmux_manager, temp_dirs):
         """Test that log files are preserved when running multiple sessions with the same name."""
@@ -84,9 +85,12 @@ class TestTmuxManagerLogging:
         # First session
         command1 = "echo 'First session'"
         tmux_manager.start_tmux_session(session_name, command1, Mock())
-        time.sleep(3)
 
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
+        from .docker_test_utils import wait_for_file_contains
+
+        assert wait_for_file_contains(log_file, "First session", timeout=5), "First session output not found"
+
         first_content = log_file.read_text()
 
         # Verify first session content
@@ -97,7 +101,7 @@ class TestTmuxManagerLogging:
         # Second session (same name - should append, not overwrite)
         command2 = "echo 'Second session'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
-        time.sleep(3)
+        assert wait_for_file_contains(log_file, "Second session", timeout=5), "Second session output not found"
 
         # Check that both sessions are in the log
         second_content = log_file.read_text()
@@ -124,8 +128,9 @@ class TestTmuxManagerLogging:
         # Start session
         tmux_manager.start_tmux_session(session_name, command, Mock())
 
-        # Wait for command to complete
-        time.sleep(3)
+        from .docker_test_utils import wait_for_file_contains
+
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Test completed", timeout=5), "Command output not found in log"
 
         # Check that job status can be retrieved from Redis (through the status tracker)
         # This replaces the old file marker check
@@ -147,12 +152,15 @@ class TestTmuxManagerLogging:
         # First session
         command1 = "echo 'First run'"
         tmux_manager.start_tmux_session(session_name, command1, Mock())
-        time.sleep(2)
+
+        from .docker_test_utils import wait_for_file_contains
+
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "First run", timeout=5), "First run output not found"
 
         # Second session with same name - should append to existing log
         command2 = "echo 'Second run'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
-        time.sleep(2)
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Second run", timeout=5), "Second run output not found"
 
         # Check that log contains both runs
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"

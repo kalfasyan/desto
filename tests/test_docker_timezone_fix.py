@@ -44,18 +44,18 @@ def ensure_docker_containers():
         # Get the project root directory dynamically
         project_root = Path(__file__).parent.parent.resolve()
 
-        # Start containers if not running
-        subprocess.run(["docker", "compose", "up", "-d"], cwd=str(project_root))
+    # Start containers if not running (use helper polling)
+    from .docker_test_utils import compose_up_if_needed, wait_for_http
 
-        # Wait a moment for containers to be ready
-        import time
+    compose_up_if_needed(project_root=project_root, services=["desto-dashboard"], timeout=20)
 
-        time.sleep(3)
+    # Wait for the dashboard HTTP service to be responsive
+    wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
 
     yield
 
-    # Cleanup desto containers after tests
-    safe_docker_cleanup()
+    # Cleanup desto containers after tests (skip removing volumes for speed)
+    safe_docker_cleanup(remove_volumes=False)
 
     # Additional explicit session cleanup
     cleanup_tmux_test_sessions()

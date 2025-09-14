@@ -41,8 +41,13 @@ def check_for_existing_containers():
     return []
 
 
-def safe_docker_cleanup(project_root=None):
-    """Safely cleanup only desto-related containers without affecting user containers."""
+def safe_docker_cleanup(project_root=None, remove_volumes=True):
+    """Safely cleanup only desto-related containers without affecting user containers.
+
+    Args:
+        project_root: path to the repo root where compose file lives.
+        remove_volumes: if True include `-v` when calling `docker compose down`.
+    """
     try:
         if project_root is None:
             project_root = Path(__file__).parent.parent
@@ -61,8 +66,12 @@ def safe_docker_cleanup(project_root=None):
             logger.info(f"Found desto containers to cleanup: {desto_containers}")
 
             # Use docker compose down but only in our project directory
-            # This ensures we only affect containers defined in our compose file
-            result = subprocess.run(["docker", "compose", "down", "-v", "--remove-orphans"], capture_output=True, text=True, cwd=project_root)
+            # Optionally avoid removing volumes which is slower on teardown
+            cmd = ["docker", "compose", "down", "--remove-orphans"]
+            if remove_volumes:
+                cmd.insert(3, "-v")
+
+            result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
 
             if result.returncode != 0:
                 logger.warning(f"Docker compose down returned non-zero: {result.stderr}")
@@ -91,6 +100,88 @@ def wait_for_compose_down(timeout=30):
         except Exception:
             pass
     logger.warning(f"Docker containers did not stop within {timeout} seconds")
+    return False
+
+
+def compose_up_if_needed(project_root=None, services=None, timeout=30):
+    """Start docker compose if the specified services are not running.
+
+    Returns True if compose was started or services are already running.
+    """
+    try:
+        if project_root is None:
+            project_root = Path(__file__).parent.parent
+
+        # Check running services
+        cmd = ["docker", "compose", "ps", "--services", "--filter", "status=running"]
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+
+        running = set(result.stdout.split()) if result.returncode == 0 else set()
+        if services:
+            needed = set(services) - running
+        else:
+            needed = set()
+
+        if services and not needed:
+            logger.debug("Requested services already running; skipping compose up")
+            return True
+
+        logger.info("Bringing up docker compose services...")
+        up = subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True, cwd=project_root)
+        if up.returncode != 0:
+            logger.error(f"docker compose up failed: {up.stderr}")
+            return False
+
+        # wait for services to appear as running
+        start = time.time()
+        while time.time() - start < timeout:
+            res = subprocess.run(cmd, capture_output=True, text=True, cwd=project_root)
+            if res.returncode == 0 and res.stdout.strip():
+                return True
+            time.sleep(0.5)
+
+        logger.warning("Services did not start within timeout")
+        return False
+    except Exception as e:
+        logger.debug(f"Error in compose_up_if_needed: {e}")
+        return False
+
+
+def wait_for_http(url, timeout=30, interval=0.5):
+    """Poll an HTTP URL until it returns status 200 or timeout.
+
+    Returns True if service responded 200 within timeout.
+    """
+    import requests
+
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            r = requests.get(url, timeout=3)
+            if r.status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(interval)
+    return False
+
+
+def wait_for_file_contains(path, substring, timeout=5, interval=0.1):
+    """Wait until a file at `path` contains `substring` or timeout.
+
+    Returns True if substring found within timeout, False otherwise.
+    """
+    start = time.time()
+    p = Path(path)
+    while time.time() - start < timeout:
+        try:
+            if p.exists():
+                text = p.read_text()
+                if substring in text:
+                    return True
+        except Exception:
+            pass
+        time.sleep(interval)
     return False
 
 

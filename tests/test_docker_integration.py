@@ -5,11 +5,9 @@ Tests for Docker integration functionality.
 import shutil
 import subprocess
 import tempfile
-import time
 from pathlib import Path
 
 import pytest
-import requests
 
 
 class TestDockerIntegration:
@@ -103,39 +101,27 @@ class TestDockerIntegration:
         if compose_check.returncode != 0:
             pytest.skip("Docker Compose not available")
 
-        compose_cmd = ["docker", "compose", "-f", "docker-compose.yml", "up", "-d", "--build"]
+        from .docker_test_utils import compose_up_if_needed, wait_for_http
 
         try:
-            result = subprocess.run(compose_cmd, cwd=repo_root, capture_output=True, text=True, timeout=60)
-            if result.returncode != 0:
-                pytest.skip(f"Docker Compose start failed: {result.stderr}")
+            up_ok = compose_up_if_needed(project_root=repo_root, services=["dashboard", "redis"], timeout=40)
+            if not up_ok:
+                pytest.skip("Docker Compose start failed or timed out")
 
-            max_retries = 5
-            for i in range(max_retries):
-                time.sleep(2)
-                ps_result = subprocess.run(
-                    ["docker", "compose", "-f", "docker-compose.yml", "ps", "--services", "--filter", "status=running"],
-                    cwd=repo_root,
-                    capture_output=True,
-                    text=True,
+            healthy = wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
+            if not healthy:
+                logs_result = subprocess.run(
+                    ["docker", "compose", "-f", "docker-compose.yml", "logs", "dashboard"], cwd=repo_root, capture_output=True, text=True
                 )
-                if "desto" in ps_result.stdout and "redis" in ps_result.stdout:
-                    try:
-                        response = requests.get("http://localhost:8809", timeout=2)
-                        if response.status_code == 200:
-                            break
-                    except requests.exceptions.RequestException:
-                        pass
-                if i == max_retries - 1:
-                    logs_result = subprocess.run(
-                        ["docker", "compose", "-f", "docker-compose.yml", "logs", "desto"], cwd=repo_root, capture_output=True, text=True
-                    )
-                    pytest.skip(f"Could not connect to service after {max_retries} retries. Logs: {logs_result.stdout}")
+                pytest.skip(f"Could not connect to service within timeout. Logs: {logs_result.stdout}")
 
             assert True, "Docker Compose stack is running and responding"
 
         finally:
-            subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "down", "-v", "--remove-orphans"], cwd=repo_root, capture_output=True)
+            # Use safer/ faster cleanup helper which can skip volume removal
+            from .docker_test_utils import safe_docker_cleanup
+
+            safe_docker_cleanup(project_root=repo_root, remove_volumes=False)
 
     def test_example_scripts_exist(self):
         """Test that example scripts exist and are executable."""
