@@ -97,7 +97,7 @@ class TestDockerIntegration:
         if compose_check.returncode != 0:
             pytest.skip("Docker Compose not available")
 
-        from .docker_test_utils import wait_for_http, safe_docker_cleanup
+        from .docker_test_utils import safe_docker_cleanup, wait_for_http
 
         try:
             # The `docker_compose` fixture ensures compose is running for this session
