@@ -86,9 +86,7 @@ class TestDockerIntegration:
         assert result.returncode == 0, f"Docker build failed: {result.stderr}"
         # Check for successful build indicators from both classic and buildx output
         success_indicators = ["Successfully built", "Successfully tagged", "DONE", "writing image"]
-        assert any(indicator in result.stdout or indicator in result.stderr for indicator in success_indicators), (
-            f"Docker build may have failed. stdout: {result.stdout}, stderr: {result.stderr}"
-        )
+        assert any(indicator in result.stdout or indicator in result.stderr for indicator in success_indicators), f"Docker build may have failed. stdout: {result.stdout}, stderr: {result.stderr}"
 
     @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
     def test_docker_compose_health_check(self, temp_scripts_dir, temp_logs_dir, docker_compose):
@@ -105,9 +103,7 @@ class TestDockerIntegration:
             # The `docker_compose` fixture ensures compose is running for this session
             healthy = wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
             if not healthy:
-                logs_result = subprocess.run(
-                    ["docker", "compose", "-f", "docker-compose.yml", "logs", "dashboard"], cwd=repo_root, capture_output=True, text=True
-                )
+                logs_result = subprocess.run(["docker", "compose", "-f", "docker-compose.yml", "logs", "dashboard"], cwd=repo_root, capture_output=True, text=True)
                 pytest.skip(f"Could not connect to service within timeout. Logs: {logs_result.stdout}")
 
             assert True, "Docker Compose stack is running and responding"

@@ -19,9 +19,7 @@ from .docker_test_utils import (
     wait_for_http,
 )
 
-pytestmark = pytest.mark.skipif(
-    not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests."
-)
+pytestmark = pytest.mark.skipif(not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests.")
 
 
 class TestDockerCompose:
@@ -144,12 +142,8 @@ class TestDockerCompose:
 
         # Check that the files exist inside the container
         logger.info("Checking if files are accessible inside container...")
-        result_script = subprocess.run(
-            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"], capture_output=True, text=True
-        )
-        result_log = subprocess.run(
-            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"], capture_output=True, text=True
-        )
+        result_script = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"], capture_output=True, text=True)
+        result_log = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"], capture_output=True, text=True)
 
         if result_script.returncode == 0:
             logger.info("Script file successfully accessed in container")

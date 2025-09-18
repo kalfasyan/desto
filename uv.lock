@@ -395,6 +395,7 @@ dev = [
     { name = "ruff" },
 ]
 docs = [
+    { name = "loguru" },
     { name = "mkdocs" },
     { name = "mkdocs-htmlproofer-plugin" },
     { name = "mkdocs-include-markdown-plugin" },
@@ -406,6 +407,7 @@ docs = [
 requires-dist = [
     { name = "ipython", specifier = ">=9.2.0" },
     { name = "loguru", specifier = ">=0.7.3" },
+    { name = "loguru", marker = "extra == 'docs'", specifier = ">=0.7.3" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
     { name = "mkdocs-htmlproofer-plugin", marker = "extra == 'docs'", specifier = ">=1.2.1" },
     { name = "mkdocs-include-markdown-plugin", marker = "extra == 'docs'", specifier = ">=6.0.0" },

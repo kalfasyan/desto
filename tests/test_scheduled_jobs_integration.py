@@ -34,10 +34,10 @@ def tmux_manager(mock_ui, mock_logger, tmp_path):
 
 @pytest.mark.skipif(not shutil.which("at"), reason="'at' command not available")
 class TestScheduledJobsIntegration:
-    """Integration tests for scheduled jobs functionality (requires 'at' command)"""
+    """Integration tests for scheduled jobs functionality (requires 'at' command)."""
 
     def cleanup_test_jobs(self):
-        """Clean up any test jobs that might exist"""
+        """Clean up any test jobs that might exist."""
         try:
             result = subprocess.run(["atq"], capture_output=True, text=True)
             if result.returncode == 0:
@@ -49,7 +49,7 @@ class TestScheduledJobsIntegration:
             pass  # Ignore cleanup errors
 
     def test_real_scheduled_job_creation_and_removal(self, tmux_manager):
-        """Test creating and removing a real scheduled job"""
+        """Test creating and removing a real scheduled job."""
         self.cleanup_test_jobs()
 
         try:
@@ -97,7 +97,7 @@ class TestScheduledJobsIntegration:
             self.cleanup_test_jobs()
 
     def test_get_scheduled_jobs_real_format(self, tmux_manager):
-        """Test that get_scheduled_jobs correctly parses real atq output"""
+        """Test that get_scheduled_jobs correctly parses real atq output."""
         # This test just verifies that the parsing doesn't crash on real output
         jobs = tmux_manager.get_scheduled_jobs()
 
@@ -115,7 +115,7 @@ class TestScheduledJobsIntegration:
             assert isinstance(job["user"], str)
 
     def test_kill_scheduled_jobs_no_permission_errors(self, tmux_manager):
-        """Test that kill_scheduled_jobs handles permission errors gracefully"""
+        """Test that kill_scheduled_jobs handles permission errors gracefully."""
         # This test ensures the method doesn't crash even if we can't remove jobs
         # (e.g., due to permissions or jobs belonging to other users)
 
@@ -132,10 +132,10 @@ class TestScheduledJobsIntegration:
 
 @pytest.mark.skipif(not shutil.which("tmux"), reason="'tmux' command not available")
 class TestCombinedFunctionalityIntegration:
-    """Integration tests for combined tmux sessions and scheduled jobs functionality"""
+    """Integration tests for combined tmux sessions and scheduled jobs functionality."""
 
     def cleanup_test_sessions(self):
-        """Clean up any test tmux sessions"""
+        """Clean up any test tmux sessions."""
         try:
             result = subprocess.run(
                 ["tmux", "list-sessions", "-F", "#{session_name}"],
@@ -153,7 +153,7 @@ class TestCombinedFunctionalityIntegration:
             pass
 
     def cleanup_test_jobs(self):
-        """Clean up any test jobs"""
+        """Clean up any test jobs."""
         try:
             result = subprocess.run(["atq"], capture_output=True, text=True)
             if result.returncode == 0:
@@ -166,7 +166,7 @@ class TestCombinedFunctionalityIntegration:
 
     @pytest.mark.skipif(not shutil.which("at"), reason="'at' command not available")
     def test_kill_all_sessions_and_jobs_integration(self, tmux_manager):
-        """Test the combined kill functionality with real sessions and jobs"""
+        """Test the combined kill functionality with real sessions and jobs."""
         self.cleanup_test_sessions()
         self.cleanup_test_jobs()
 
@@ -227,7 +227,7 @@ class TestCombinedFunctionalityIntegration:
             self.cleanup_test_jobs()
 
     def test_confirm_kill_all_sessions_dialog_structure(self, tmux_manager):
-        """Test that the confirmation dialog is properly structured"""
+        """Test that the confirmation dialog is properly structured."""
         # Mock the pause/resume functions
         tmux_manager.pause_updates = MagicMock()
         tmux_manager.resume_updates = MagicMock()

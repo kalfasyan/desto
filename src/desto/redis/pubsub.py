@@ -14,7 +14,7 @@ class SessionPubSub:
         self.listening_thread = None
 
     def subscribe_to_session_updates(self, callback: Callable[[Dict], None]):
-        """Subscribe to all session updates for dashboard"""
+        """Subscribe to all session updates for dashboard."""
         self.pubsub.subscribe("desto:session_updates")
         self.listeners["session_updates"] = callback
 
@@ -23,13 +23,13 @@ class SessionPubSub:
             self.listening_thread.start()
 
     def subscribe_to_specific_session(self, session_name: str, callback: Callable[[Dict], None]):
-        """Subscribe to specific session updates"""
+        """Subscribe to specific session updates."""
         channel = f"desto:session:{session_name}"
         self.pubsub.subscribe(channel)
         self.listeners[channel] = callback
 
     def publish_session_update(self, session_name: str, data: Dict[str, Any]):
-        """Publish session update"""
+        """Publish session update."""
         update_data = {"session_name": session_name, "timestamp": datetime.now().isoformat(), **data}
 
         # General updates channel
@@ -39,7 +39,7 @@ class SessionPubSub:
         self.redis.redis.publish(f"desto:session:{session_name}", json.dumps(update_data))
 
     def _listen_loop(self):
-        """Background thread to listen for Redis pub/sub messages"""
+        """Background thread to listen for Redis pub/sub messages."""
         for message in self.pubsub.listen():
             if message["type"] == "message":
                 channel = message["channel"]
@@ -51,7 +51,7 @@ class SessionPubSub:
                         pass  # Skip invalid JSON
 
     def stop_listening(self):
-        """Stop listening to pub/sub"""
+        """Stop listening to pub/sub."""
         if self.listening_thread:
             self.pubsub.unsubscribe()
             self.listening_thread = None

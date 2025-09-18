@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""
-Comprehensive tests for job completion tracking and logging functionality.
+"""Comprehensive tests for job completion tracking and logging functionality.
 These tests verify that:
 1. Job completion is properly detected with keep-alive
 2. Logging works correctly
 3. Chained scripts work properly
-4. Failed scripts are handled correctly
+4. Failed scripts are handled correctly.
 """
 
 import os
@@ -32,7 +31,7 @@ except ImportError:
 
 
 class TestJobCompletionTracking(unittest.TestCase):
-    """Test that job completion tracking works correctly"""
+    """Test that job completion tracking works correctly."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -54,7 +53,7 @@ class TestJobCompletionTracking(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_command_structure_handles_success(self):
-        """Test that successful scripts are logged correctly"""
+        """Test that successful scripts are logged correctly."""
         session_name = "test_success"
         command = "echo 'Test script'; sleep 0.1; echo 'Done'"
 
@@ -86,7 +85,7 @@ echo "Job completion: exit code $SCRIPT_EXIT_CODE" >> {log_file}
             self.assertIn(part, content, f"Missing expected content: {part}")
 
     def test_command_structure_handles_failure(self):
-        """Test that failed scripts are logged correctly and don't break the chain"""
+        """Test that failed scripts are logged correctly and don't break the chain."""
         session_name = "test_failure"
         command = "echo 'Starting'; exit 1"  # This will fail
 
@@ -125,7 +124,7 @@ echo "Keep-alive would continue here" >> {log_file}
             self.assertIn(part, content, f"Missing expected content: {part}")
 
     def test_chained_scripts_with_failure(self):
-        """Test that chained scripts continue even if some fail"""
+        """Test that chained scripts continue even if some fail."""
         session_name = "test_chain"
 
         # Simulate a chain of scripts where the middle one fails
@@ -171,7 +170,7 @@ echo "Chain completion marker" >> {log_file}
 
     @patch("src.desto.app.sessions.subprocess.run")
     def test_tmux_manager_uses_correct_command_structure(self, mock_subprocess):
-        """Test that TmuxManager generates correct command structure"""
+        """Test that TmuxManager generates correct command structure."""
         if not TmuxManager:
             self.skipTest("TmuxManager not available")
 
@@ -200,7 +199,7 @@ echo "Chain completion marker" >> {log_file}
 
 
 class TestLoggingIntegration(unittest.TestCase):
-    """Test that the logging integration works correctly"""
+    """Test that the logging integration works correctly."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -210,7 +209,7 @@ class TestLoggingIntegration(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_log_messages_panel_integration(self):
-        """Test that the LogSection receives messages correctly"""
+        """Test that the LogSection receives messages correctly."""
         try:
             from src.desto.app.ui import LogSection
         except ImportError:
@@ -235,7 +234,7 @@ class TestLoggingIntegration(unittest.TestCase):
         log_section.log_display.value = expected_display
 
     def test_log_messages_rotation(self):
-        """Test that log messages are rotated when limit is exceeded"""
+        """Test that log messages are rotated when limit is exceeded."""
         try:
             from src.desto.app.ui import LogSection
         except ImportError:

@@ -82,7 +82,7 @@ class UISettings:
     redis: RedisSettings = field(default_factory=RedisSettings)
 
     def __post_init__(self):
-        """Override settings with environment variables if available"""
+        """Override settings with environment variables if available."""
         # Redis configuration from environment variables
         self.redis.host = os.getenv("REDIS_HOST", self.redis.host)
         self.redis.port = int(os.getenv("REDIS_PORT", self.redis.port))

@@ -108,11 +108,7 @@ class UserInterfaceManager:
         return display_value  # Return as-is if no icon
 
     def build_ui(self):
-        with (
-            ui.header(elevated=True)
-            .style(f"background-color: {self.ui_settings['header']['background_color']}; color: {self.ui_settings['header']['color']};")
-            .classes(replace="row items-center justify-between")
-        ):
+        with ui.header(elevated=True).style(f"background-color: {self.ui_settings['header']['background_color']}; color: {self.ui_settings['header']['color']};").classes(replace="row items-center justify-between"):
             ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props("flat color=white")
             ui.label("desto").style(f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;")
             ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=white").style("margin-left: auto;")
@@ -150,9 +146,7 @@ class UserInterfaceManager:
                             self.script_manager_tab.build()
 
                         with ui.tab_panel(new_script_tab):
-                            with ui.card().style(
-                                "background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"
-                            ):
+                            with ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"):
                                 self.new_script_tab.build()
 
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
@@ -217,11 +211,7 @@ class UserInterfaceManager:
         tmux_cpu = "N/A"
         tmux_mem = "N/A"
         try:
-            tmux_procs = [
-                p
-                for p in psutil.process_iter(["name", "ppid", "cpu_percent", "memory_info", "cmdline"])
-                if p.info["name"] == "tmux" or "tmux" in p.info["name"]
-            ]
+            tmux_procs = [p for p in psutil.process_iter(["name", "ppid", "cpu_percent", "memory_info", "cmdline"]) if p.info["name"] == "tmux" or "tmux" in p.info["name"]]
             if tmux_procs:
                 server_proc = next((p for p in tmux_procs if p.info["ppid"] == 1), None)
                 if not server_proc:
@@ -391,7 +381,6 @@ class UserInterfaceManager:
 
     def build_logging_command(self, log_file_path, info_block, exec_cmd, job_completion_cmd, session_start_cmd=None):
         """Build a properly formatted logging command that appends to existing logs."""
-
         # Check if log file exists to determine if we should append or create new
         append_mode = Path(log_file_path).exists()
 

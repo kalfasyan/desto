@@ -555,13 +555,11 @@ def copy_script(
 
 @scripts_app.command("chain")
 def chain_scripts(
-    scripts: List[str] = typer.Argument(
-        ..., help="Scripts to run in sequence. Each entry can include arguments, e.g. 'myscript.sh arg1 arg2'. Use quotes for scripts with arguments."
-    ),
+    scripts: List[str] = typer.Argument(..., help="Scripts to run in sequence. Each entry can include arguments, e.g. 'myscript.sh arg1 arg2'. Use quotes for scripts with arguments."),
     continue_on_error: bool = typer.Option(False, "--continue-on-error", "-c", help="Continue chain if a script fails"),
 ):
-    """
-    Run multiple scripts in sequence (chain). Each script can have its own arguments.
+    """Run multiple scripts in sequence (chain). Each script can have its own arguments.
+
     Example:
       desto-cli scripts chain "count_files.sh ./mydir" "other_script.py foo bar"
     """

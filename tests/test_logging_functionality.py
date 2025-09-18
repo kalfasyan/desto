@@ -1,5 +1,4 @@
-"""
-Test the enhanced logging functionality for TmuxManager.
+"""Test the enhanced logging functionality for TmuxManager.
 This test verifies that log files are preserved between sessions and include proper timestamps.
 """
 

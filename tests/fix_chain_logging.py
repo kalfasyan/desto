@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-This script demonstrates the issues with chain logging and provides a fixed implementation.
-"""
+"""This script demonstrates the issues with chain logging and provides a fixed implementation."""
 
 import subprocess
 import tempfile

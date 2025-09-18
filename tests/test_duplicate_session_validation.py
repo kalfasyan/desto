@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Unit tests for duplicate session validation
-"""
+"""Unit tests for duplicate session validation."""
 
 import os
 import subprocess
@@ -18,7 +16,7 @@ pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not 
 
 
 class TestDuplicateSessionValidation:
-    """Test duplicate session validation functionality"""
+    """Test duplicate session validation functionality."""
 
     @pytest.fixture
     def temp_dirs(self):

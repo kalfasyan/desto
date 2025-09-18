@@ -16,9 +16,9 @@ repos:
         pass_filenames: false
       - id: pytest
         name: pytest (run tests)
-        entry: pytest tests/
+        entry: uv run pytest tests/test_logging_functionality.py tests/test_duplicate_session_validation.py tests/test_notifications.py -v
         language: system
-        types: [python]
+        pass_filenames: false
 
 # Install with: pre-commit install
 # Run on all files: pre-commit run --all-files

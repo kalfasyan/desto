@@ -1,5 +1,4 @@
-"""
-Safe Docker test utilities for desto tests.
+"""Safe Docker test utilities for desto tests.
 
 This module provides utilities for managing Docker containers in tests while
 ensuring we don't interfere with user's existing containers.
@@ -212,9 +211,7 @@ def ensure_docker_compose_available():
 def get_desto_container_status():
     """Get the status of desto-related containers."""
     try:
-        result = subprocess.run(
-            ["docker", "ps", "-a", "--filter", "name=desto-", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True
-        )
+        result = subprocess.run(["docker", "ps", "-a", "--filter", "name=desto-", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True)
         if result.returncode == 0:
             return result.stdout
     except Exception as e:
