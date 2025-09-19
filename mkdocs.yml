@@ -7,6 +7,9 @@ nav:
   - Home: index.md
   - CLI: cli.md
   - Config: pyproject.md
+  - Contributing: CONTRIBUTING.md
+  - Security: SECURITY.md
+  - Code of Conduct: CODE_OF_CONDUCT.md
 
 theme:
   name: material
