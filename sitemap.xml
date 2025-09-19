@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://github.com/kalfasyan/desto/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/CODE_OF_CONDUCT/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/CONTRIBUTING/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/SECURITY/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/cli/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/pyproject/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/kalfasyan/desto/src/desto/cli/</loc>
+         <lastmod>2025-09-19</lastmod>
+    </url>
+</urlset>
