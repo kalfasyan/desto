@@ -1,5 +1,10 @@
 name: Build and deploy MkDocs site
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 on:
   push:
     branches: [ mkdocs ]
