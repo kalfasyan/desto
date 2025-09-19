@@ -54,10 +54,4 @@ jobs:
           name: site
           path: site
 
-      - name: Deploy (pages) conditional
-        if: github.ref == 'refs/heads/mkdocs' && github.event_name == 'push'
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          force_orphan: true
+
