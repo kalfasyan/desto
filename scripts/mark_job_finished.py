@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Helper script to mark job completion in Redis.
+"""Helper script to mark job completion in Redis.
 This is called from within tmux sessions when jobs finish.
 """
 
@@ -73,10 +72,7 @@ try:
             if session_data:
                 # Handle bytes from Redis
                 if isinstance(list(session_data.values())[0], bytes):
-                    session_data = {
-                        k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
-                        for k, v in session_data.items()
-                    }
+                    session_data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in session_data.items()}
                 job_finished_time = session_data.get("job_finished_time")
         except Exception:
             job_finished_time = None

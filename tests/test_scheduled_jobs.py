@@ -30,11 +30,11 @@ def tmux_manager(mock_ui, mock_logger, tmp_path):
 
 
 class TestScheduledJobs:
-    """Test scheduled jobs functionality"""
+    """Test scheduled jobs functionality."""
 
     @patch("desto.app.sessions.subprocess.run")
     def test_get_scheduled_jobs_empty(self, mock_run, tmux_manager):
-        """Test getting scheduled jobs when none exist"""
+        """Test getting scheduled jobs when none exist."""
         # Mock empty atq output
         mock_run.return_value = MagicMock(returncode=0, stdout="")
 
@@ -45,7 +45,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_get_scheduled_jobs_with_jobs(self, mock_run, tmux_manager):
-        """Test getting scheduled jobs when they exist"""
+        """Test getting scheduled jobs when they exist."""
         # Mock atq output with sample jobs
         mock_output = """39\tMon Jun 30 15:30:00 2025 a\tkalfasy
 40\tTue Jul  1 10:00:00 2025 a\tkalfasy
@@ -69,7 +69,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_get_scheduled_jobs_command_fails(self, mock_run, tmux_manager):
-        """Test getting scheduled jobs when atq command fails"""
+        """Test getting scheduled jobs when atq command fails."""
         # Mock failed atq command
         mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="atq: command not found")
 
@@ -80,7 +80,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_get_scheduled_jobs_exception(self, mock_run, tmux_manager):
-        """Test getting scheduled jobs when an exception occurs"""
+        """Test getting scheduled jobs when an exception occurs."""
         # Mock exception
         mock_run.side_effect = Exception("Connection error")
 
@@ -91,7 +91,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_kill_scheduled_jobs_empty(self, mock_run, tmux_manager):
-        """Test killing scheduled jobs when none exist"""
+        """Test killing scheduled jobs when none exist."""
         # Mock empty atq output
         mock_run.return_value = MagicMock(returncode=0, stdout="")
 
@@ -104,7 +104,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_kill_scheduled_jobs_success(self, mock_run, tmux_manager):
-        """Test successfully killing scheduled jobs"""
+        """Test successfully killing scheduled jobs."""
         # Mock atq output first, then atrm success
         mock_output = """39\tMon Jun 30 15:30:00 2025 a\tkalfasy
 40\tTue Jul  1 10:00:00 2025 a\tkalfasy"""
@@ -127,7 +127,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_kill_scheduled_jobs_partial_failure(self, mock_run, tmux_manager):
-        """Test killing scheduled jobs with some failures"""
+        """Test killing scheduled jobs with some failures."""
         # Mock atq output
         mock_output = """39\tMon Jun 30 15:30:00 2025 a\tkalfasy
 40\tTue Jul  1 10:00:00 2025 a\tkalfasy"""
@@ -150,7 +150,7 @@ class TestScheduledJobs:
 
     @patch("desto.app.sessions.subprocess.run")
     def test_kill_scheduled_jobs_unexpected_error(self, mock_run, tmux_manager):
-        """Test killing scheduled jobs with unexpected errors"""
+        """Test killing scheduled jobs with unexpected errors."""
         # Mock atq output
         mock_output = """39	Mon Jun 30 15:30:00 2025 a	kalfasy"""
 
@@ -168,12 +168,12 @@ class TestScheduledJobs:
 
 
 class TestKillAllSessionsAndJobs:
-    """Test the combined kill all functionality"""
+    """Test the combined kill all functionality."""
 
     @patch.object(TmuxManager, "kill_scheduled_jobs")
     @patch.object(TmuxManager, "kill_all_sessions")
     def test_kill_all_sessions_and_jobs_success(self, mock_kill_sessions, mock_kill_jobs, tmux_manager):
-        """Test successfully killing all sessions and jobs"""
+        """Test successfully killing all sessions and jobs."""
         # Mock successful operations
         mock_kill_sessions.return_value = (2, 2, [])  # 2/2 sessions killed
         mock_kill_jobs.return_value = (1, 1, [])  # 1/1 jobs killed
@@ -192,7 +192,7 @@ class TestKillAllSessionsAndJobs:
     @patch.object(TmuxManager, "kill_scheduled_jobs")
     @patch.object(TmuxManager, "kill_all_sessions")
     def test_kill_all_sessions_and_jobs_with_errors(self, mock_kill_sessions, mock_kill_jobs, tmux_manager):
-        """Test killing all sessions and jobs with some errors"""
+        """Test killing all sessions and jobs with some errors."""
         # Mock operations with errors
         session_errors = ["Session error 1", "Session error 2"]
         job_errors = ["Job error 1"]
@@ -214,7 +214,7 @@ class TestKillAllSessionsAndJobs:
     @patch.object(TmuxManager, "kill_scheduled_jobs")
     @patch.object(TmuxManager, "kill_all_sessions")
     def test_kill_all_sessions_and_jobs_empty(self, mock_kill_sessions, mock_kill_jobs, tmux_manager):
-        """Test killing all when no sessions or jobs exist"""
+        """Test killing all when no sessions or jobs exist."""
         # Mock empty operations
         mock_kill_sessions.return_value = (0, 0, [])
         mock_kill_jobs.return_value = (0, 0, [])
@@ -229,12 +229,12 @@ class TestKillAllSessionsAndJobs:
 
 
 class TestConfirmKillAllSessions:
-    """Test the UI confirmation dialog functionality"""
+    """Test the UI confirmation dialog functionality."""
 
     @patch.object(TmuxManager, "get_scheduled_jobs")
     @patch.object(TmuxManager, "check_sessions")
     def test_confirm_kill_all_sessions_no_jobs_or_sessions(self, mock_check_sessions, mock_get_jobs, tmux_manager):
-        """Test confirmation dialog when no sessions or jobs exist"""
+        """Test confirmation dialog when no sessions or jobs exist."""
         # Mock empty sessions and jobs
         mock_check_sessions.return_value = {}
         mock_get_jobs.return_value = []
@@ -257,7 +257,7 @@ class TestConfirmKillAllSessions:
     @patch.object(TmuxManager, "get_scheduled_jobs")
     @patch.object(TmuxManager, "check_sessions")
     def test_confirm_kill_all_sessions_with_jobs_and_sessions(self, mock_check_sessions, mock_get_jobs, tmux_manager, tmp_path):
-        """Test confirmation dialog when both sessions and jobs exist"""
+        """Test confirmation dialog when both sessions and jobs exist."""
         # Mock sessions and jobs
         mock_check_sessions.return_value = {
             "session1": {"created": 1640995200},  # Mock session
@@ -281,7 +281,7 @@ class TestConfirmKillAllSessions:
     @patch.object(TmuxManager, "get_scheduled_jobs")
     @patch.object(TmuxManager, "check_sessions")
     def test_confirm_kill_all_sessions_only_jobs(self, mock_check_sessions, mock_get_jobs, tmux_manager):
-        """Test confirmation dialog when only scheduled jobs exist"""
+        """Test confirmation dialog when only scheduled jobs exist."""
         # Mock no sessions, but some jobs
         mock_check_sessions.return_value = {}
         mock_get_jobs.return_value = [
@@ -301,7 +301,7 @@ class TestConfirmKillAllSessions:
     @patch.object(TmuxManager, "get_scheduled_jobs")
     @patch.object(TmuxManager, "check_sessions")
     def test_confirm_kill_all_sessions_only_sessions(self, mock_check_sessions, mock_get_jobs, tmux_manager):
-        """Test confirmation dialog when only sessions exist"""
+        """Test confirmation dialog when only sessions exist."""
         # Mock some sessions, but no jobs
         mock_check_sessions.return_value = {"session1": {"created": 1640995200}}
         mock_get_jobs.return_value = []

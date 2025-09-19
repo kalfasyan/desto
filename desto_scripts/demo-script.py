@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-Example Python script for desto Docker demo
-"""
+"""Example Python script for desto Docker demo."""
 
 import os
 import sys

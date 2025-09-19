@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Helper script to mark session started in Redis.
+"""Helper script to mark session started in Redis.
 This is called from within tmux sessions when sessions start.
 """
 

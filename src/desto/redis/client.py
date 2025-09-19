@@ -27,7 +27,7 @@ class DestoRedisClient:
             self._initialize_redis()
 
     def _initialize_redis(self):
-        """Initialize Redis connection with error handling"""
+        """Initialize Redis connection with error handling."""
         try:
             self.redis = redis.Redis(
                 host=self.config["host"],
@@ -49,7 +49,7 @@ class DestoRedisClient:
             self.redis = None
 
     def is_connected(self) -> bool:
-        """Check if Redis is available"""
+        """Check if Redis is available."""
         if not self.redis:
             return False
         try:

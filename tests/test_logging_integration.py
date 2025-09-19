@@ -1,5 +1,4 @@
-"""
-Integration test for logging functionality.
+"""Integration test for logging functionality.
 This test can be run manually to verify the logging fix works in practice.
 """
 

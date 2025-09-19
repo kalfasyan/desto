@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.png" alt="desto Logo" title="desto Logo" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
+  <img src="images/logo.png" alt="desto Logo" title="desto Logo" width="300" style="border:2px solid #ccc; border-radius:6px;"/>  
 </p>  
 
 
@@ -28,7 +28,7 @@ The key features are:
   
 <strong>🎬 Demo</strong>
 
-<img src="docs/images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+<img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
 ## ✨ `desto` Overview
 
@@ -37,7 +37,7 @@ The key features are:
 <details>
 <summary><strong>👀 Dashboard Overview</strong></summary>
 
-<img src="docs/images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+<img src="images/dashboard.png" alt="Dashboard Screenshot" title="Desto Dashboard" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
 </details>  
       
@@ -53,7 +53,7 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
 3. (OPTIONAL) edit and save your changes
 4. Click "Launch"! 🎬
 
-<img src="docs/images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+<img src="images/launch_script.png" alt="Custom Template" title="Launch Script" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 </details>
 
 <details>
@@ -61,7 +61,7 @@ Your scripts show up automatically—no setup needed. Both `.sh` (bash) and `.py
 
 If you want to compose a new script, you can do it right here, or simply just paste the output of your favorite LLM :) Choose between bash and Python templates with syntax highlighting and smart defaults.
 
-<img src="docs/images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+<img src="images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
 </details>
   
@@ -70,13 +70,13 @@ If you want to compose a new script, you can do it right here, or simply just pa
 
 More settings to be added! 
 
-<img src="docs/images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+<img src="images/settings.png" alt="Custom Template" title="Change Settings" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 </details>
   
 <details>
 <summary><strong>📜 View your script's logs</strong></summary>
 
-<img src="docs/images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
+<img src="images/view_logs.png" alt="Custom Template" title="View Logs" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
 </details>
 
@@ -161,7 +161,7 @@ If you are not familiar with `uv`, you may visit [uv's official website](https:/
 - [tmux](https://github.com/tmux/tmux)
 - [at](https://en.wikipedia.org/wiki/At_(command)) (for scheduling features)
   
-Check [`pyproject.toml`](pyproject.toml)
+Check [`pyproject.md`](pyproject.md)
 
 ### Installation Steps
 

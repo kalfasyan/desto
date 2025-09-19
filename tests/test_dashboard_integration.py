@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Integration tests for dashboard UI behavior and session status display.
+"""Integration tests for dashboard UI behavior and session status display.
 These tests ensure that the dashboard correctly shows job completion status.
 """
 
@@ -30,7 +29,7 @@ except ImportError as e:
 
 
 class TestDashboardStatusDisplay(unittest.TestCase):
-    """Test that the dashboard correctly displays job completion status"""
+    """Test that the dashboard correctly displays job completion status."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -54,7 +53,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_add_sessions_table_uses_redis_status_when_available(self):
-        """Test that add_sessions_table checks Redis job status for keep-alive sessions"""
+        """Test that add_sessions_table checks Redis job status for keep-alive sessions."""
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
@@ -96,7 +95,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             self.assertTrue(len(captured_labels) > 0)
 
     def test_add_sessions_table_falls_back_to_file_marker_without_redis(self):
-        """Test that add_sessions_table falls back to file markers when Redis is not available"""
+        """Test that add_sessions_table falls back to file markers when Redis is not available."""
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_instance = Mock(spec=DestoRedisClient)
             mock_redis_instance.is_connected.return_value = False
@@ -105,7 +104,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
                 TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
     def test_session_status_correctly_distinguishes_job_vs_session(self):
-        """Test that session status correctly shows job completion vs session running state"""
+        """Test that session status correctly shows job completion vs session running state."""
         with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
@@ -156,18 +155,18 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
 
 class TestLogSectionIntegration(unittest.TestCase):
-    """Test LogSection integration with the dashboard"""
+    """Test LogSection integration with the dashboard."""
 
     def setUp(self):
         self.log_section = LogSection()
 
     def test_log_section_initialization(self):
-        """Test that LogSection initializes correctly"""
+        """Test that LogSection initializes correctly."""
         self.assertIsInstance(self.log_section.log_messages, list)
         self.assertEqual(len(self.log_section.log_messages), 0)
 
     def test_log_section_message_handling(self):
-        """Test that LogSection handles messages correctly"""
+        """Test that LogSection handles messages correctly."""
         # Test adding messages
         test_messages = ["Test message 1", "Test message 2", "Test message 3"]
 
@@ -179,7 +178,7 @@ class TestLogSectionIntegration(unittest.TestCase):
         self.assertEqual(self.log_section.log_messages, test_messages)
 
     def test_log_section_ui_component_setup(self):
-        """Test that LogSection sets up UI components correctly"""
+        """Test that LogSection sets up UI components correctly."""
         # This test verifies the structure without needing actual NiceGUI
         self.assertTrue(hasattr(self.log_section, "log_messages"))
         self.assertTrue(hasattr(self.log_section, "update_log_messages"))
@@ -187,7 +186,7 @@ class TestLogSectionIntegration(unittest.TestCase):
 
 
 class TestJobCompletionMarkingIntegration(unittest.TestCase):
-    """Test job completion marking integration"""
+    """Test job completion marking integration."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -204,7 +203,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_job_completion_command_generation(self):
-        """Test that job completion commands are generated correctly"""
+        """Test that job completion commands are generated correctly."""
         # Mock Redis client
         mock_redis_client = Mock(spec=DestoRedisClient)
         mock_redis_client.is_connected.return_value = True
@@ -227,7 +226,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
             self.assertIn("$SCRIPT_EXIT_CODE", command)
 
     def test_job_completion_command_without_redis(self):
-        """Test job completion command generation without Redis"""
+        """Test job completion command generation without Redis."""
         # Mock Redis client as disconnected
         mock_redis_client = Mock(spec=DestoRedisClient)
         mock_redis_client.is_connected.return_value = False

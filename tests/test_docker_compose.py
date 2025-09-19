@@ -6,25 +6,36 @@ import time
 from pathlib import Path
 
 import pytest
-import requests
 from loguru import logger
 
 from .docker_test_utils import (
     check_for_existing_containers,
     cleanup_tmux_test_sessions,
+    compose_up_if_needed,
     ensure_docker_available,
     ensure_docker_compose_available,
     safe_docker_cleanup,
     wait_for_compose_down,
+    wait_for_http,
 )
 
-pytestmark = pytest.mark.skipif(
-    not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests."
-)
+pytestmark = pytest.mark.skipif(not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests.")
 
 
 class TestDockerCompose:
     """Test Docker Compose functionality."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def compose_once(self):
+        """Start compose once for the test class and tear down at the end.
+
+        This reduces repeated compose up/down per test which is slow.
+        """
+        # Rely on session-scoped autouse fixture `docker_compose` to have started compose.
+        # Wait briefly for HTTP readiness before running tests
+        wait_for_http("http://localhost:8809", timeout=30, interval=0.5)
+        yield
+        # No class-level teardown; session fixture will handle final cleanup.
 
     @pytest.fixture(autouse=True)
     def setup_and_teardown(self):
@@ -37,16 +48,26 @@ class TestDockerCompose:
         # Check for existing containers that might conflict
         check_for_existing_containers()
 
-        # Cleanup any existing desto test containers specifically
-        logger.info("Cleaning up existing desto test containers...")
-        safe_docker_cleanup(project_root)
+        # Detect whether desto containers are already present (e.g. started by class fixture)
+        res = subprocess.run(["docker", "ps", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True)
+        containers_present = bool(res.stdout.strip())
+
+        # Cleanup only if no desto containers are present; this avoids removing class-level compose
+        if not containers_present:
+            logger.info("Cleaning up existing desto test containers...")
+            safe_docker_cleanup(project_root)
+        else:
+            logger.debug("Desto containers already present; skipping initial cleanup")
 
         yield
 
-        # Cleanup after test
-        logger.info("Cleaning up desto test containers after test...")
-        safe_docker_cleanup(project_root)
-        wait_for_compose_down()
+        # Cleanup after test only when we did not detect pre-existing containers
+        if not containers_present:
+            logger.info("Cleaning up desto test containers after test...")
+            safe_docker_cleanup(project_root, remove_volumes=False)
+            wait_for_compose_down()
+        else:
+            logger.debug("Skipping per-test cleanup because containers were present at setup")
 
         # Additional explicit session cleanup
         cleanup_tmux_test_sessions()
@@ -54,11 +75,7 @@ class TestDockerCompose:
     def test_docker_compose_build(self):
         """Test that Docker Compose can build the service."""
         logger.info("Starting Docker Compose build test...")
-
-        # Ensure clean state before build
-        safe_docker_cleanup()
-        wait_for_compose_down()
-
+        # Do NOT tear down existing containers started by fixtures; just build images.
         result = subprocess.run(["docker", "compose", "build"], capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -68,54 +85,36 @@ class TestDockerCompose:
 
         assert result.returncode == 0, f"Build failed: {result.stderr}"
 
+        # Ensure services are (back) up for subsequent tests if build interrupted them
+        compose_up_if_needed(timeout=60)
+        wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
+
     def test_docker_compose_up_and_health(self):
         """Test that Docker Compose can start the service and it becomes healthy."""
         logger.info("Starting Docker Compose up and health test...")
-
-        # Start the service
-        logger.info("Starting Docker Compose service...")
-        result = subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
-
-        if result.returncode != 0:
-            logger.error(f"Failed to start service with stderr: {result.stderr}")
-            time.sleep(10)  # Wait and retry once
-            result = subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
-        assert result.returncode == 0, f"Failed to start service: {result.stderr}"
-        time.sleep(10)  # Give extra time for network/service creation
-
-        # Wait for the service to be healthy (max 60 seconds)
-        logger.info("Waiting for service to become healthy...")
-        max_wait = 60
-        wait_time = 0
-        service_healthy = False
-
-        while wait_time < max_wait:
+        # Proactively ensure compose is up (idempotent if already running)
+        compose_up_if_needed(timeout=60)
+        # Allow a slightly longer window; cold starts or CI can be slower
+        healthy = wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
+        if not healthy:
+            # Dump diagnostic info to help debugging
+            logger.error("Service did not become healthy within timeout; dumping diagnostics")
             try:
-                # Check container health
-                health_result = subprocess.run(["docker", "compose", "ps", "--format", "json"], capture_output=True, text=True)
-
-                if health_result.returncode == 0:
-                    # Try to make a request to the service
-                    response = requests.get("http://localhost:8809", timeout=5)
-                    if response.status_code == 200:
-                        logger.info(f"Service became healthy after {wait_time} seconds")
-                        service_healthy = True
-                        break
-
-            except (requests.RequestException, subprocess.SubprocessError) as e:
-                logger.debug(f"Health check attempt failed: {e}")
-
-            time.sleep(2)
-            wait_time += 2
-
-        if not service_healthy:
-            logger.error(f"Service did not become healthy within {max_wait} seconds")
-        assert service_healthy, "Service did not become healthy within timeout"
+                ps = subprocess.run(["docker", "compose", "ps"], capture_output=True, text=True)
+                logs_dash = subprocess.run(["docker", "compose", "logs", "dashboard"], capture_output=True, text=True)
+                logger.error(f"Compose ps output:\n{ps.stdout}")
+                logger.error(f"Dashboard logs:\n{logs_dash.stdout}")
+            except Exception as e:
+                logger.error(f"Failed to collect diagnostics: {e}")
+        assert healthy, "Service did not become healthy within timeout"
 
     @pytest.mark.skipif(os.getenv("CI") == "true", reason="Skip volume test on GitHub Actions due to permission issues")
     def test_docker_compose_volumes(self):
         """Test that volumes are mounted correctly in the container."""
         logger.info("Starting Docker Compose volumes test...")
+        # Ensure service is running (build test may have rebuilt images)
+        compose_up_if_needed(timeout=60)
+        wait_for_http("http://localhost:8809", timeout=60, interval=0.5)
 
         # Create test files in host directories
         scripts_dir = Path("desto_scripts")
@@ -138,18 +137,13 @@ class TestDockerCompose:
         test_script.write_text("hello from host script")
         test_log.write_text("hello from host log")
 
-        # Start the service
-        subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
-        time.sleep(10)  # Increase wait time for container startup and volume mount
+        # The class fixture ensures compose is up; allow more time for mounts (slower FS / CI)
+        time.sleep(1.0)
 
         # Check that the files exist inside the container
         logger.info("Checking if files are accessible inside container...")
-        result_script = subprocess.run(
-            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"], capture_output=True, text=True
-        )
-        result_log = subprocess.run(
-            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"], capture_output=True, text=True
-        )
+        result_script = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"], capture_output=True, text=True)
+        result_log = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"], capture_output=True, text=True)
 
         if result_script.returncode == 0:
             logger.info("Script file successfully accessed in container")
@@ -174,24 +168,18 @@ class TestDockerCompose:
     def test_docker_compose_environment_variables(self):
         """Test that environment variables are properly set."""
         logger.info("Starting Docker Compose environment variables test...")
-
-        # Start the service
-        logger.info("Starting Docker Compose service for environment test...")
-        subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
-
-        # Wait a bit for startup
-        time.sleep(10)
+        # The class fixture starts compose; wait for HTTP readiness
+        wait_for_http("http://localhost:8809", timeout=20)
 
         # Check environment variables in container
         logger.info("Checking environment variables in container...")
-        result = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "env"], capture_output=True, text=True)
 
-        # Wait for container to be running
-        for _ in range(10):
+        # Wait (short) for container to be running
+        for _ in range(6):
             status = subprocess.run(["docker", "compose", "ps", "--services", "--filter", "status=running"], capture_output=True, text=True)
             if "dashboard" in status.stdout:
                 break
-            time.sleep(2)
+            time.sleep(0.5)
         else:
             logs = subprocess.run(["docker", "compose", "logs", "dashboard"], capture_output=True, text=True)
             logger.error(f"Dashboard logs:\n{logs.stdout}")
@@ -217,23 +205,9 @@ class TestDockerCompose:
         logger.info("Starting Docker Compose service...")
         subprocess.run(["docker", "compose", "up", "-d"], capture_output=True, text=True)
 
-        # Wait for initial startup
+        # Wait for initial startup (use helper)
         logger.info("Waiting for initial service startup...")
-        max_wait = 60
-        wait_time = 0
-        service_healthy = False
-        while wait_time < max_wait:
-            try:
-                response = requests.get("http://localhost:8809", timeout=5)
-                if response.status_code == 200:
-                    logger.info(f"Service became healthy after {wait_time} seconds")
-                    service_healthy = True
-                    break
-            except requests.RequestException as e:
-                logger.debug(f"Health check attempt failed: {e}")
-            time.sleep(2)
-            wait_time += 2
-        assert service_healthy, "Service did not become healthy before restart"
+        assert wait_for_http("http://localhost:8809", timeout=30), "Service did not become healthy before restart"
 
         # Restart the service
         logger.info("Restarting Docker Compose service...")
@@ -246,18 +220,4 @@ class TestDockerCompose:
 
         # Wait for restart and for the service to become healthy again
         logger.info("Waiting for service to become healthy after restart...")
-        max_wait = 60
-        wait_time = 0
-        service_healthy = False
-        while wait_time < max_wait:
-            try:
-                response = requests.get("http://localhost:8809", timeout=5)
-                if response.status_code == 200:
-                    logger.info(f"Service became healthy after restart in {wait_time} seconds")
-                    service_healthy = True
-                    break
-            except requests.RequestException as e:
-                logger.debug(f"Health check attempt after restart failed: {e}")
-            time.sleep(2)
-            wait_time += 2
-        assert service_healthy, "Service did not become healthy after restart"
+        assert wait_for_http("http://localhost:8809", timeout=30), "Service did not become healthy after restart"

@@ -1,6 +1,4 @@
-"""
-CLI-specific session manager using Redis-backed session management.
-"""
+"""CLI-specific session manager using Redis-backed session management."""
 
 import getpass
 import os
@@ -59,8 +57,7 @@ class CLISessionManager:
         return "\n".join(info_lines)
 
     def start_session(self, session_name: str, command: str) -> bool:
-        """
-        Start a new session using the Redis-based SessionManager and launch the command in tmux.
+        """Start a new session using the Redis-based SessionManager and launch the command in tmux.
         Also removes any existing .finished marker file for test compatibility.
         """
         # Check for duplicate session in-memory (for test compatibility)
@@ -120,8 +117,7 @@ class CLISessionManager:
             return False
 
     def start_chain_session(self, scripts_with_args: List[List[str]], continue_on_error: bool = False) -> Optional[str]:
-        """
-        Start a chain session: runs multiple scripts in a single tmux session, logs info blocks, and registers in Redis.
+        """Start a chain session: runs multiple scripts in a single tmux session, logs info blocks, and registers in Redis.
         scripts_with_args: List of [script_name, arg1, arg2, ...]
         Returns the session name if started, else None.
         """
@@ -171,10 +167,7 @@ class CLISessionManager:
             # Script execution with output redirection
             cmd_parts.append(f"({script_cmd}) >> {quoted_log_file} 2>&1")
             cmd_parts.append("SCRIPT_EXIT_CODE=$?")
-            script_end = (
-                f"printf '\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n' "
-                f'"$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
-            )
+            script_end = f"printf '\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n' " f'"$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
             cmd_parts.append(script_end)
             if not continue_on_error:
                 cmd_parts.append("if [ $SCRIPT_EXIT_CODE -ne 0 ]; then exit $SCRIPT_EXIT_CODE; fi")
@@ -207,9 +200,7 @@ class CLISessionManager:
             return None
 
     def list_sessions(self) -> Dict[str, Dict]:
-        """
-        List all sessions using the Redis-based SessionManager.
-        """
+        """List all sessions using the Redis-based SessionManager."""
         try:
             redis_client = DestoRedisClient()
             session_manager = SessionManager(redis_client)
@@ -235,9 +226,7 @@ class CLISessionManager:
             return {}
 
     def kill_session(self, session_name: str) -> bool:
-        """
-        Mark a session as finished using the Redis-based SessionManager.
-        """
+        """Mark a session as finished using the Redis-based SessionManager."""
         logger.info(f"Attempting to finish session: '{session_name}' (Redis-based)")
         redis_client = DestoRedisClient()
         session_manager = SessionManager(redis_client)
@@ -260,8 +249,8 @@ class CLISessionManager:
             return False
 
     def kill_all_sessions(self) -> Tuple[int, int, list]:
-        """
-        Mark all sessions as finished using the Redis-based SessionManager.
+        """Mark all sessions as finished using the Redis-based SessionManager.
+
         Returns:
             Tuple of (success_count, total_count, error_messages)
         """
@@ -283,9 +272,7 @@ class CLISessionManager:
         return (success_count, total_count, error_messages)
 
     def attach_session(self, session_name: str) -> bool:
-        """
-        Attach to an existing session (checks Redis, but still uses tmux for terminal attach).
-        """
+        """Attach to an existing session (checks Redis, but still uses tmux for terminal attach)."""
         # Check if session exists in Redis
         redis_client = DestoRedisClient()
         session_manager = SessionManager(redis_client)
@@ -305,11 +292,12 @@ class CLISessionManager:
             return False
 
     def get_log_content(self, session_name: str, lines: Optional[int] = None) -> Optional[str]:
-        """
-        Get log content for a session.
+        """Get log content for a session.
+
         Args:
             session_name: Name of the session
             lines: Number of lines to return from the end (None for all)
+
         Returns:
             Log content as string, or None if not found
         """
@@ -339,8 +327,8 @@ class CLISessionManager:
             return None
 
     def follow_log(self, session_name: str) -> bool:
-        """
-        Follow log output for a session (like tail -f).
+        """Follow log output for a session (like tail -f).
+
         Args:
             session_name: Name of the session to follow
         Returns:
@@ -364,8 +352,8 @@ class CLISessionManager:
             return False
 
     def get_log_file(self, session_name: str) -> Path:
-        """
-        Get the log file path for a session.
+        """Get the log file path for a session.
+
         Args:
             session_name: Name of the session
         Returns:
@@ -374,8 +362,8 @@ class CLISessionManager:
         return self.log_dir / f"{session_name}.log"
 
     def get_script_file(self, script_name: str) -> Path:
-        """
-        Get the script file path.
+        """Get the script file path.
+
         Args:
             script_name: Name of the script file
         Returns:
@@ -384,8 +372,8 @@ class CLISessionManager:
         return self.scripts_dir / script_name
 
     def session_exists(self, session_name: str) -> bool:
-        """
-        Check if a session exists.
+        """Check if a session exists.
+
         Args:
             session_name: Name of the session to check
         Returns:

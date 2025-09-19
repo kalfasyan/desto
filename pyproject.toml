@@ -11,6 +11,7 @@ dependencies = [
     "pre-commit>=4.2.0",
     "psutil>=7.0.0",
     "pytest>=8.3.5",
+    "pytest-xdist>=3.2.0",
     "twine>=6.1.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
@@ -21,6 +22,15 @@ dependencies = [
 dev = [
     "ruff>=0.1.0",
     "requests>=2.31.0",
+]
+
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "pymdown-extensions>=9.0.0",
+    "mkdocs-include-markdown-plugin>=6.0.0",
+    "mkdocs-htmlproofer-plugin>=1.2.1",
+    "loguru>=0.7.3",  # For docs generation scripts
 ]
 
 [project.scripts]
@@ -35,7 +45,7 @@ build-backend = "hatchling.build"
 path = "src/desto/_version.py"
 
 [tool.ruff]
-line-length = 150  # Increased to handle long UI strings and f-strings
+line-length = 250  # Increased to handle long UI strings and f-strings
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -44,9 +54,42 @@ select = [
     "W",  # pycodestyle warnings
     "F",  # pyflakes
     "I",  # isort
+    "D",  # pydocstyle (docstring conventions)
 ]
-ignore = []
+ignore = [
+    "D100",  # Missing docstring in public module
+    "D101",  # Missing docstring in public class
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D106",  # Missing docstring in public nested class
+    "D107",  # Missing docstring in __init__
+    "D205",  # 1 blank line required between summary line and description
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Allow all docstring issues in tests and mock classes
+"tests/*" = ["D"]
+"src/desto/cli/*" = ["D"]  # CLI modules often have mock classes
+"src/desto/__init__.py" = ["D"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra"
+]
+# Exclude non-test directories completely
+norecursedirs = ["src", "scripts", "docs", ".git", ".venv", "build", "dist"]

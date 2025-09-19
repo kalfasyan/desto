@@ -1,0 +1,57 @@
+name: Docs
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+on:
+  push:
+    branches: [ main, mkdocs ]
+  pull_request:
+    branches: [ main, mkdocs ]
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+
+      - name: Sync dependencies (docs extra)
+        run: |
+          uv sync --extra docs --no-dev
+
+      - name: Sync README into docs
+        run: |
+          uv run python scripts/sync_readme_to_docs.py
+
+      - name: Check README drift
+        run: |
+          if ! git diff --quiet -- docs/README.md; then
+            echo 'README drift detected. Run sync script locally.'
+            git --no-pager diff -- docs/README.md
+            exit 1
+          fi
+
+      - name: Build docs
+        run: |
+          uv run mkdocs build --strict
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site
+
+

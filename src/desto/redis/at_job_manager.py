@@ -12,15 +12,10 @@ from .client import DestoRedisClient
 
 
 class AtJobManager:
-    """
-    Wrapper for scheduling, listing, and canceling jobs with 'at',
-    and for extracting the system 'at' job ID. Now supports storing job metadata in Redis.
-    """
+    """Wrapper for scheduling, listing, and canceling jobs with 'at', and for extracting the system 'at' job ID. Now supports storing job metadata in Redis."""
 
     def __init__(self, redis_client: Optional[DestoRedisClient] = None):
-        """
-        Optionally pass a DestoRedisClient to enable Redis metadata tracking.
-        """
+        """Optionally pass a DestoRedisClient to enable Redis metadata tracking."""
         self.redis_client = redis_client
 
     def schedule(
@@ -31,10 +26,7 @@ class AtJobManager:
         script_path: list = None,  # Accept a list
         arguments: str = "",
     ) -> Optional[str]:
-        """
-        Schedule a command with 'at'. Returns the at job ID as a string, or None on failure.
-        Also stores job metadata in Redis if enabled.
-        """
+        """Schedule a command with 'at'. Returns the at job ID as a string, or None on failure. Also stores job metadata in Redis if enabled."""
         try:
             request_time = datetime.now()
             # Convert time_spec if needed
@@ -134,9 +126,7 @@ class AtJobManager:
             return None
 
     def list_jobs(self) -> List[Dict[str, Any]]:
-        """
-        List all jobs scheduled with 'atq'. Returns a list of dicts with job info and metadata from Redis if available.
-        """
+        """List all jobs scheduled with 'atq'. Returns a list of dicts with job info and metadata from Redis if available."""
         jobs = []
         try:
             proc = subprocess.run(["atq"], capture_output=True, text=True, check=False)
@@ -166,9 +156,7 @@ class AtJobManager:
         return jobs
 
     def get_job_command(self, job_id: str) -> str:
-        """
-        Get the command for a scheduled job by job ID.
-        """
+        """Get the command for a scheduled job by job ID."""
         try:
             proc = subprocess.run(["at", "-c", str(job_id)], capture_output=True, text=True, check=True)
             return proc.stdout
@@ -176,9 +164,7 @@ class AtJobManager:
             return f"Unknown command (error: {e})"
 
     def get_job_metadata(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve job metadata from Redis for a given job_id.
-        """
+        """Retrieve job metadata from Redis for a given job_id."""
         if self.redis_client and self.redis_client.is_connected():
             key = f"desto:atjob:{job_id}"
             metadata = self.redis_client.redis.hgetall(key)
@@ -186,9 +172,7 @@ class AtJobManager:
         return None
 
     def cancel(self, job_id: str) -> bool:
-        """
-        Cancel a scheduled job by job ID. Returns True if successful. Updates status in Redis if enabled.
-        """
+        """Cancel a scheduled job by job ID. Returns True if successful. Updates status in Redis if enabled."""
         try:
             subprocess.run(["atrm", str(job_id)], check=True)
             # Update status in Redis

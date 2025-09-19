@@ -87,8 +87,7 @@ class TmuxManager:
             logger.debug("Failed to emit telemetry event", exc_info=True)
 
     def confirm_cancel_scheduled_job_by_id(self, at_job_id):
-        """
-        Show a confirmation dialog before canceling a scheduled job by at_job_id.
+        """Show a confirmation dialog before canceling a scheduled job by at_job_id.
         Pauses updates while dialog is open.
         """
         from nicegui import ui
@@ -112,9 +111,7 @@ class TmuxManager:
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             # Telemetry: dialog opened
             self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
-            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
-                "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
-            )
+            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
 
             def _cancel():
                 cancel()
@@ -130,8 +127,7 @@ class TmuxManager:
         dialog.open()
 
     def cancel_scheduled_job(self, at_job_id, session_name=None):
-        """
-        Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
+        """Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
         If session_name is not provided, attempts to find the session by at_job_id in Redis.
         """
         from nicegui import ui
@@ -172,9 +168,7 @@ class TmuxManager:
             return False
 
     def get_all_sessions_status(self):
-        """
-        Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it.
-        """
+        """Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it."""
         sessions = {}
         try:
             # Get all session keys from Redis
@@ -184,9 +178,7 @@ class TmuxManager:
                     session_id = key.replace("desto:session:", "")
                     session_data = self.redis_client.redis.hgetall(key)
                     if session_data:
-                        session_info = {
-                            k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
-                        }
+                        session_info = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()}
                         # Use session_name if present, else fallback to id
                         display_session_name = session_info.get("session_name", session_id)
                         sessions[display_session_name] = session_info
@@ -203,9 +195,7 @@ class TmuxManager:
         return sessions
 
     def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None):
-        """
-        Render the stats cards and control buttons (Refresh, Clear History, Clear Logs)
-        """
+        """Render the stats cards and control buttons (Refresh, Clear History, Clear Logs)."""
         from nicegui import ui
 
         # --- Control Buttons (Refresh, Clear History, Clear Logs) ---
@@ -250,9 +240,7 @@ class TmuxManager:
                 ui.label("Running").style("color: #666; font-size: 0.9em;")
 
     def confirm_clear_history(self):
-        """
-        Show confirmation dialog before clearing session history. Pauses updates while dialog is open.
-        """
+        """Show confirmation dialog before clearing session history. Pauses updates while dialog is open."""
         from nicegui import ui
 
         if self.pause_updates:
@@ -284,9 +272,7 @@ class TmuxManager:
         dialog.open()
 
     def clear_session_history(self):
-        """
-        Clear all session history from Redis.
-        """
+        """Clear all session history from Redis."""
         try:
             all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
             if not all_keys:
@@ -312,9 +298,7 @@ class TmuxManager:
             ui.notification(error_msg, type="negative")
 
     def confirm_clear_logs(self):
-        """
-        Show confirmation dialog before clearing log files. Pauses updates while dialog is open.
-        """
+        """Show confirmation dialog before clearing log files. Pauses updates while dialog is open."""
         from nicegui import ui
 
         log_dir = self.LOG_DIR
@@ -362,9 +346,7 @@ class TmuxManager:
         dialog.open()
 
     def clear_log_files(self):
-        """
-        Clear all log files from the logs directory.
-        """
+        """Clear all log files from the logs directory."""
         log_dir = self.LOG_DIR
         if not log_dir.exists():
             ui.notification("Logs directory not found", type="warning")
@@ -405,8 +387,7 @@ class TmuxManager:
             ui.notification(error_msg, type="negative")
 
     def _start_redis_monitoring(self, session_name):
-        """Monitor tmux session and update Redis"""
-
+        """Monitor tmux session and update Redis."""
         # Skip monitoring if Redis is not available
         if not self.desto_manager:
             return
@@ -502,15 +483,11 @@ class TmuxManager:
             self.ui.notification(msg, type="negative")
 
     def clear_sessions_container(self):
-        """
-        Clears the sessions container.
-        """
+        """Clears the sessions container."""
         self.sessions_container.clear()
 
     def add_to_sessions_container(self, content):
-        """
-        Adds content to the sessions container.
-        """
+        """Adds content to the sessions container."""
         with self.sessions_container:
             content()
 
@@ -521,8 +498,7 @@ class TmuxManager:
         return self.SCRIPTS_DIR / script_name
 
     def start_tmux_session(self, session_name, command, instance_logger):
-        """
-        Starts a new tmux session with the given name and command, redirecting output to a log file.
+        """Starts a new tmux session with the given name and command, redirecting output to a log file.
         Shows notifications for success or failure.
         Enhanced: Checks Redis for existing session with SCHEDULED status and notifies user if found.
         """
@@ -537,9 +513,7 @@ class TmuxManager:
                 logger.info(f"Checking Redis session: {name} with status {status}")
                 # Accept both enum and string for status
                 if name == session_name and (status == SessionStatus.SCHEDULED or (isinstance(status, str) and str(status).lower() == "scheduled")):
-                    msg = (
-                        f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
-                    )
+                    msg = f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
                     logger.error(msg)
                     ui.notification(msg, type="negative")
                     return
@@ -632,8 +606,7 @@ class TmuxManager:
             ui.notification(msg, type="negative")
 
     def update_sessions_status(self, ui_manager=None):
-        """
-        Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
+        """Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
         Also renders the stats cards and control buttons above the table, as in the history tab.
         Shows all sessions (active, finished, failed, scheduled) by aggregating from Redis, not just active tmux sessions.
         """
@@ -648,9 +621,7 @@ class TmuxManager:
         self.add_to_sessions_container(render)
 
     def kill_tmux_session(self, session_name):
-        """
-        Kills a tmux session by name.
-        """
+        """Kills a tmux session by name."""
         try:
             subprocess.run(["tmux", "kill-session", "-t", session_name], check=True)
             logger.info(f"Successfully killed tmux session '{session_name}'")
@@ -660,9 +631,7 @@ class TmuxManager:
             ui.notification(msg, type="negative")
 
     def confirm_kill_session(self, session_name):
-        """
-        Displays a confirmation dialog before killing a tmux session and pauses updates.
-        """
+        """Displays a confirmation dialog before killing a tmux session and pauses updates."""
         logger.debug(f"User requested to kill session: {session_name}")
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
@@ -694,9 +663,7 @@ class TmuxManager:
     # single-session confirmation shown above; do not open the 'kill all' dialog here
 
     def get_script_run_time(self, created_time, session_name):
-        """
-        Returns the elapsed time for a session using Redis data.
-        """
+        """Returns the elapsed time for a session using Redis data."""
         try:
             # Get session from Redis using new manager
             session = self.desto_manager.session_manager.get_session_by_name(session_name)
@@ -714,14 +681,9 @@ class TmuxManager:
             return int(time.time() - created_time)
 
     def add_sessions_table(self, sessions_status, ui):
-        """
-        Adds the sessions table to the UI, using the history tab's columns plus an Actions column.
-        """
-
+        """Adds the sessions table to the UI, using the history tab's columns plus an Actions column."""
         # Table header
-        with ui.row().style(
-            "width: 100%; min-width: 1100px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"
-        ):
+        with ui.row().style("width: 100%; min-width: 1100px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"):
             ui.label("Session Name").style("flex: 2; min-width: 150px;")
             ui.label("Status").style("flex: 1; min-width: 100px;")
             ui.label("Job Duration").style("flex: 1; min-width: 120px;")
@@ -826,9 +788,7 @@ class TmuxManager:
                     if elapsed_seconds >= 0:
                         hours, remainder = divmod(elapsed_seconds, 3600)
                         minutes, seconds = divmod(remainder, 60)
-                        job_duration = (
-                            f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
-                        )
+                        job_duration = f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
                 except Exception:
                     pass
             # Fallback to job_elapsed or elapsed fields
@@ -849,9 +809,7 @@ class TmuxManager:
                     if elapsed_seconds >= 0:
                         hours, remainder = divmod(elapsed_seconds, 3600)
                         minutes, seconds = divmod(remainder, 60)
-                        session_duration = (
-                            f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
-                        )
+                        session_duration = f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
                     else:
                         session_duration = "N/A"
                 except Exception:
@@ -890,10 +848,7 @@ class TmuxManager:
             job_duration = format_duration(job_duration)
             session_duration = format_duration(session_duration)
 
-            with ui.row().style(
-                "width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #eee; "
-                "align-items: center; hover:background-color: #f9f9f9;"
-            ):
+            with ui.row().style("width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #eee; " "align-items: center; hover:background-color: #f9f9f9;"):
                 ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
                 ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
                 ui.label(job_duration).style("flex: 1; min-width: 120px; color: #666;")
@@ -978,9 +933,7 @@ class TmuxManager:
                     dialog.open()
 
                 with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
-                    ui.button(str(job_id), on_click=show_metadata_dialog, color="primary", icon="info").style(
-                        "flex: 1; min-width: 80px; font-weight: 500;"
-                    )
+                    ui.button(str(job_id), on_click=show_metadata_dialog, color="primary", icon="info").style("flex: 1; min-width: 80px; font-weight: 500;")
                     ui.label(str(scheduled_time)).style("flex: 2; min-width: 180px; color: #666;")
                     ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
                     ui.label(str(status)).style("flex: 1; min-width: 100px; color: #666;")
@@ -991,9 +944,7 @@ class TmuxManager:
                         ).props("color=red flat")
 
     def confirm_clear_session(self, session_name, ui):
-        """
-        Show confirmation dialog before clearing a session (deletes log and removes from Redis).
-        """
+        """Show confirmation dialog before clearing a session (deletes log and removes from Redis)."""
         if self.pause_updates:
             self.pause_updates()
 
@@ -1010,9 +961,7 @@ class TmuxManager:
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             self.telemetry_event("confirm_clear_session.open", {"session": session_name})
-            ui.label(f"Are you sure you want to clear session '{session_name}'?").style(
-                "font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;"
-            )
+            ui.label(f"Are you sure you want to clear session '{session_name}'?").style("font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
             ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
 
             def _cancel_clear_session():
@@ -1029,9 +978,7 @@ class TmuxManager:
         dialog.open()
 
     def clear_session(self, session_name, ui):
-        """
-        Deletes the session's log file and removes the session from Redis, then refreshes the UI.
-        """
+        """Deletes the session's log file and removes the session from Redis, then refreshes the UI."""
         # Delete log file
         log_file = self.get_log_file(session_name)
         log_deleted = False
@@ -1052,9 +999,7 @@ class TmuxManager:
             for key in all_keys:
                 session_data = self.redis_client.redis.hgetall(key)
                 if session_data:
-                    session_info = {
-                        k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()
-                    }
+                    session_info = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()}
                     display_session_name = session_info.get("session_name", key.replace("desto:session:", ""))
                     if display_session_name == session_name:
                         found_key = key
@@ -1083,9 +1028,7 @@ class TmuxManager:
         self.update_sessions_status(ui)
 
     def view_log(self, session_name, ui):
-        """
-        Pauses the app and opens a dialog to display the last 100 lines of the session's log file.
-        """
+        """Pauses the app and opens a dialog to display the last 100 lines of the session's log file."""
         logger.debug(f"User requested to view log for session: {session_name}")
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
@@ -1121,9 +1064,8 @@ class TmuxManager:
         dialog.open()
 
     def kill_all_sessions(self):
-        """
-        Kill all active tmux sessions.
-        Returns a tuple: (success_count, total_count, error_messages)
+        """Kill all active tmux sessions.
+        Returns a tuple: (success_count, total_count, error_messages).
         """
         sessions_status = self.check_sessions()
         total_count = len(sessions_status)
@@ -1157,9 +1099,7 @@ class TmuxManager:
         return (success_count, total_count, error_messages)
 
     def confirm_kill_all_sessions(self):
-        """
-        Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates.
-        """
+        """Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates."""
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
 
@@ -1281,8 +1221,7 @@ class TmuxManager:
         dialog.open()
 
     def get_scheduled_jobs(self):
-        """
-        Get a list of scheduled jobs from the 'at' command.
+        """Get a list of scheduled jobs from the 'at' command.
         Returns a list of dictionaries with job info.
         """
         try:
@@ -1316,7 +1255,7 @@ class TmuxManager:
             return []
 
     def _get_scheduled_job_command(self, job_id):
-        """Get the actual command for a scheduled job"""
+        """Get the actual command for a scheduled job."""
         try:
             result = subprocess.run(["at", "-c", job_id], capture_output=True, text=True)
             if result.returncode == 0:
@@ -1336,7 +1275,7 @@ class TmuxManager:
             return "Unknown command"
 
     def _format_scheduled_datetime(self, date_time):
-        """Format datetime from atq output for better display"""
+        """Format datetime from atq output for better display."""
         try:
             from datetime import datetime
 
@@ -1348,9 +1287,8 @@ class TmuxManager:
             return date_time
 
     def kill_scheduled_jobs(self):
-        """
-        Kill all scheduled jobs and return summary.
-        Returns a tuple: (success_count, total_count, error_messages)
+        """Kill all scheduled jobs and return summary.
+        Returns a tuple: (success_count, total_count, error_messages).
         """
         jobs = self.get_scheduled_jobs()
         total_count = len(jobs)
@@ -1381,9 +1319,8 @@ class TmuxManager:
         return (success_count, total_count, error_messages)
 
     def kill_all_sessions_and_jobs(self):
-        """
-        Kill all active tmux sessions and scheduled jobs.
-        Returns a tuple: (session_success, session_total, job_success, job_total, all_error_messages)
+        """Kill all active tmux sessions and scheduled jobs.
+        Returns a tuple: (session_success, session_total, job_success, job_total, all_error_messages).
         """
         # Kill tmux sessions
         session_success, session_total, session_errors = self.kill_all_sessions()
@@ -1396,8 +1333,7 @@ class TmuxManager:
         return (session_success, session_total, job_success, job_total, all_errors)
 
     def get_job_completion_command(self, session_name, use_variable=False):
-        """
-        Get the appropriate command to mark job completion.
+        """Get the appropriate command to mark job completion.
 
         Args:
             session_name: Name of the session
@@ -1436,8 +1372,7 @@ class TmuxManager:
         return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"
 
     def get_session_start_command(self, session_name: str, command: str):
-        """
-        Get the appropriate command to mark session start using Redis.
+        """Get the appropriate command to mark session start using Redis.
 
         Args:
             session_name: Name of the session

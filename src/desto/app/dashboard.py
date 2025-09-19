@@ -33,7 +33,7 @@ def resume_global_timer(um: UserInterfaceManager, tm: TmuxManager):
 
 
 def handle_instant_update(um: UserInterfaceManager, update_data):
-    """Handle instant updates from Redis - happens immediately, not on timer"""
+    """Handle instant updates from Redis - happens immediately, not on timer."""
     session_name = update_data.get("session_name")
     status = update_data.get("status")
 

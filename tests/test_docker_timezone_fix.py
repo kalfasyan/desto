@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test Docker timezone configuration for scheduling validation.
+"""Test Docker timezone configuration for scheduling validation.
 
 This test verifies that the Docker container uses the same timezone as the host,
 preventing scheduling validation issues where past/future date detection fails
@@ -34,6 +33,9 @@ def ensure_docker_containers():
     # Check for existing user containers that might conflict
     check_for_existing_containers()
 
+    # Get the project root directory dynamically
+    project_root = Path(__file__).parent.parent.resolve()
+
     # Check if desto-dashboard container is running
     result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
 
@@ -41,21 +43,18 @@ def ensure_docker_containers():
         # Clean up any existing desto containers first
         safe_docker_cleanup()
 
-        # Get the project root directory dynamically
-        project_root = Path(__file__).parent.parent.resolve()
+    # Start containers if not running (use helper polling)
+    from .docker_test_utils import compose_up_if_needed, wait_for_http
 
-        # Start containers if not running
-        subprocess.run(["docker", "compose", "up", "-d"], cwd=str(project_root))
+    compose_up_if_needed(project_root=project_root, services=["desto-dashboard"], timeout=20)
 
-        # Wait a moment for containers to be ready
-        import time
-
-        time.sleep(3)
+    # Wait for the dashboard HTTP service to be responsive
+    wait_for_http("http://localhost:8809", timeout=20, interval=0.5)
 
     yield
 
-    # Cleanup desto containers after tests
-    safe_docker_cleanup()
+    # Cleanup desto containers after tests (skip removing volumes for speed)
+    safe_docker_cleanup(remove_volumes=False)
 
     # Additional explicit session cleanup
     cleanup_tmux_test_sessions()
@@ -63,7 +62,6 @@ def ensure_docker_containers():
 
 def test_docker_container_timezone():
     """Test that Docker container uses the correct timezone."""
-
     # Get host timezone
     host_date = subprocess.run(["date"], capture_output=True, text=True).stdout.strip()
 
@@ -85,7 +83,6 @@ def test_docker_container_timezone():
 
 def test_docker_timezone_symlink():
     """Test that timezone symlink is correctly configured."""
-
     result = subprocess.run(["docker", "exec", "desto-dashboard", "ls", "-la", "/etc/localtime"], capture_output=True, text=True)
 
     assert "Europe/Berlin" in result.stdout, f"Expected Europe/Berlin timezone, got: {result.stdout}"
@@ -93,7 +90,6 @@ def test_docker_timezone_symlink():
 
 def test_docker_timezone_environment():
     """Test that TZ environment variable is set."""
-
     result = subprocess.run(["docker", "exec", "desto-dashboard", "env"], capture_output=True, text=True)
 
     assert "TZ=Europe/Berlin" in result.stdout, "TZ environment variable should be set to Europe/Berlin"
@@ -101,16 +97,8 @@ def test_docker_timezone_environment():
 
 def test_scheduling_validation_past_date():
     """Test that past date validation works in Docker container."""
-
     # Test past date validation using the same logic as the UI
-    python_code = (
-        "from datetime import datetime; "
-        'past_dt = datetime.strptime("2025-07-11 10:00", "%Y-%m-%d %H:%M"); '
-        "now = datetime.now(); "
-        "delta = (past_dt - now).total_seconds(); "
-        'print(f"DELTA:{delta}"); '
-        'print(f"VALID:{delta < 0}")'
-    )
+    python_code = 'from datetime import datetime; past_dt = datetime.strptime("2025-07-11 10:00", "%Y-%m-%d %H:%M"); now = datetime.now(); delta = (past_dt - now).total_seconds(); print(f"DELTA:{delta}"); print(f"VALID:{delta < 0}")'
 
     result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
 
@@ -130,19 +118,11 @@ def test_scheduling_validation_past_date():
 
 def test_scheduling_validation_future_date():
     """Test that future date validation works in Docker container."""
-
     # Test future date validation using a dynamically generated future date
     from datetime import datetime, timedelta
 
     future_dt = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
-    python_code = (
-        "from datetime import datetime; "
-        f'future_dt = datetime.strptime("{future_dt}", "%Y-%m-%d %H:%M"); '
-        "now = datetime.now(); "
-        "delta = (future_dt - now).total_seconds(); "
-        'print(f"DELTA:{delta}"); '
-        'print(f"VALID:{delta > 0}")'
-    )
+    python_code = f'from datetime import datetime; future_dt = datetime.strptime("{future_dt}", "%Y-%m-%d %H:%M"); now = datetime.now(); delta = (future_dt - now).total_seconds(); print(f"DELTA:{{delta}}"); print(f"VALID:{{delta > 0}}")'
 
     result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
 
