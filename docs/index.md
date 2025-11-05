@@ -14,6 +14,7 @@ The key features are:
 - **One-click session control:** Launch, monitor, and stop `tmux` sessions from your browser.
 - **🐚 Bash & 🐍 Python support:** Run both bash (`.sh`) and Python (`.py`) scripts seamlessly.
 - **Script management:** Use your existing scripts, write new ones, edit, save, or delete them directly in the dashboard.
+- **⭐ Favorite commands:** Save, organize, and quickly run your frequently used commands with usage tracking and search.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.

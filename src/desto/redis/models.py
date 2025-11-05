@@ -115,3 +115,41 @@ class DestoSession:
             tmux_active=(str(data.get("tmux_active", "False")).lower() == "true"),
             at_job_id=data.get("at_job_id") or None,
         )
+
+
+@dataclass
+class FavoriteCommand:
+    """Represents a favorite command saved by the user."""
+
+    favorite_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = ""
+    command: str = ""
+    created_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+    use_count: int = 0
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for Redis storage."""
+        return {
+            "favorite_id": self.favorite_id,
+            "name": self.name,
+            "command": self.command,
+            "created_at": self.created_at.isoformat() if self.created_at else "",
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else "",
+            "use_count": str(self.use_count),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "FavoriteCommand":
+        """Create from dictionary (Redis data)."""
+        # Handle bytes from Redis
+        if data and isinstance(list(data.values())[0], bytes):
+            data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in data.items()}
+        return cls(
+            favorite_id=data.get("favorite_id", ""),
+            name=data.get("name", ""),
+            command=data.get("command", ""),
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
+            last_used_at=datetime.fromisoformat(data["last_used_at"]) if data.get("last_used_at") else None,
+            use_count=int(data.get("use_count", 0)),
+        )

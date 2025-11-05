@@ -51,8 +51,8 @@ def main():
     # Use the single TmuxManager class
     tm = TmuxManager(ui, logger)
 
-    # Remove duplicate Redis initialization - use TmuxManager's Redis client
-    um = UserInterfaceManager(ui, ui_settings, tm)
+    # Pass the desto_manager from TmuxManager to UserInterfaceManager
+    um = UserInterfaceManager(ui, ui_settings, tm, desto_manager=tm.desto_manager)
 
     logger.add(
         lambda msg: um.log_section.update_log_messages(msg.strip()),

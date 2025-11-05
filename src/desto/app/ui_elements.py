@@ -29,11 +29,7 @@ class SystemStatsPanel:
 
     def build(self):
         with ui.column():
-            ui.label("System Stats").style(
-                f"font-size: {self.ui_settings['labels']['title_font_size']}; "
-                f"font-weight: {self.ui_settings['labels']['title_font_weight']}; "
-                "margin-bottom: 10px;"
-            )
+            ui.label("System Stats").style(f"font-size: {self.ui_settings['labels']['title_font_size']}; font-weight: {self.ui_settings['labels']['title_font_weight']}; margin-bottom: 10px;")
             ui.label("CPU Usage (Average)").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("memory", size="1.2rem")
@@ -43,9 +39,7 @@ class SystemStatsPanel:
             # CPU Details toggle and container
             core_info = "Show CPU details"
             self.show_cpu_cores = ui.switch(core_info, value=False).style("margin-top: 8px;")
-            self.cpu_cores_container = ui.column().style(
-                "margin-top: 8px; min-height: 50px; border: 1px solid #ddd; padding: 8px; border-radius: 4px;"
-            )
+            self.cpu_cores_container = ui.column().style("margin-top: 8px; min-height: 50px; border: 1px solid #ddd; padding: 8px; border-radius: 4px;")
 
             def toggle_cpu_cores_visibility(e):
                 # Access the switch value directly after the event
@@ -69,26 +63,16 @@ class SystemStatsPanel:
                 ui.icon("memory", size="1.2rem")
                 self.memory_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
             self.memory_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.memory_used = ui.label("0 GB Used").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.memory_available = ui.label("0 GB Available").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
+            self.memory_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
+            self.memory_available = ui.label("0 GB Available").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
             ui.label("Disk Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("storage", size="1.2rem")
                 self.disk_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
             self.disk_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.disk_used = ui.label("0 GB Used").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.disk_free = ui.label("0 GB Free").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};"
-            )
-            self.tmux_cpu = ui.label("tmux CPU: N/A").style(
-                f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;"
-            )
+            self.disk_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
+            self.disk_free = ui.label("0 GB Free").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
+            self.tmux_cpu = ui.label("tmux CPU: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;")
             self.tmux_mem = ui.label("tmux MEM: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;")
 
     def _initialize_cpu_cores(self):
@@ -101,9 +85,7 @@ class SystemStatsPanel:
         logger.debug(f"CPU cores: {logical_cores} logical, {physical_cores} physical, max_cols: {max_cols}")
 
         with self.cpu_cores_container:
-            ui.label(f"CPU Details ({logical_cores} threads on {physical_cores} cores)").style(
-                f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;"
-            )
+            ui.label(f"CPU Details ({logical_cores} threads on {physical_cores} cores)").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-bottom: 8px;")
 
             # Create cores in rows based on max_columns
             for i in range(0, logical_cores, max_cols):
@@ -335,11 +317,7 @@ class LogSection:
         log_card = ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;")
         with log_card:
             ui.label("Log Messages").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
-            self.log_display = (
-                ui.textarea("")
-                .style("width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;")
-                .props("readonly")
-            )
+            self.log_display = ui.textarea("").style("width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;").props("readonly")
 
         def toggle_log_card_visibility(value):
             if value:
@@ -537,3 +515,30 @@ class ScriptManagerTab:
                     on_click=self.ui_manager.chain_current_script,
                     icon="add_link",
                 )
+                if self.ui_manager.favorites_tab:
+
+                    def save_script_as_favorite():
+                        # Build the command from script and arguments
+                        selected_script = self.script_path_select.value if self.script_path_select else ""
+                        arguments = self.arguments_input.value if self.arguments_input else ""
+                        actual_filename = self.ui_manager.extract_script_filename(selected_script)
+                        script_path = self.ui_manager.tmux_manager.SCRIPTS_DIR / actual_filename
+                        if script_path.is_file():
+                            command = self.ui_manager.build_execution_command(script_path, arguments)
+
+                            # Create a simple wrapper object with a value attribute
+                            class CommandWrapper:
+                                def __init__(self, val):
+                                    self.value = val
+
+                            command_obj = CommandWrapper(command)
+                            self.ui_manager.favorites_tab._save_as_favorite(self.session_name_input, command_obj)
+                        else:
+                            ui.notification("Please select a valid script first", type="warning")
+
+                    ui.button(
+                        "Save as Favorite",
+                        color="info",
+                        icon="star",
+                        on_click=save_script_as_favorite,
+                    )
