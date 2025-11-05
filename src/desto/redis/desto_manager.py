@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 from loguru import logger
 
 from .client import DestoRedisClient
+from .favorites_manager import FavoriteCommandsManager
 from .job_manager import JobManager
 from .models import DestoJob, DestoSession, SessionStatus
 from .session_manager import SessionManager
@@ -17,6 +18,7 @@ class DestoManager:
         self.redis = redis_client
         self.session_manager = SessionManager(redis_client)
         self.job_manager = JobManager(redis_client)
+        self.favorites_manager = FavoriteCommandsManager(redis_client)
 
     def start_session_with_job(self, session_name: str, command: str, script_path: str, status=None) -> Tuple[DestoSession, DestoJob]:
         """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""

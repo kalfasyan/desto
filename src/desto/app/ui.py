@@ -11,18 +11,21 @@ from nicegui import ui
 
 from desto.redis.at_job_manager import AtJobManager
 
+from .favorites_ui import FavoritesTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
 class UserInterfaceManager:
-    def __init__(self, ui, ui_settings, tmux_manager):
+    def __init__(self, ui, ui_settings, tmux_manager, desto_manager=None):
         self.ui_settings = ui_settings
         self.ui = ui
+        self.desto_manager = desto_manager
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
         self.new_script_tab = NewScriptTab(tmux_manager, self)
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
+        self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
         self.script_path_select = None  # Reference to the script select component
         self.session_name_input = None  # Reference to session name input
         self.arguments_input = None  # Reference to arguments input
@@ -140,6 +143,7 @@ class UserInterfaceManager:
                     with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
+                        favorites_tab = ui.tab("Favorites", icon="star") if self.favorites_tab else None
                 with splitter.after:
                     with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
                         with ui.tab_panel(scripts_tab):
@@ -148,6 +152,10 @@ class UserInterfaceManager:
                         with ui.tab_panel(new_script_tab):
                             with ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"):
                                 self.new_script_tab.build()
+
+                        if favorites_tab and self.favorites_tab:
+                            with ui.tab_panel(favorites_tab):
+                                self.favorites_tab.build()
 
             ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
             self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
