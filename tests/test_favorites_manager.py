@@ -1,9 +1,13 @@
 """Tests for FavoriteCommandsManager."""
 
+import os
+
 import pytest
 
 from desto.redis.client import DestoRedisClient
 from desto.redis.favorites_manager import FavoriteCommandsManager
+
+pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
 @pytest.fixture
