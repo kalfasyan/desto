@@ -24,7 +24,7 @@ def demonstrate_current_issues():
         current_command = " && ".join(current_commands)
         print(f"Current command: {current_command}")
 
-        result = subprocess.run(current_command, shell=True, capture_output=True, text=True)
+        result = subprocess.run(current_command, shell=True, capture_output=True, text=True)  # nosec B602
         print(f"Return code: {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
@@ -56,7 +56,7 @@ def demonstrate_fixed_version():
         fixed_command = " && ".join(fixed_commands)
         print(f"Fixed command: {fixed_command}")
 
-        result = subprocess.run(fixed_command, shell=True, capture_output=True, text=True)
+        result = subprocess.run(fixed_command, shell=True, capture_output=True, text=True)  # nosec B602
         print(f"Return code: {result.returncode}")
         print(f"Stdout: {result.stdout}")
         print(f"Stderr: {result.stderr}")
@@ -92,7 +92,7 @@ def demonstrate_failure_handling():
         ]
 
         cmd = " && ".join(stop_on_fail)
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)  # nosec B602
         print(f"Return code: {result.returncode}")
 
         if log_file.exists():
@@ -113,7 +113,7 @@ def demonstrate_failure_handling():
         ]
 
         cmd2 = "; ".join(continue_on_fail)  # Use semicolons to continue on failure
-        result2 = subprocess.run(cmd2, shell=True, capture_output=True, text=True)
+        result2 = subprocess.run(cmd2, shell=True, capture_output=True, text=True)  # nosec B602
         print(f"Return code: {result2.returncode}")
 
         if log_file2.exists():

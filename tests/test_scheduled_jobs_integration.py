@@ -57,7 +57,7 @@ class TestScheduledJobsIntegration:
             test_command = "echo 'test_job_12345_unique' > /tmp/test_output.txt"
             result = subprocess.run(
                 f"echo '{test_command}' | at now + 2 minutes",
-                shell=True,
+                shell=True,  # nosec B602
                 capture_output=True,
                 text=True,
             )
