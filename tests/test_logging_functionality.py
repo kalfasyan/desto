@@ -63,6 +63,9 @@ class TestTmuxManagerLogging:
 
         assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Hello World", timeout=5), "Log did not contain expected output"
 
+        # Wait for session to fully complete by waiting for the finish marker
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "=== SCRIPT FINISHED at", timeout=5), "Finish marker not found"
+
         # Check log file exists
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
         assert log_file.exists(), "Log file should be created"
@@ -90,6 +93,9 @@ class TestTmuxManagerLogging:
 
         assert wait_for_file_contains(log_file, "First session", timeout=5), "First session output not found"
 
+        # Wait for session to fully complete
+        assert wait_for_file_contains(log_file, "=== SCRIPT FINISHED at", timeout=5), "First session finish marker not found"
+
         first_content = log_file.read_text()
 
         # Verify first session content
@@ -101,6 +107,17 @@ class TestTmuxManagerLogging:
         command2 = "echo 'Second session'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
         assert wait_for_file_contains(log_file, "Second session", timeout=5), "Second session output not found"
+
+        # Wait for second session to also complete - we need 2 finish markers total
+        import time
+
+        max_wait = 5
+        start_time = time.time()
+        while time.time() - start_time < max_wait:
+            content = log_file.read_text()
+            if content.count("=== SCRIPT FINISHED at") >= 2:
+                break
+            time.sleep(0.1)
 
         # Check that both sessions are in the log
         second_content = log_file.read_text()
