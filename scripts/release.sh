@@ -21,6 +21,20 @@ fi
 echo "📦 Installing dev dependencies..."
 uv sync --extra dev
 
+# Run tests FIRST before any changes
+echo "🧪 Running tests..."
+if ! uv run --extra dev pytest tests/; then
+    echo "❌ Tests failed! Aborting release."
+    exit 1
+fi
+
+# Run linting
+echo "🔍 Running linting..."
+if ! uv run --extra dev ruff check .; then
+    echo "❌ Linting failed! Aborting release."
+    exit 1
+fi
+
 # Bump version
 echo "📝 Bumping version..."
 python scripts/bump_version.py $BUMP_TYPE
@@ -36,14 +50,6 @@ if [ -z "$NEW_VERSION" ]; then
 fi
 
 echo "✅ New version: $NEW_VERSION"
-
-# Run tests
-echo "🧪 Running tests..."
-uv run --extra dev pytest tests/
-
-# Run linting
-echo "🔍 Running linting..."
-uv run --extra dev ruff check .
 
 # Build package
 echo "📦 Building package..."
