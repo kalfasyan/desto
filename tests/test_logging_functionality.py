@@ -31,6 +31,15 @@ class TestTmuxManagerLogging:
 
             yield {"temp_path": temp_path, "log_dir": log_dir, "scripts_dir": scripts_dir}
 
+            # Clean up any remaining log files after test
+            try:
+                import shutil
+
+                if log_dir.exists():
+                    shutil.rmtree(log_dir, ignore_errors=True)
+            except Exception:
+                pass
+
     @pytest.fixture
     def tmux_manager(self, temp_dirs):
         """Create a TmuxManager instance for testing."""
