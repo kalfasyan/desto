@@ -10,7 +10,7 @@ build:
     python: "3.11"
   jobs:
     install:
-      - python3 -m pip install --upgrade pip || python3 -m ensurepip --upgrade || (curl -sS https://bootstrap.pypa.io/get-pip.py | python3 -)
+      - python3 -m pip install --upgrade pip
       - python3 -m pip install -r docs/requirements-docs.txt
     pre_build:
       - mkdir -p src/desto
