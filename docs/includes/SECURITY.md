@@ -19,4 +19,3 @@ Please include as much detail as possible to help me quickly understand and addr
 
 - I appreciate responsible disclosure.
 - After a fix is released, I will credit reporters (if desired) in the release notes.
-

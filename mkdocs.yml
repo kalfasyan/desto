@@ -3,14 +3,21 @@ repo_name: kalfasyan/desto
 site_description: "desto — tmux session manager"
 site_url: https://github.com/kalfasyan/desto
 docs_dir: docs
+watch:
+  - README.md
 nav:
   - Home: index.md
-  - Favorites: favorites.md
-  - CLI: cli.md
-  - Config: pyproject.md
-  - Contributing: CONTRIBUTING.md
-  - Security: SECURITY.md
-  - Code of Conduct: CODE_OF_CONDUCT.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+  - User Guide:
+      - CLI: user-guide/cli.md
+      - Favorites: user-guide/favorites.md
+  - Reference:
+      - Configuration: reference/configuration.md
+  - Community:
+      - Contributing: community/CONTRIBUTING.md
+      - Security: community/SECURITY.md
+      - Code of Conduct: community/CODE_OF_CONDUCT.md
 
 theme:
   name: material

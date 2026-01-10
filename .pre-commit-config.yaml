@@ -9,11 +9,6 @@ repos:
         name: ruff (format)
   - repo: local
     hooks:
-      - id: sync-readme
-        name: sync README into docs
-        entry: uv run python scripts/sync_readme_to_docs.py
-        language: system
-        pass_filenames: false
       - id: pytest
         name: pytest (run tests)
         entry: uv run pytest tests/test_logging_functionality.py tests/test_duplicate_session_validation.py tests/test_notifications.py -v

@@ -24,7 +24,7 @@ The key features are:
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
-- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](src/desto/cli/README.md)
+- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](cli.md)
   
   
 <strong>🎬 Demo</strong>
@@ -297,7 +297,7 @@ desto-cli scripts run "my_script" --direct
 </details>
 
 
-**📖 [Full CLI Documentation →](src/desto/cli/README.md)**
+**📖 [Full CLI Documentation →](cli.md)**
 
 The CLI provides the same functionality as the web interface but optimized for terminal use, including rich formatting, real-time log viewing, and comprehensive session management.
 

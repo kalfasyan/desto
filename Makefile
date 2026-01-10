@@ -48,7 +48,7 @@ clean:  ## Clean build artifacts
 dev-install:  ## Install package in development mode with dev dependencies
 	uv sync --extra dev
 
-docs-build: docs-sync-readme  ## Install docs dependencies and build the MkDocs documentation site
+docs-build:  ## Install docs dependencies and build the MkDocs documentation site
 	uv sync --extra docs
 	uv run --extra docs mkdocs build -f mkdocs.yml
 
