@@ -19,6 +19,9 @@ nav:
       - Security: community/SECURITY.md
       - Code of Conduct: community/CODE_OF_CONDUCT.md
 
+exclude_docs: |
+  includes/*
+
 theme:
   name: material
   custom_dir: theme
@@ -36,6 +39,8 @@ markdown_extensions:
       base_path:
         - docs
         - .
+  - pymdownx.pathconverter:
+      base_path: docs
 
 extra:
   social:
