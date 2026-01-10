@@ -7,7 +7,7 @@
 
 [![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/desto?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/desto)
-[![Documentation Status](https://readthedocs.org/projects/desto/badge/?version=latest)](https://desto.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/desto/badge/?version=latest)](https://desto.readthedocs.io/)
 [![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
@@ -31,7 +31,7 @@ The key features are:
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
-- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](https://desto.readthedocs.io/en/latest/user-guide/cli/)
+- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](https://desto.readthedocs.io/user-guide/cli/)
   
   
 <strong>🎬 Demo</strong>
@@ -304,7 +304,7 @@ desto-cli scripts run "my_script" --direct
 </details>
 
 
-**📖 [Full CLI Documentation →](https://desto.readthedocs.io/en/latest/user-guide/cli/)**
+**📖 [Full CLI Documentation →](https://desto.readthedocs.io/user-guide/cli/)**
 
 The CLI provides the same functionality as the web interface but optimized for terminal use, including rich formatting, real-time log viewing, and comprehensive session management.
 
