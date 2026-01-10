@@ -179,9 +179,13 @@ cython_debug/
 
 .vscode/
 
-# *.txt
+# IDE / Editor stuff
+.continue/
+
+# Workspace / Temporary files
 *.json
 output/
 *.finished
 WARP.md
-.continue/mcpServers/
+
+# *.txt

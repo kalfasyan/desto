@@ -10,10 +10,12 @@ repos:
   - repo: local
     hooks:
       - id: pytest
-        name: pytest (run tests)
-        entry: uv run pytest tests/test_logging_functionality.py tests/test_duplicate_session_validation.py tests/test_notifications.py -v
+        name: pytest (run fast tests)
+        entry: env DOCKER_COMPOSE_AUTOSTART=false uv run pytest tests/test_notifications.py tests/test_cli_utils.py -v
         language: system
         pass_filenames: false
+        files: ^(src/|tests/|pyproject\.toml)
+        types: [python]
 
 # Install with: pre-commit install
 # Run on all files: pre-commit run --all-files

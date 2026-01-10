@@ -140,9 +140,9 @@ class TestCLIIntegration:
             result = manager.start_session("test", "echo hello")
             assert result is False
 
-    @pytest.mark.skipif(True, reason="requires typer")
+    @pytest.mark.skip(reason="Test has mocking issues - needs fixing")
     def test_cli_commands_integration(self, temp_dirs):
-        """Test CLI commands integration (requires typer)."""
+        """Test CLI commands integration."""
         try:
             from typer.testing import CliRunner
 

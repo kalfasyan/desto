@@ -7,12 +7,14 @@ import pytest
 from .docker_test_utils import ensure_docker_available, ensure_docker_compose_available, safe_docker_cleanup, wait_for_http
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def docker_compose():
     """Bring up docker-compose once for tests that opt-in.
 
     Yields the project_root Path. Tests can call `safe_docker_cleanup(..., remove_volumes=False)`
     to cleanup without removing volumes when appropriate.
+
+    Note: This is NOT autouse - tests must explicitly request this fixture to start Docker.
     """
     project_root = Path(__file__).parent.parent
 
@@ -23,6 +25,7 @@ def docker_compose():
 
     if not autostart:
         # Autostart disabled by environment — do nothing.
+        yield project_root
         return
 
     # Skip starting compose if Docker or Docker Compose are not available on this runner

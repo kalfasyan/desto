@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.slow, pytest.mark.docker]
+
 
 class TestDockerIntegration:
     """Test Docker integration for desto dashboard."""
@@ -42,8 +44,8 @@ class TestDockerIntegration:
         assert "FROM ghcr.io/astral-sh/uv:" in content
         assert "uv sync --frozen" in content
         assert "EXPOSE 8809" in content
-        # Accept either the original CMD or the new one with service atd start
-        assert 'CMD ["uv", "run", "desto"]' in content or "CMD service atd start && uv run desto" in content
+        # Accept either the original CMD, the new one with service atd start, or multi-stage optimized
+        assert 'CMD ["uv", "run", "desto"]' in content or "CMD service atd start && uv run desto" in content or "CMD service atd start && desto" in content
 
     def test_dockerignore_exists(self):
         """Test that .dockerignore exists and excludes common files."""

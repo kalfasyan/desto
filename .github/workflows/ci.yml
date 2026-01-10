@@ -28,5 +28,5 @@ jobs:
         run: pip install -e .
       - name: Run ruff
         run: ruff check .
-      - name: Run pytest
-        run: pytest tests/
+      - name: Run pytest (fast tests only, skip Docker)
+        run: pytest -m "not docker and not slow" tests/

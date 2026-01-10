@@ -26,10 +26,13 @@ release-major:  ## Bump major version and create release
 	./scripts/release.sh major
 
 # Development
+test-fast:  ## Run fast tests only (skip slow/docker tests)
+	uv run --extra dev pytest --instafail -m "not slow and not docker" tests/
+
 test-parallel:  ## Run tests in parallel
 	uv run --extra dev pytest --instafail -n auto tests/
 
-test:  ## Run tests
+test:  ## Run all tests
 	uv run --extra dev pytest --instafail tests/
 
 lint:  ## Run linting

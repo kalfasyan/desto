@@ -19,19 +19,23 @@ from .docker_test_utils import (
     wait_for_http,
 )
 
-pytestmark = pytest.mark.skipif(not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests.")
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.docker,
+    pytest.mark.skipif(not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests."),
+]
 
 
 class TestDockerCompose:
     """Test Docker Compose functionality."""
 
     @pytest.fixture(scope="class", autouse=True)
-    def compose_once(self):
+    def compose_once(self, docker_compose):
         """Start compose once for the test class and tear down at the end.
 
         This reduces repeated compose up/down per test which is slow.
         """
-        # Rely on session-scoped autouse fixture `docker_compose` to have started compose.
+        # The docker_compose fixture ensures compose is running
         # Wait briefly for HTTP readiness before running tests
         wait_for_http("http://localhost:8809", timeout=30, interval=0.5)
         yield

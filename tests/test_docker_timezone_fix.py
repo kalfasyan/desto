@@ -26,9 +26,11 @@ from .docker_test_utils import (
     safe_docker_cleanup,
 )
 
+pytestmark = [pytest.mark.slow, pytest.mark.docker]
+
 
 @pytest.fixture(scope="module", autouse=True)
-def ensure_docker_containers():
+def ensure_docker_containers(docker_compose):
     """Ensure Docker containers are running for timezone tests."""
     # Check for existing user containers that might conflict
     check_for_existing_containers()
