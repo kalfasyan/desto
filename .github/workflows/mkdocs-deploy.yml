@@ -7,7 +7,7 @@ permissions:
 
 on:
   push:
-    branches: [ mkdocs ]
+    branches: [ main, mkdocs ]
   workflow_dispatch:
 
 jobs:

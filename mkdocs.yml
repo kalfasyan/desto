@@ -1,7 +1,7 @@
 site_name: desto
 repo_name: kalfasyan/desto
 site_description: "desto — tmux session manager"
-site_url: https://github.com/kalfasyan/desto
+site_url: https://kalfasyan.github.io/desto/
 docs_dir: docs
 watch:
   - README.md
