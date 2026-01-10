@@ -21,10 +21,17 @@ fi
 echo "📦 Installing dev dependencies..."
 uv sync --extra dev
 
-# Run tests FIRST before any changes
-echo "🧪 Running tests..."
+# Run fast tests FIRST before any changes
+echo "🧪 Running fast tests..."
+if ! uv run --extra dev pytest --instafail -m "not slow and not docker" tests/; then
+    echo "❌ Fast tests failed! Aborting release."
+    exit 1
+fi
+
+# Run full test suite
+echo "🧪 Running full test suite..."
 if ! uv run --extra dev pytest --instafail tests/; then
-    echo "❌ Tests failed! Aborting release."
+    echo "❌ Full tests failed! Aborting release."
     exit 1
 fi
 

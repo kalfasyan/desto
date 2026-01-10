@@ -93,10 +93,10 @@ docker-redis-logs:  ## View Redis logs
 	docker logs -f desto-redis
 
 docker-test:  ## Run Docker integration tests (excluding slow/hanging tests)
-	uv run --extra dev pytest tests/test_docker_integration.py -k "not test_docker_run_health_check and not test_docker_build" -v
+	uv run --extra dev pytest --instafail tests/test_docker_integration.py -k "not test_docker_run_health_check and not test_docker_build" -v
 
 docker-test-full:  ## Run all Docker integration tests (including slow ones)
-	uv run --extra dev pytest tests/test_docker_integration.py -v
+	uv run --extra dev pytest --instafail tests/test_docker_integration.py -v
 
 docker-setup-examples:  ## Setup Docker example scripts
 	mkdir -p desto_scripts desto_logs
