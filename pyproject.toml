@@ -25,12 +25,14 @@ dev = [
 ]
 
 docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.0.0",
-    "pymdown-extensions>=9.0.0",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.19",
+    "mkdocstrings>=0.30.0",
+    "mkdocstrings-python>=1.18.2",
+    "pymdown-extensions>=10.16.1",
     "mkdocs-include-markdown-plugin>=6.0.0",
     "mkdocs-htmlproofer-plugin>=1.2.1",
-    "loguru>=0.7.3",  # For docs generation scripts
+    "loguru>=0.7.3", # For docs generation scripts
 ]
 
 [project.scripts]
@@ -80,6 +82,18 @@ convention = "google"
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[dependency-groups]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.19",
+    "mkdocstrings>=0.30.0",
+    "mkdocstrings-python>=1.18.2",
+    "pymdown-extensions>=10.16.1",
+    "mkdocs-include-markdown-plugin>=6.0.0",
+    "mkdocs-htmlproofer-plugin>=1.2.1",
+    "loguru>=0.7.3",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
