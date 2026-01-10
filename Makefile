@@ -27,10 +27,10 @@ release-major:  ## Bump major version and create release
 
 # Development
 test-parallel:  ## Run tests in parallel
-	uv run --extra dev pytest -n auto tests/
+	uv run --extra dev pytest --instafail -n auto tests/
 
 test:  ## Run tests
-	uv run --extra dev pytest tests/
+	uv run --extra dev pytest --instafail tests/
 
 lint:  ## Run linting
 	uv run --extra dev ruff check .

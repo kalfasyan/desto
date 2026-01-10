@@ -23,7 +23,7 @@ uv sync --extra dev
 
 # Run tests FIRST before any changes
 echo "🧪 Running tests..."
-if ! uv run --extra dev pytest tests/; then
+if ! uv run --extra dev pytest --instafail tests/; then
     echo "❌ Tests failed! Aborting release."
     exit 1
 fi
