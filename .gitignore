@@ -179,7 +179,7 @@ cython_debug/
 
 .vscode/
 
-*.txt
+# *.txt
 *.json
 output/
 *.finished
