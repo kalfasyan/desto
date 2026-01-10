@@ -5,7 +5,14 @@
 
 **desto** lets you run and manage your bash and Python scripts in the background (inside `tmux` sessions) through a simple web dashboard. Launch scripts, monitor their and your system's status, view live logs, and control sessions—all from your browser.  
 
-[![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto) [![PyPI Downloads](https://static.pepy.tech/personalized-badge/desto?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/desto) ![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-blueviolet) ![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat) [![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml) [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit) [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks-action) 
+[![PyPI version](https://badge.fury.io/py/desto.svg)](https://badge.fury.io/py/desto)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/desto?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)](https://pepy.tech/projects/desto)
+[![Documentation Status](https://readthedocs.org/projects/desto/badge/?version=latest)](https://desto.readthedocs.io/en/latest/?badge=latest)
+[![Tests](https://github.com/kalfasyan/desto/actions/workflows/ci.yml/badge.svg)](https://github.com/kalfasyan/desto/actions/workflows/ci.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
+[![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks-action)
+![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
 
 ---
 
@@ -24,7 +31,7 @@ The key features are:
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
-- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](cli.md)
+- **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](https://desto.readthedocs.io/en/latest/user-guide/cli/)
   
   
 <strong>🎬 Demo</strong>
@@ -297,7 +304,7 @@ desto-cli scripts run "my_script" --direct
 </details>
 
 
-**📖 [Full CLI Documentation →](cli.md)**
+**📖 [Full CLI Documentation →](https://desto.readthedocs.io/en/latest/user-guide/cli/)**
 
 The CLI provides the same functionality as the web interface but optimized for terminal use, including rich formatting, real-time log viewing, and comprehensive session management.
 

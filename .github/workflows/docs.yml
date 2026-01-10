@@ -1,9 +1,7 @@
 name: Docs
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 on:
   push:
@@ -36,9 +34,3 @@ jobs:
       - name: Build docs
         run: |
           uv run mkdocs build --strict
-
-      - name: Upload site artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: site
-          path: site
