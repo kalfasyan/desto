@@ -67,7 +67,7 @@ mkdocs-autorefs==1.4.3
 mkdocs-get-deps==0.2.0
     # via mkdocs
 mkdocs-htmlproofer-plugin==1.4.0
-mkdocs-include-markdown-plugin==7.2.0
+mkdocs-include-markdown-plugin==7.1.8
 mkdocs-material==9.7.1
 mkdocs-material-extensions==1.3.1
     # via mkdocs-material
@@ -98,7 +98,7 @@ pyyaml==6.0.2
     #   pyyaml-env-tag
 pyyaml-env-tag==1.1
     # via mkdocs
-requests==2.32.5
+requests==2.32.4
     # via
     #   mkdocs-htmlproofer-plugin
     #   mkdocs-material
