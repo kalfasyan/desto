@@ -77,7 +77,13 @@ def main():
     tm.pause_updates = pause_global_timer
     tm.resume_updates = lambda: resume_global_timer(um, tm)
 
-    ui.run(title="desto dashboard", port=8809, reload=False)
+    ui.run(
+        title="desto dashboard",
+        port=8809,
+        reload=False,
+        show=False,
+        binding_refresh_interval=0.1,
+    )
 
 
 if __name__ in {"__main__", "__mp_main__"}:

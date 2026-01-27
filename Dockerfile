@@ -59,4 +59,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8809 || exit 1
 
 # Start atd in the background, then run the dashboard
-CMD service atd start && uv run desto
+# Use -m to run as module to avoid some NiceGUI reload/startup issues in Docker
+CMD service atd start && uv run python3 -m desto.app.dashboard
