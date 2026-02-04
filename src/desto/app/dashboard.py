@@ -48,10 +48,16 @@ def handle_instant_update(um: UserInterfaceManager, update_data):
 
 
 def main():
-    # Use the single TmuxManager class
-    tm = TmuxManager(ui, logger)
+    # Configure dark mode colors for Quasar
+    ui.colors(primary="#1976D2", secondary="#2196F3", accent="#FFC107", positive="#4CAF50", negative="#F44336", info="#00BCD4", warning="#FF9800", dark="#1e1e1e", dark_page="#121212")
 
-    # Pass the desto_manager from TmuxManager to UserInterfaceManager
+    # Set body background with Tailwind dark mode support
+    ui.query("body").classes("bg-grey-1 dark:bg-grey-10")
+
+    # Add custom styles
+    ui.add_head_html('<style>body { font-family: "Inter", "Segoe UI", Arial, sans-serif; }</style>')
+
+    tm = TmuxManager(ui, logger)
     um = UserInterfaceManager(ui, ui_settings, tm, desto_manager=tm.desto_manager)
 
     logger.add(

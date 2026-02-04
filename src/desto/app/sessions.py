@@ -26,7 +26,7 @@ class TmuxManager:
         self.SCRIPTS_DIR = Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
         self.LOG_DIR = Path(logs_dir_env) if logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
         self.ui = ui_instance
-        self.sessions_container = ui_instance.column().style("margin-top: 20px;")
+        self.sessions_container = ui_instance.column().classes("w-full mt-5 gap-4")
         self.logger = instance_logger
         self.pause_updates = None  # Function to pause updates
         self.resume_updates = None  # Function to resume updates
@@ -226,18 +226,18 @@ class TmuxManager:
                 running_jobs += 1
 
         with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap;"):
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:bg-grey-9"):
                 ui.label(str(total_sessions)).style("font-size: 2em; font-weight: bold; color: #2196F3;")
-                ui.label("Total Sessions").style("color: #666; font-size: 0.9em;")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label("Total Sessions").style("font-size: 0.9em;").classes("text-grey-6 dark:text-grey-4")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:bg-grey-9"):
                 ui.label(str(finished_jobs)).style("font-size: 2em; font-weight: bold; color: #4CAF50;")
-                ui.label("Finished").style("color: #666; font-size: 0.9em;")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label("Finished").style("font-size: 0.9em;").classes("text-grey-6 dark:text-grey-4")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:bg-grey-9"):
                 ui.label(str(failed_jobs)).style("font-size: 2em; font-weight: bold; color: #F44336;")
-                ui.label("Failed").style("color: #666; font-size: 0.9em;")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;"):
+                ui.label("Failed").style("font-size: 0.9em;").classes("text-grey-6 dark:text-grey-4")
+            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:bg-grey-9"):
                 ui.label(str(running_jobs)).style("font-size: 2em; font-weight: bold; color: #FF9800;")
-                ui.label("Running").style("color: #666; font-size: 0.9em;")
+                ui.label("Running").style("font-size: 0.9em;").classes("text-grey-6 dark:text-grey-4")
 
     def confirm_clear_history(self):
         """Show confirmation dialog before clearing session history. Pauses updates while dialog is open."""
@@ -251,11 +251,11 @@ class TmuxManager:
             if self.resume_updates:
                 self.resume_updates()
 
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:bg-grey-9"):
             self.telemetry_event("confirm_clear_history.open", {})
             ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
             ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
-            ui.label("This action cannot be undone.").style("color: #666; margin-bottom: 20px;")
+            ui.label("This action cannot be undone.").style("margin-bottom: 20px;").classes("text-grey-6 dark:text-grey-4")
 
             def _close_and_telemetry_cancel():
                 close_dialog()
@@ -316,11 +316,11 @@ class TmuxManager:
             if self.resume_updates:
                 self.resume_updates()
 
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+        with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:bg-grey-9"):
             self.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
             ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
             ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
-            ui.label(str(log_dir)).style("font-family: monospace; background: #f5f5f5; padding: 5px; border-radius: 3px; margin-bottom: 15px;")
+            ui.label(str(log_dir)).style("font-family: monospace; padding: 5px; border-radius: 3px; margin-bottom: 15px;").classes("bg-grey-2 dark:bg-grey-8")
             if len(log_files) <= 5:
                 ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
                 for log_file in log_files:
@@ -329,7 +329,7 @@ class TmuxManager:
                 ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
                 for log_file in log_files[:3]:
                     ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
-                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; color: #666; font-size: 0.9em;")
+                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; font-size: 0.9em;").classes("text-grey-6")
 
             def _close_logs_cancel():
                 close_dialog()
@@ -683,7 +683,7 @@ class TmuxManager:
     def add_sessions_table(self, sessions_status, ui):
         """Adds the sessions table to the UI, using the history tab's columns plus an Actions column."""
         # Table header
-        with ui.row().style("width: 100%; min-width: 1100px; background-color: #f5f5f5; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;"):
+        with ui.row().style("width: 100%; min-width: 1100px; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;").classes("bg-grey-2 dark:bg-grey-9 text-grey-9 dark:text-grey-2"):
             ui.label("Session Name").style("flex: 2; min-width: 150px;")
             ui.label("Status").style("flex: 1; min-width: 100px;")
             ui.label("Job Duration").style("flex: 1; min-width: 120px;")
@@ -848,13 +848,13 @@ class TmuxManager:
             job_duration = format_duration(job_duration)
             session_duration = format_duration(session_duration)
 
-            with ui.row().style("width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #eee; " "align-items: center; hover:background-color: #f9f9f9;"):
+            with ui.row().style("width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-grey-8 hover:bg-grey-1 dark:hover:bg-grey-9"):
                 ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
                 ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
-                ui.label(job_duration).style("flex: 1; min-width: 120px; color: #666;")
-                ui.label(session_duration).style("flex: 1; min-width: 130px; color: #666;")
-                ui.label(formatted_start_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
-                ui.label(formatted_end_time).style("flex: 2; min-width: 140px; color: #666; font-size: 0.9em;")
+                ui.label(job_duration).style("flex: 1; min-width: 120px;").classes("text-grey-7 dark:text-grey-4")
+                ui.label(session_duration).style("flex: 1; min-width: 130px;").classes("text-grey-7 dark:text-grey-4")
+                ui.label(formatted_start_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-grey-6 dark:text-grey-5")
+                ui.label(formatted_end_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-grey-6 dark:text-grey-5")
                 # Tmux Active column
                 icon = "check_circle" if tmux_active else "cancel"
                 color = "#4CAF50" if tmux_active else "#F44336"
@@ -890,7 +890,7 @@ class TmuxManager:
                 ui.label("Scheduled Jobs (with metadata)").style("font-size: 1.2em; font-weight: bold;")
 
             # Table header for scheduled jobs
-            with ui.row().style("width: 100%; min-width: 700px; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-weight: bold;"):
+            with ui.row().style("width: 100%; min-width: 700px; padding: 10px; border-radius: 4px; font-weight: bold;").classes("bg-grey-2 dark:bg-grey-9 text-grey-9 dark:text-grey-2"):
                 ui.label("Job ID").style("flex: 1; min-width: 80px;")
                 ui.label("Scheduled Time").style("flex: 2; min-width: 180px;")
                 ui.label("User").style("flex: 1; min-width: 100px;")
@@ -913,7 +913,7 @@ class TmuxManager:
                         if self.resume_updates:
                             self.resume_updates()
 
-                    with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
+                    with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:bg-grey-9"):
                         ui.label(f"Job Metadata for ID: {job_id}").style("font-weight: bold; font-size: 1.1em;")
                         if metadata:
                             for k in sorted(metadata.keys()):
@@ -932,11 +932,11 @@ class TmuxManager:
                         ui.button("Close", on_click=close_dialog)
                     dialog.open()
 
-                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #eee; align-items: center;"):
+                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-grey-8 hover:bg-grey-1 dark:hover:bg-grey-9"):
                     ui.button(str(job_id), on_click=show_metadata_dialog, color="primary", icon="info").style("flex: 1; min-width: 80px; font-weight: 500;")
-                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 180px; color: #666;")
-                    ui.label(str(user)).style("flex: 1; min-width: 100px; color: #666;")
-                    ui.label(str(status)).style("flex: 1; min-width: 100px; color: #666;")
+                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 180px;").classes("text-grey-7 dark:text-grey-4")
+                    ui.label(str(user)).style("flex: 1; min-width: 100px;").classes("text-grey-7 dark:text-grey-4")
+                    ui.label(str(status)).style("flex: 1; min-width: 100px;").classes("text-grey-7 dark:text-grey-4")
                     with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                         ui.button(
                             "Cancel",
@@ -1048,11 +1048,11 @@ class TmuxManager:
 
         with (
             ui.dialog() as dialog,
-            ui.card().style("width: 100%; height: 80%;"),
+            ui.card().style("width: 100%; height: 80%;").classes("dark:bg-grey-9"),
         ):
             ui.label(f"Log for session '{session_name}'").style("font-weight: bold;")
             with ui.scroll_area().style("width: 100%; height: 100%;"):
-                ui.label(log_content).style("white-space: pre-wrap;")
+                ui.label(log_content).style("white-space: pre-wrap;").classes("font-mono text-xs dark:text-grey-3")
             ui.button(
                 "Close",
                 on_click=lambda: [

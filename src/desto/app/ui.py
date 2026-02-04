@@ -17,6 +17,10 @@ from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPan
 
 class UserInterfaceManager:
     def __init__(self, ui, ui_settings, tmux_manager, desto_manager=None):
+        from nicegui import ui as nicegui_ui
+
+        self.nicegui_ui = nicegui_ui
+        self._dark_mode = self.nicegui_ui.dark_mode()  # Create ONCE
         self.ui_settings = ui_settings
         self.ui = ui
         self.desto_manager = desto_manager
@@ -111,71 +115,105 @@ class UserInterfaceManager:
         return display_value  # Return as-is if no icon
 
     def build_ui(self):
-        with ui.header(elevated=True).style(f"background-color: {self.ui_settings['header']['background_color']}; color: {self.ui_settings['header']['color']};").classes(replace="row items-center justify-between"):
-            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props("flat color=white")
-            ui.label("desto").style(f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold;")
-            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=white").style("margin-left: auto;")
-        with ui.left_drawer().style(
-            f"width: {self.ui_settings['sidebar']['width']}; "
-            f"min-width: {self.ui_settings['sidebar']['width']}; "
-            f"max-width: {self.ui_settings['sidebar']['width']}; "
-            f"padding: {self.ui_settings['sidebar']['padding']}; "
-            f"background-color: {self.ui_settings['sidebar']['background_color']}; "
-            f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
-            "display: flex; flex-direction: column;"
-        ) as left_drawer:
+        # Listener to update CodeMirror themes and body class for Tailwind
+        def update_dark_mode_ui(v):
+            # Update body class for Tailwind's dark: variant
+            # NiceGUI uses 'body--dark' for Quasar, but Tailwind needs 'dark' class
+            if v:
+                ui.query("body").classes(add="dark")
+            else:
+                ui.query("body").classes(remove="dark")
+            # Update CodeMirror themes
+            if hasattr(self, "new_script_tab") and hasattr(self.new_script_tab, "code_editor") and self.new_script_tab.code_editor:
+                self.new_script_tab.code_editor.theme = "vscodeDark" if v else "vscodeLight"
+            if hasattr(self, "script_manager_tab") and hasattr(self.script_manager_tab, "script_preview_editor") and self.script_manager_tab.script_preview_editor:
+                self.script_manager_tab.script_preview_editor.theme = "vscodeDark" if v else "vscodeLight"
+
+        self._dark_mode.on_value_change(lambda e: update_dark_mode_ui(e.value))
+        # Set initial state
+        update_dark_mode_ui(self._dark_mode.value)
+
+        # Main Layout: Drawer + Header + Content
+        with (
+            ui.left_drawer()
+            .style(
+                "width: 260px; min-width: 240px; max-width: 280px; "
+                f"padding: {self.ui_settings['sidebar']['padding']}; "
+                f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
+                "box-shadow: 2px 0 8px rgba(33,150,243,0.06); display: flex; flex-direction: column; border: none;"
+            )
+            .classes("bg-blue-1 dark:bg-grey-9") as left_drawer
+        ):
             self.stats_panel.build()
 
-        with ui.right_drawer(top_corner=False, bottom_corner=True, value=False).style(
-            f"width: {self.ui_settings['sidebar']['width']}; "
-            f"padding: {self.ui_settings['sidebar']['padding']}; "
-            f"background-color: {self.ui_settings['sidebar']['background_color']}; "
-            f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
-            "display: flex; flex-direction: column;"
-        ) as right_drawer:
+        # Right drawer (settings)
+        with (
+            ui.right_drawer(top_corner=False, bottom_corner=True, value=False)
+            .style(
+                f"width: {self.ui_settings['sidebar']['width']}; "
+                f"padding: {self.ui_settings['sidebar']['padding']}; "
+                f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
+                "box-shadow: -2px 0 8px rgba(33,150,243,0.06); display: flex; flex-direction: column;"
+            )
+            .classes("bg-gradient-to-b from-blue-grey-1 to-blue-grey-2 dark:from-grey-9 dark:to-grey-8") as right_drawer
+        ):
             self.settings_panel = SettingsPanel(self.tmux_manager, self)
             self.settings_panel.build()
 
-        ui.button("Settings", on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=blue").style("margin-right: auto;")
-        with ui.column().style("flex-grow: 1; padding: 20px; gap: 20px;"):
-            with ui.splitter(value=25).classes("w-full").style("gap:0; padding:0; margin:0;") as splitter:
+        # Header with gradient and shadow
+        with (
+            ui.header(elevated=True)
+            .style("box-shadow: 0 2px 8px rgba(33,150,243,0.08); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
+            .classes(replace="row items-center justify-between bg-gradient-to-r from-blue-700 to-blue-900 dark:from-grey-9 dark:to-black text-white")
+        ):
+            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props("flat color=white").style("margin-right: 8px;")
+            ui.label("desto").style(f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold; letter-spacing: 2px; text-shadow: 0 1px 2px #1976D2;")
+
+            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=white").style("margin-left: auto;")
+
+        # Floating settings button (bottom right)
+        ui.button("Settings", on_click=lambda: right_drawer.toggle(), icon="settings").props("fab color=primary").style("position: fixed; bottom: 32px; right: 32px; z-index: 1000; box-shadow: 0 2px 8px #1976D2;")
+
+        # Main content area
+        with ui.column().style("flex-grow: 1; padding: 32px 24px 24px 24px; gap: 24px;").classes("bg-grey-1 dark:bg-grey-10 text-black dark:text-white"):
+            with ui.splitter(value=25).classes("w-full bg-transparent").style("gap:0; padding:0; margin:0; border-radius: 12px; box-shadow: 0 2px 12px rgba(33,150,243,0.04);") as splitter:
                 with splitter.before:
-                    with ui.tabs().props("vertical").classes("w-32 min-w-0") as tabs:
+                    with ui.tabs().props("vertical").classes("w-32 min-w-0 bg-grey-2 dark:bg-grey-8") as tabs:
                         scripts_tab = ui.tab("Scripts", icon="terminal")
                         new_script_tab = ui.tab("New Script", icon="add")
                         favorites_tab = ui.tab("Favorites", icon="star") if self.favorites_tab else None
                 with splitter.after:
-                    with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full"):
-                        with ui.tab_panel(scripts_tab):
+                    with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full bg-transparent"):
+                        with ui.tab_panel(scripts_tab).classes("bg-transparent"):
                             self.script_manager_tab.build()
 
-                        with ui.tab_panel(new_script_tab):
-                            with ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0;"):
-                                self.new_script_tab.build()
+                        with ui.tab_panel(new_script_tab).classes("bg-transparent"):
+                            self.new_script_tab.build()
 
                         if favorites_tab and self.favorites_tab:
-                            with ui.tab_panel(favorites_tab):
+                            with ui.tab_panel(favorites_tab).classes("bg-transparent"):
                                 self.favorites_tab.build()
 
-            ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px;")
-            self.chain_queue_display = ui.column().style("margin-bottom: 10px;")
+            # Chain queue section
+            ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px; font-size: 1.1em; letter-spacing: 1px;")
+            self.chain_queue_display = ui.column().style("margin-bottom: 10px; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 4px rgba(33,150,243,0.03);").classes("bg-white dark:bg-grey-9 text-black dark:text-white")
             self.refresh_chain_queue_display()
 
             # Clear Chain Queue button
             ui.button(
                 "Clear Chain Queue",
-                color="orange",
+                color="warning",
                 icon="clear_all",
                 on_click=self.clear_chain_queue,
-            ).style("width: 200px; margin-top: 10px; margin-bottom: 5px;")
+            ).style("width: 220px; margin-top: 10px; margin-bottom: 5px; border-radius: 8px; font-weight: 500;")
 
             # Clear All Jobs button
             ui.button(
                 "Clear All Jobs",
-                color="red",
+                color="negative",
                 icon="delete_forever",
                 on_click=self.tmux_manager.confirm_kill_all_sessions,
-            ).style("width: 200px; margin-top: 15px; margin-bottom: 15px;")
+            ).style("width: 220px; margin-top: 15px; margin-bottom: 15px; border-radius: 8px; font-weight: 500;")
 
             self.log_section.build()
 
@@ -187,34 +225,44 @@ class UserInterfaceManager:
 
     def update_ui_system_info(self):
         """Update system stats in the UI."""
-        # Get CPU percentage once to avoid inconsistent readings
-        cpu_percent = psutil.cpu_percent(interval=None)  # Non-blocking call
-        self.stats_panel.cpu_percent.text = f"{cpu_percent:.1f}%"
-        self.stats_panel.cpu_bar.value = cpu_percent / 100
+        cpu_percent = psutil.cpu_percent(interval=None)
+        if self.stats_panel.cpu_percent is not None:
+            self.stats_panel.cpu_percent.text = f"{cpu_percent:.1f}%"
+        if self.stats_panel.cpu_bar is not None:
+            self.stats_panel.cpu_bar.value = cpu_percent / 100
 
         # Update CPU cores if they're visible and initialized
-        if self.stats_panel.show_cpu_cores.value and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
+        show_cores = getattr(self.stats_panel.show_cpu_cores, "value", False)
+        if show_cores and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
             try:
                 core_percentages = psutil.cpu_percent(percpu=True, interval=None)
                 for i, core_percent in enumerate(core_percentages):
                     if i < len(self.stats_panel.cpu_core_labels) and i < len(self.stats_panel.cpu_core_bars):
-                        self.stats_panel.cpu_core_labels[i].text = f"{core_percent:.1f}%"
-                        self.stats_panel.cpu_core_bars[i].value = core_percent / 100
+                        if self.stats_panel.cpu_core_labels[i] is not None:
+                            self.stats_panel.cpu_core_labels[i].text = f"{core_percent:.1f}%"
+                        if self.stats_panel.cpu_core_bars[i] is not None:
+                            self.stats_panel.cpu_core_bars[i].value = core_percent / 100
             except Exception as e:
-                # If there's an error getting per-core data, just skip the update
                 logger.debug(f"Error updating CPU core data: {e}")
-                pass
 
         memory = psutil.virtual_memory()
-        self.stats_panel.memory_percent.text = f"{memory.percent}%"
-        self.stats_panel.memory_bar.value = memory.percent / 100
-        self.stats_panel.memory_available.text = f"{round(memory.available / (1024**3), 2)} GB Available"
-        self.stats_panel.memory_used.text = f"{round(memory.used / (1024**3), 2)} GB Used"
+        if self.stats_panel.memory_percent is not None:
+            self.stats_panel.memory_percent.text = f"{memory.percent}%"
+        if self.stats_panel.memory_bar is not None:
+            self.stats_panel.memory_bar.value = memory.percent / 100
+        if self.stats_panel.memory_available is not None:
+            self.stats_panel.memory_available.text = f"{round(memory.available / (1024**3), 2)} GB Available"
+        if self.stats_panel.memory_used is not None:
+            self.stats_panel.memory_used.text = f"{round(memory.used / (1024**3), 2)} GB Used"
         disk = psutil.disk_usage("/")
-        self.stats_panel.disk_percent.text = f"{disk.percent}%"
-        self.stats_panel.disk_bar.value = disk.percent / 100
-        self.stats_panel.disk_free.text = f"{round(disk.free / (1024**3), 2)} GB Free"
-        self.stats_panel.disk_used.text = f"{round(disk.used / (1024**3), 2)} GB Used"
+        if self.stats_panel.disk_percent is not None:
+            self.stats_panel.disk_percent.text = f"{disk.percent}%"
+        if self.stats_panel.disk_bar is not None:
+            self.stats_panel.disk_bar.value = disk.percent / 100
+        if self.stats_panel.disk_free is not None:
+            self.stats_panel.disk_free.text = f"{round(disk.free / (1024**3), 2)} GB Free"
+        if self.stats_panel.disk_used is not None:
+            self.stats_panel.disk_used.text = f"{round(disk.used / (1024**3), 2)} GB Used"
         # --- tmux server stats ---
         tmux_cpu = "N/A"
         tmux_mem = "N/A"
@@ -235,8 +283,10 @@ class UserInterfaceManager:
         except Exception:
             tmux_cpu = "N/A"
             tmux_mem = "N/A"
-        self.stats_panel.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
-        self.stats_panel.tmux_mem.text = f"tmux MEM: {tmux_mem}"
+        if self.stats_panel.tmux_cpu is not None:
+            self.stats_panel.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
+        if self.stats_panel.tmux_mem is not None:
+            self.stats_panel.tmux_mem.text = f"tmux MEM: {tmux_mem}"
 
     def update_script_preview(self, e):
         """Update the script preview editor when a new script is selected."""
@@ -257,25 +307,27 @@ class UserInterfaceManager:
         # Now selected should be a string (filename or display text)
         actual_filename = self.extract_script_filename(selected)
         script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
-        if script_path.is_file():
-            with open(script_path, "r") as f:
-                content = f.read()
-                self.ignore_next_edit = True  # Ignore the next edit event
-                self.script_preview_editor.value = content
+        if self.script_preview_editor is not None:
+            if script_path.is_file():
+                with open(script_path, "r") as f:
+                    content = f.read()
+                    self.ignore_next_edit = True  # Ignore the next edit event
+                    self.script_preview_editor.value = content
 
-                # Update syntax highlighting based on script type
-                script_type = self.get_script_type(actual_filename)
-                if script_type == "python":
-                    self.script_preview_editor.language = "python"
-                elif script_type == "bash":
-                    self.script_preview_editor.language = "bash"
-        else:
-            self.ignore_next_edit = True
-            self.script_preview_editor.value = "# Script not found."
+                    # Update syntax highlighting based on script type
+                    script_type = self.get_script_type(actual_filename)
+                    if hasattr(self.script_preview_editor, "language"):
+                        if script_type == "python":
+                            self.script_preview_editor.language = "python"
+                        elif script_type == "bash":
+                            self.script_preview_editor.language = "bash"
+            else:
+                self.ignore_next_edit = True
+                self.script_preview_editor.value = "# Script not found."
 
     def confirm_delete_script(self):
         """Show a confirmation dialog and delete the selected script if confirmed."""
-        selected_script = self.script_path_select.value
+        selected_script = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
         if not selected_script or selected_script == "No scripts found":
             msg = "No script selected to delete."
             logger.warning(msg)
@@ -293,7 +345,8 @@ class UserInterfaceManager:
                 logger.info(msg)
                 ui.notification(msg, type="positive")
                 self.refresh_script_list()
-                self.update_script_preview(type("E", (), {"args": self.script_path_select.value})())
+                if self.script_path_select is not None and hasattr(self.script_path_select, "value"):
+                    self.update_script_preview(type("E", (), {"args": self.script_path_select.value})())
             except Exception as e:
                 msg = f"Failed to delete: {e}"
                 logger.error(msg)
@@ -311,7 +364,7 @@ class UserInterfaceManager:
 
     def save_current_script(self, script_edited):
         """Save the current script in the editor to its file."""
-        selected_script = self.script_path_select.value
+        selected_script = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
         if not selected_script or selected_script == "No scripts found":
             ui.notification("No script selected to save.", type="warning")
             return
@@ -319,7 +372,8 @@ class UserInterfaceManager:
         script_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
         try:
             with script_path.open("w") as f:
-                f.write(self.script_preview_editor.value)
+                if self.script_preview_editor is not None and hasattr(self.script_preview_editor, "value"):
+                    f.write(self.script_preview_editor.value)
             os.chmod(script_path, 0o755)
             script_edited["changed"] = False
             ui.notification(f"Saved changes to {actual_filename}", type="positive")
@@ -344,10 +398,12 @@ class UserInterfaceManager:
                     return
                 try:
                     with new_script_path.open("w") as f:
-                        f.write(self.script_preview_editor.value)
+                        if self.script_preview_editor is not None and hasattr(self.script_preview_editor, "value"):
+                            f.write(self.script_preview_editor.value)
                     os.chmod(new_script_path, 0o755)
                     self.refresh_script_list()
-                    self.script_path_select.value = f"{name}.sh"
+                    if self.script_path_select is not None:
+                        self.script_path_select.value = f"{name}.sh"
                     ui.notification(f"Script saved as {name}.sh", type="positive")
                     name_dialog.close()
                 except Exception as e:
@@ -359,8 +415,8 @@ class UserInterfaceManager:
         name_dialog.open()
 
     def chain_current_script(self):
-        script_name = self.script_path_select.value
-        arguments = self.arguments_input.value
+        script_name = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
+        arguments = self.arguments_input.value if self.arguments_input is not None and hasattr(self.arguments_input, "value") else ""
         if not script_name or script_name == "No scripts found":
             ui.notification("No script selected to chain.", type="warning")
             return
@@ -486,8 +542,8 @@ class UserInterfaceManager:
 
         date_val = date_input.value
         time_val = time_input.value
-        session_name = self.session_name_input.value.strip() if hasattr(self, "session_name_input") else ""
-        arguments = self.arguments_input.value if hasattr(self, "arguments_input") else "."
+        session_name = self.session_name_input.value.strip() if self.session_name_input is not None and hasattr(self.session_name_input, "value") else ""
+        arguments = self.arguments_input.value if self.arguments_input is not None and hasattr(self.arguments_input, "value") else "."
 
         if not date_val or not time_val or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
@@ -520,7 +576,7 @@ class UserInterfaceManager:
                         status=SessionStatus.SCHEDULED,
                     )
                 else:
-                    actual_filename = self.extract_script_filename(self.script_path_select.value)
+                    actual_filename = self.extract_script_filename(self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None)
                     script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
                     exec_cmd = self.build_execution_command(script_file_path, arguments)
                     manager.start_session_with_job(
@@ -541,7 +597,7 @@ class UserInterfaceManager:
                     script_paths.append(script)
                 tmux_cmd = " && ".join(commands)
             else:
-                actual_filename = self.extract_script_filename(self.script_path_select.value)
+                actual_filename = self.extract_script_filename(self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None)
                 script_file_path = self.tmux_manager.SCRIPTS_DIR / actual_filename
                 exec_cmd = self.build_execution_command(script_file_path, arguments)
                 tmux_cmd = exec_cmd

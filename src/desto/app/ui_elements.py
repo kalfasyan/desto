@@ -28,7 +28,7 @@ class SystemStatsPanel:
         self.tmux_mem = None
 
     def build(self):
-        with ui.column():
+        with ui.column().classes("w-full h-full bg-blue-1 dark:bg-grey-9"):
             ui.label("System Stats").style(f"font-size: {self.ui_settings['labels']['title_font_size']}; font-weight: {self.ui_settings['labels']['title_font_weight']}; margin-bottom: 10px;")
             ui.label("CPU Usage (Average)").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
@@ -39,7 +39,7 @@ class SystemStatsPanel:
             # CPU Details toggle and container
             core_info = "Show CPU details"
             self.show_cpu_cores = ui.switch(core_info, value=False).style("margin-top: 8px;")
-            self.cpu_cores_container = ui.column().style("margin-top: 8px; min-height: 50px; border: 1px solid #ddd; padding: 8px; border-radius: 4px;")
+            self.cpu_cores_container = ui.column().style("margin-top: 8px; min-height: 50px; padding: 8px; border-radius: 4px;").classes("bg-grey-1 dark:bg-grey-8 border border-grey-3 dark:border-grey-7")
 
             def toggle_cpu_cores_visibility(e):
                 # Access the switch value directly after the event
@@ -63,17 +63,17 @@ class SystemStatsPanel:
                 ui.icon("memory", size="1.2rem")
                 self.memory_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
             self.memory_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.memory_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
-            self.memory_available = ui.label("0 GB Available").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
+            self.memory_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']};").classes("text-grey-7 dark:text-grey-4")
+            self.memory_available = ui.label("0 GB Available").style(f"font-size: {self.ui_settings['labels']['info_font_size']};").classes("text-grey-7 dark:text-grey-4")
             ui.label("Disk Usage").style(f"font-weight: {self.ui_settings['labels']['subtitle_font_weight']}; margin-top: 10px;")
             with ui.row().style("align-items: center"):
                 ui.icon("storage", size="1.2rem")
                 self.disk_percent = ui.label("0%").style(f"font-size: {self.ui_settings['labels']['subtitle_font_size']}; margin-left: 5px;")
             self.disk_bar = ui.linear_progress(value=0, size=self.ui_settings["progress_bar"]["size"], show_value=False)
-            self.disk_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
-            self.disk_free = ui.label("0 GB Free").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: {self.ui_settings['labels']['info_color']};")
-            self.tmux_cpu = ui.label("tmux CPU: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888; margin-top: 20px;")
-            self.tmux_mem = ui.label("tmux MEM: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; color: #888;")
+            self.disk_used = ui.label("0 GB Used").style(f"font-size: {self.ui_settings['labels']['info_font_size']};").classes("text-grey-7 dark:text-grey-4")
+            self.disk_free = ui.label("0 GB Free").style(f"font-size: {self.ui_settings['labels']['info_font_size']};").classes("text-grey-7 dark:text-grey-4")
+            self.tmux_cpu = ui.label("tmux CPU: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']}; margin-top: 20px;").classes("text-grey-6 dark:text-grey-5")
+            self.tmux_mem = ui.label("tmux MEM: N/A").style(f"font-size: {self.ui_settings['labels']['info_font_size']};").classes("text-grey-6 dark:text-grey-5")
 
     def _initialize_cpu_cores(self):
         """Initialize the CPU cores display."""
@@ -220,23 +220,24 @@ class NewScriptTab:
         self.code_editor = None
 
     def build(self):
-        # Script type selector
-        ui.select(
-            ["bash", "python"],
-            label="Script Type",
-            value="bash",
-            on_change=self.on_script_type_change,
-        ).style("width: 100%; margin-bottom: 10px;")
+        with ui.card().style("padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;").classes("bg-white dark:bg-grey-9 text-black dark:text-white"):
+            # Script type selector
+            ui.select(
+                ["bash", "python"],
+                label="Script Type",
+                value="bash",
+                on_change=self.on_script_type_change,
+            ).style("width: 100%; margin-bottom: 10px;")
 
         self.code_editor = (
             ui.codemirror(
                 self.custom_code["value"],
                 language="bash",
-                theme="vscodeLight",
+                theme="vscodeDark" if self.ui_manager._dark_mode.value else "vscodeLight",
                 on_change=lambda e: self.custom_code.update({"value": e.value}),
             )
-            .style("width: 100%; font-family: monospace; background: #f5f5f5; color: #222; border-radius: 6px;")
-            .classes("h-48")
+            .style("width: 100%; font-family: monospace; border-radius: 6px;")
+            .classes("h-48 bg-grey-2 dark:bg-grey-8 text-black dark:text-white")
         )
         ui.select(self.code_editor.supported_themes, label="Theme").classes("w-32").bind_value(self.code_editor, "theme")
         self.custom_template_name_input = ui.input(
@@ -314,19 +315,16 @@ class LogSection:
 
     def build(self):
         show_logs = ui.switch("Show Logs", value=True).style("margin-bottom: 10px;")
-        log_card = ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%;")
+        log_card = ui.card().style("width: 100%; padding: 20px; border-radius: 8px;").classes("bg-white dark:bg-grey-9 text-black dark:text-white")
         with log_card:
             ui.label("Log Messages").style("font-size: 1.5em; font-weight: bold; margin-bottom: 20px; text-align: center;")
-            self.log_display = ui.textarea("").style("width: 600px; height: 100%; background-color: #fff; color: #000; border: 1px solid #ccc; font-family: monospace;").props("readonly")
+            self.log_display = ui.textarea("").style("width: 600px; height: 100%; border: 1px solid #ccc; font-family: monospace; color: #1e1e1e;").props("readonly").classes("bg-grey-1 dark:bg-grey-8 dark:text-grey-1")
 
         def toggle_log_card_visibility(value):
-            if value:
-                log_card.visible = True
-            else:
-                log_card.visible = False
+            log_card.set_visibility(value)
 
-        show_logs.on("update:model-value", lambda e: toggle_log_card_visibility(e.args[0]))
-        log_card.visible = show_logs.value
+        show_logs.on_value_change(lambda e: toggle_log_card_visibility(e.value))
+        log_card.set_visibility(show_logs.value)
 
     def update_log_messages(self, message, number_of_lines=20):
         self.log_messages.append(message)
@@ -400,7 +398,7 @@ class ScriptManagerTab:
 
     def build(self):
         """Build the script manager tab UI."""
-        with ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"):
+        with ui.card().style("padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;").classes("bg-white dark:bg-grey-9 text-black dark:text-white"):
             # Place Session Name, Script, and Arguments side by side
             with ui.row().style("width: 100%; gap: 10px; margin-bottom: 10px;"):
                 self.session_name_input = ui.input(label="Session Name").style("width: 30%; color: #75a8db;")
@@ -441,7 +439,7 @@ class ScriptManagerTab:
                     ui.codemirror(
                         script_preview_content,
                         language="bash",
-                        theme="vscodeLight",
+                        theme="vscodeDark" if self.ui_manager._dark_mode.value else "vscodeLight",
                         line_wrapping=True,
                         highlight_whitespace=True,
                         indent="    ",

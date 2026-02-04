@@ -40,11 +40,11 @@ class FavoritesTab:
         # Display favorites
         for favorite in favorites:
             with self.favorites_container:
-                with ui.card().style("width: 100%; margin-bottom: 10px; padding: 10px;"):
+                with ui.card().style("width: 100%; margin-bottom: 10px; padding: 10px;").classes("bg-white dark:bg-grey-9 text-black dark:text-white"):
                     with ui.row().style("width: 100%; justify-content: space-between; align-items: start;"):
                         with ui.column().style("flex: 1;"):
                             ui.label(favorite.name).style("font-weight: bold; font-size: 1.1em; margin-bottom: 5px;")
-                            ui.label(favorite.command).style("color: #666; font-family: monospace; font-size: 0.9em; word-break: break-all; padding: 5px; background-color: #f5f5f5; border-radius: 3px;")
+                            ui.label(favorite.command).style("font-family: monospace; font-size: 0.9em; word-break: break-all; padding: 5px; border-radius: 3px;").classes("text-grey-7 dark:text-grey-4 bg-grey-2 dark:bg-grey-8")
                             with ui.row().style("margin-top: 8px; font-size: 0.85em; color: #999;"):
                                 ui.label(f"Used {favorite.use_count} times")
                                 if favorite.last_used_at:
@@ -171,7 +171,7 @@ class FavoritesTab:
             return
 
         with ui.dialog() as dialog:
-            with ui.card().style("min-width: 400px;"):
+            with ui.card().style("min-width: 400px;").classes("dark:bg-grey-9"):
                 ui.label("Save as Favorite").style("font-weight: bold; font-size: 1.2em; margin-bottom: 15px;")
                 ui.label("Enter a name for this favorite:").style("margin-bottom: 10px;")
 
@@ -211,7 +211,7 @@ class FavoritesTab:
 
     def build(self):
         """Build the favorites tab UI."""
-        with ui.card().style("background-color: #fff; color: #000; padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;"):
+        with ui.card().style("padding: 20px; border-radius: 8px; width: 100%; margin-left: 0; margin-right: 0;").classes("bg-white dark:bg-grey-9 text-black dark:text-white"):
             ui.label("Favorite Commands").style("font-weight: bold; font-size: 1.3em; margin-bottom: 15px;")
 
             # Search box
