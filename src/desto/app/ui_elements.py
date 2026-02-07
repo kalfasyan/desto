@@ -105,9 +105,10 @@ class SystemStatsPanel:
 
 
 class SettingsPanel:
-    def __init__(self, tmux_manager, ui_manager=None):
+    def __init__(self, tmux_manager, ui_manager=None, right_drawer=None):
         self.tmux_manager = tmux_manager
         self.ui_manager = ui_manager
+        self.right_drawer = right_drawer
         self.scripts_dir_input = None
         self.logs_dir_input = None
         self.pushbullet_input = None
@@ -180,6 +181,10 @@ class SettingsPanel:
         from datetime import datetime
 
         ui.button("Send test push", on_click=_send_test_push).style("width: 100%; margin-top: 8px;")
+
+        # Add a close button at the bottom right of the settings panel
+        with ui.row().style("justify-content: flex-end; align-items: center; margin-top: 20px; margin-bottom: 0;"):
+            ui.button("Close", icon="close", on_click=lambda: self.right_drawer.toggle()).props("flat color=primary").style("margin-bottom: 0; margin-top: 0; margin-right: -8px;")
 
     def save_settings(self):
         scripts_dir = Path(self.scripts_dir_input.value).expanduser()

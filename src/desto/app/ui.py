@@ -157,7 +157,7 @@ class UserInterfaceManager:
             )
             .classes("bg-gradient-to-b from-blue-grey-1 to-blue-grey-2 dark:from-grey-9 dark:to-grey-8") as right_drawer
         ):
-            self.settings_panel = SettingsPanel(self.tmux_manager, self)
+            self.settings_panel = SettingsPanel(self.tmux_manager, self, right_drawer)
             self.settings_panel.build()
 
         # Header with gradient and shadow
