@@ -86,6 +86,9 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             mock_context.__exit__ = Mock(return_value=None)
             mock_row = Mock()
             mock_row.style.return_value = mock_context
+            mock_context.classes.return_value = mock_context  # Support chained .classes() after .style()
+            mock_context.__enter__ = Mock(return_value=mock_context)
+            mock_context.__exit__ = Mock(return_value=None)
             mock_ui.row.return_value = mock_row
             mock_ui.label = capture_label
             mock_ui.button = Mock()
@@ -145,6 +148,9 @@ class TestDashboardStatusDisplay(unittest.TestCase):
                     mock_context.__exit__ = Mock(return_value=None)
                     mock_row = Mock()
                     mock_row.style.return_value = mock_context
+                    mock_context.classes.return_value = mock_context  # Support chained .classes() after .style()
+                    mock_context.__enter__ = Mock(return_value=mock_context)
+                    mock_context.__exit__ = Mock(return_value=None)
                     mock_ui.row.return_value = mock_row
                     mock_ui.label = capture_label
                     mock_ui.button = Mock()
