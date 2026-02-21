@@ -1,7 +1,9 @@
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -184,3 +186,29 @@ class AtJobManager:
         except Exception as e:
             logger.debug(f"Failed to cancel job {job_id} with 'atrm': {e}")
             return False
+
+    @staticmethod
+    def is_atd_running() -> bool:
+        """Check if the 'at' daemon (atd/atrun) is running/enabled."""
+        # On macOS, check for com.apple.atrun
+        if sys.platform == "darwin":
+            try:
+                # Check if atrun is loaded in launchctl
+                proc = subprocess.run(["launchctl", "list", "com.apple.atrun"], capture_output=True, text=True)
+                return proc.returncode == 0
+            except Exception:
+                return False
+        # On Linux, check for atd process
+        else:
+            try:
+                # Try to check via systemctl if available
+                if shutil.which("systemctl"):
+                    proc = subprocess.run(["systemctl", "is-active", "atd"], capture_output=True, text=True)
+                    if proc.returncode == 0:
+                        return True
+
+                # Fallback to checking process list
+                proc = subprocess.run(["pgrep", "atd"], capture_output=True)
+                return proc.returncode == 0
+            except Exception:
+                return False

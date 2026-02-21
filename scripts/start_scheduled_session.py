@@ -3,6 +3,7 @@
 This ensures scheduled jobs get the same Redis tracking as manually started sessions.
 """
 
+import shlex
 import subprocess
 import sys
 
@@ -121,7 +122,7 @@ def main():
                     logger.info(f"[SCHEDULED WRAPPER] Found existing scheduled session '{session_name}' (id={session.session_id}), updating to RUNNING")
                 else:
                     # Existing session is not scheduled, create a new SCHEDULED session
-                    logger.info(f"[SCHEDULED WRAPPER] Existing session found but not SCHEDULED, " f"creating new session '{session_name}' in Redis with status SCHEDULED")
+                    logger.info(f"[SCHEDULED WRAPPER] Existing session found but not SCHEDULED, creating new session '{session_name}' in Redis with status SCHEDULED")
                     session, job = manager.start_session_with_job(
                         session_name=session_name,
                         command=command,
@@ -165,7 +166,7 @@ def main():
 
             # Log job info if available
             if "job" in locals():
-                logger.info(f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, " f"session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}")
+                logger.info(f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}")
 
             # Compose the wrapped command to run in tmux
             # Find mark_job_finished.py script path
@@ -223,7 +224,7 @@ def main():
                     f"{chained_cmd}; "
                     f"SCRIPT_EXIT_CODE=$?; "
                     f'printf "\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n" "$(date)" >> \'{log_file}\'; '
-                    f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                    f"{shlex.quote(sys.executable)} '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
                     "exit $SCRIPT_EXIT_CODE"
                 )
             else:
@@ -236,7 +237,7 @@ def main():
                     f"{starting_marker} && {marker} && {run_script}; "
                     f"SCRIPT_EXIT_CODE=$?; "
                     f'printf "\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n" "$(date)" >> \'{log_file}\'; '
-                    f"python3 '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
+                    f"{shlex.quote(sys.executable)} '{script_path}' '{session_name}' $SCRIPT_EXIT_CODE; "
                     "exit $SCRIPT_EXIT_CODE"
                 )
 

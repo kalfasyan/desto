@@ -3,11 +3,13 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
+import redis
 from loguru import logger
 from nicegui import ui
 
@@ -205,6 +207,20 @@ class TmuxManager:
                 ui.button("Refresh", icon="refresh", on_click=self.update_sessions_status).props("flat")
                 ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
                 ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
+
+        # --- 'at' Daemon Status Check ---
+        from desto.redis.at_job_manager import AtJobManager
+
+        at_running = AtJobManager.is_atd_running()
+        if not at_running:
+            with ui.row().style("width: 100%; align-items: center; margin-bottom: 20px; padding: 15px; border-radius: 8px;").classes("bg-orange-1 dark:bg-orange-9") as warning_row:
+                ui.icon("warning", color="orange").style("font-size: 2em; margin-right: 15px;")
+                with ui.column().style("flex-grow: 1;"):
+                    ui.label("System 'at' daemon is not running").style("font-weight: bold; color: #ef6c00;")
+                    ui.label("Scheduled jobs will be managed by desto's internal scheduler while the dashboard is open. For background execution, please enable 'atd' on your system.").style("font-size: 0.9em;")
+                    if sys.platform == "darwin":
+                        ui.label("On macOS: sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.atrun.plist").style("font-family: monospace; font-size: 0.8em; margin-top: 5px;")
+                ui.button(icon="close", on_click=lambda: warning_row.delete()).props("flat round color=orange")
 
         # --- Stats Cards (Total, Finished, Failed, Running) ---
         total_sessions = len(sessions_status)
@@ -900,9 +916,14 @@ class TmuxManager:
             for job in scheduled_jobs:
                 job_id = job.get("id", "?")
                 metadata = at_job_manager.get_job_metadata(str(job_id)) if at_job_manager else None
+                status = metadata.get("status", "scheduled") if metadata else "scheduled"
+
+                # Filter out jobs that have been handled by the internal scheduler
+                if status in ["finished_internal", "running_internal"]:
+                    continue
+
                 scheduled_time = metadata.get("scheduled_time", job.get("datetime", "?")) if metadata else job.get("datetime", "?")
                 user = metadata.get("user", job.get("user", "?")) if metadata else job.get("user", "?")
-                status = metadata.get("status", "scheduled") if metadata else "scheduled"
 
                 def show_metadata_dialog(job_id=job_id, metadata=metadata):
                     if self.pause_updates:
@@ -976,6 +997,88 @@ class TmuxManager:
                 ui.button("Cancel", on_click=_cancel_clear_session).props("color=grey")
                 ui.button("Clear Session", color="orange", on_click=_confirm_clear_session).props("icon=delete_forever")
         dialog.open()
+
+    def check_and_run_scheduled_jobs(self):
+        """Check for overdue scheduled jobs in Redis and run them if 'at' hasn't."""
+        if not self.desto_manager:
+            return
+
+        try:
+            # Scan for all atjob metadata in Redis
+            for key in self.redis_client.redis.scan_iter(match="desto:atjob:*"):
+                try:
+                    metadata = self.redis_client.redis.hgetall(key)
+                    if not metadata:
+                        continue
+
+                    # Convert bytes to strings if necessary
+                    metadata = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in metadata.items()}
+
+                    status = metadata.get("status")
+                    if status != "scheduled":
+                        # If it was already picked up by internal scheduler and finished,
+                        # or if it's been running for a long time, we might want to clean it up.
+                        # For now, just skip non-scheduled jobs.
+                        continue
+
+                    scheduled_time_str = metadata.get("scheduled_time")
+                    if not scheduled_time_str:
+                        continue
+
+                    try:
+                        scheduled_time = datetime.fromisoformat(scheduled_time_str)
+                    except Exception:
+                        # Fallback for other formats if any
+                        continue
+
+                    if datetime.now() >= scheduled_time:
+                        job_id = metadata.get("job_id")
+                        command = metadata.get("command")
+                        session_name = metadata.get("session_name")
+
+                        self.logger.info(f"Internal scheduler detected overdue job {job_id} (scheduled for {scheduled_time_str}). Running now.")
+
+                        # Atomically check and update status to prevent double execution
+                        # We use a WATCH/MULTI/EXEC pattern for a simple distributed lock
+                        # or just check current status before updating.
+                        # Since we want to ensure only one runner picks it up:
+                        can_run = False
+                        with self.redis_client.redis.pipeline() as pipe:
+                            try:
+                                pipe.watch(key)
+                                # Read using the main client, not the pipeline
+                                current_status = self.redis_client.redis.hget(key, "status")
+                                if current_status and (current_status == "scheduled" or (hasattr(current_status, "decode") and current_status.decode() == "scheduled")):
+                                    pipe.multi()
+                                    pipe.hset(key, "status", "running_internal")
+                                    pipe.execute()
+                                    can_run = True
+                                else:
+                                    pipe.unwatch()
+                            except redis.WatchError:
+                                can_run = False
+
+                        if can_run:
+                            # Run the command in a separate thread to not block the UI
+                            def run_job(cmd, s_name, k):
+                                try:
+                                    # We use shell=True because the command might contain quotes and arguments
+                                    # The command is already constructed to call start_scheduled_session.py
+                                    subprocess.run(cmd, shell=True, check=True)
+                                    self.logger.info(f"Successfully started overdue job {job_id}")
+                                    # Mark as finished in atjob metadata so it's not picked up again
+                                    # and can be filtered out from the scheduled jobs view
+                                    self.redis_client.redis.hset(k, "status", "finished_internal")
+                                except Exception as e:
+                                    self.logger.error(f"Failed to run overdue job {job_id}: {e}")
+                                    self.redis_client.redis.hset(k, "status", "failed_internal")
+
+                            threading.Thread(target=run_job, args=(command, session_name, key), daemon=True).start()
+
+                except Exception as e:
+                    self.logger.error(f"Error processing scheduled job key {key}: {e}")
+        except Exception as e:
+            self.logger.error(f"Error scanning scheduled jobs: {e}")
 
     def clear_session(self, session_name, ui):
         """Deletes the session's log file and removes the session from Redis, then refreshes the UI."""
@@ -1362,14 +1465,10 @@ class TmuxManager:
                     break
                 current = current.parent
 
-        # Determine the correct Python command
-        # In Docker with uv, use 'uv run python', otherwise use 'python3'
-        if Path("/usr/local/bin/uv").exists():
-            python_cmd = "uv run python"
-        else:
-            python_cmd = "python3"
+        # Use current interpreter to ensure correct environment
+        python_cmd = sys.executable
 
-        return f"{python_cmd} '{script_path}' '{session_name}' {exit_code_ref}"
+        return f"{shlex.quote(python_cmd)} '{script_path}' '{session_name}' {exit_code_ref}"
 
     def get_session_start_command(self, session_name: str, command: str):
         """Get the appropriate command to mark session start using Redis.
@@ -1395,12 +1494,8 @@ class TmuxManager:
                     break
                 current = current.parent
 
-        # Determine the correct Python command
-        # In Docker with uv, use 'uv run python', otherwise use 'python3'
-        if Path("/usr/local/bin/uv").exists():
-            python_cmd = "uv run python"
-        else:
-            python_cmd = "python3"
+        # Use current interpreter to ensure correct environment
+        python_cmd = sys.executable
 
         # Escape quotes in command string for shell safety
         escaped_command = command.replace("'", "'\"'\"'")

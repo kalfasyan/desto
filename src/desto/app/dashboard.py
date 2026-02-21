@@ -13,6 +13,7 @@ def run_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
     """Function to update the UI and session status."""
     um.update_ui_system_info()
     tm.update_sessions_status()
+    tm.check_and_run_scheduled_jobs()
     um.refresh_log_display()
 
 
@@ -48,14 +49,51 @@ def handle_instant_update(um: UserInterfaceManager, update_data):
 
 
 def main():
-    # Configure dark mode colors for Quasar
-    ui.colors(primary="#1976D2", secondary="#2196F3", accent="#FFC107", positive="#4CAF50", negative="#F44336", info="#00BCD4", warning="#FF9800", dark="#1e1e1e", dark_page="#121212")
+    # Configure modern colors for Quasar
+    ui.colors(
+        primary="#3b82f6",  # blue-500
+        secondary="#64748b",  # slate-500
+        accent="#8b5cf6",  # violet-500
+        positive="#10b981",  # emerald-500
+        negative="#ef4444",  # red-500
+        info="#06b6d4",  # cyan-500
+        warning="#f59e0b",  # amber-500
+        dark="#1e293b",  # slate-800
+        dark_page="#0f172a",  # slate-900
+    )
 
     # Set body background with Tailwind dark mode support
-    ui.query("body").classes("bg-grey-1 dark:bg-grey-10")
+    ui.query("body").classes("bg-slate-50 dark:bg-slate-950")
 
-    # Add custom styles
-    ui.add_head_html('<style>body { font-family: "Inter", "Segoe UI", Arial, sans-serif; }</style>')
+    # Add custom styles for a modern look
+    ui.add_head_html(
+        """
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+            body {
+                font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+            }
+            .nicegui-content {
+                padding: 0 !important;
+            }
+            .q-tab-panel {
+                padding: 0 !important;
+            }
+            .modern-card {
+                border: 1px solid rgba(0, 0, 0, 0.05);
+                transition: all 0.2s ease-in-out;
+            }
+            .dark .modern-card {
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .modern-card:hover {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+        </style>
+    """
+    )
 
     tm = TmuxManager(ui, logger)
     um = UserInterfaceManager(ui, ui_settings, tm, desto_manager=tm.desto_manager)

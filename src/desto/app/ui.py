@@ -3,6 +3,7 @@ import os
 import re
 import shlex
 import socket
+import sys
 from pathlib import Path
 
 import psutil
@@ -117,103 +118,65 @@ class UserInterfaceManager:
     def build_ui(self):
         # Listener to update CodeMirror themes and body class for Tailwind
         def update_dark_mode_ui(v):
-            # Update body class for Tailwind's dark: variant
-            # NiceGUI uses 'body--dark' for Quasar, but Tailwind needs 'dark' class
             if v:
                 ui.query("body").classes(add="dark")
             else:
                 ui.query("body").classes(remove="dark")
-            # Update CodeMirror themes
             if hasattr(self, "new_script_tab") and hasattr(self.new_script_tab, "code_editor") and self.new_script_tab.code_editor:
                 self.new_script_tab.code_editor.theme = "vscodeDark" if v else "vscodeLight"
             if hasattr(self, "script_manager_tab") and hasattr(self.script_manager_tab, "script_preview_editor") and self.script_manager_tab.script_preview_editor:
                 self.script_manager_tab.script_preview_editor.theme = "vscodeDark" if v else "vscodeLight"
 
         self._dark_mode.on_value_change(lambda e: update_dark_mode_ui(e.value))
-        # Set initial state
         update_dark_mode_ui(self._dark_mode.value)
 
-        # Main Layout: Drawer + Header + Content
-        with (
-            ui.left_drawer()
-            .style(
-                "width: 260px; min-width: 240px; max-width: 280px; "
-                f"padding: {self.ui_settings['sidebar']['padding']}; "
-                f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
-                "box-shadow: 2px 0 8px rgba(33,150,243,0.06); display: flex; flex-direction: column; border: none;"
-            )
-            .classes("bg-blue-1 dark:bg-grey-9") as left_drawer
-        ):
+        # Header
+        with ui.header(elevated=False).classes("bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 px-6 py-4 items-center justify-between"):
+            with ui.row().classes("items-center gap-4"):
+                ui.button(on_click=lambda: left_drawer.toggle(), icon="menu").props("flat round color=primary")
+                ui.label("desto").classes("text-2xl font-black tracking-tighter text-primary italic uppercase")
+
+            with ui.row().classes("items-center gap-2"):
+                ui.button(icon="dark_mode", on_click=lambda: self._dark_mode.toggle()).props("flat round color=primary")
+                ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat round color=primary")
+
+        # Drawers
+        with ui.left_drawer(value=True).classes("bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6") as left_drawer:
             self.stats_panel.build()
 
-        # Right drawer (settings)
-        with (
-            ui.right_drawer(top_corner=False, bottom_corner=True, value=False)
-            .style(
-                f"width: {self.ui_settings['sidebar']['width']}; "
-                f"padding: {self.ui_settings['sidebar']['padding']}; "
-                f"border-radius: {self.ui_settings['sidebar']['border_radius']}; "
-                "box-shadow: -2px 0 8px rgba(33,150,243,0.06); display: flex; flex-direction: column;"
-            )
-            .classes("bg-gradient-to-b from-blue-grey-1 to-blue-grey-2 dark:from-grey-9 dark:to-grey-8") as right_drawer
-        ):
+        with ui.right_drawer(value=False).classes("bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-6") as right_drawer:
             self.settings_panel = SettingsPanel(self.tmux_manager, self, right_drawer)
             self.settings_panel.build()
 
-        # Header with gradient and shadow
-        with (
-            ui.header(elevated=True)
-            .style("box-shadow: 0 2px 8px rgba(33,150,243,0.08); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;")
-            .classes(replace="row items-center justify-between bg-gradient-to-r from-blue-700 to-blue-900 dark:from-grey-9 dark:to-black text-white")
-        ):
-            ui.button(on_click=lambda: left_drawer.toggle(), icon="preview").props("flat color=white").style("margin-right: 8px;")
-            ui.label("desto").style(f"font-size: {self.ui_settings['header']['font_size']}; font-weight: bold; letter-spacing: 2px; text-shadow: 0 1px 2px #1976D2;")
-
-            ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat color=white").style("margin-left: auto;")
-
-        # Floating settings button (bottom right)
-        ui.button("Settings", on_click=lambda: right_drawer.toggle(), icon="settings").props("fab color=primary").style("position: fixed; bottom: 32px; right: 32px; z-index: 1000; box-shadow: 0 2px 8px #1976D2;")
-
         # Main content area
-        with ui.column().style("flex-grow: 1; padding: 32px 24px 24px 24px; gap: 24px;").classes("bg-grey-1 dark:bg-grey-10 text-black dark:text-white"):
-            with ui.splitter(value=25).classes("w-full bg-transparent").style("gap:0; padding:0; margin:0; border-radius: 12px; box-shadow: 0 2px 12px rgba(33,150,243,0.04);") as splitter:
-                with splitter.before:
-                    with ui.tabs().props("vertical").classes("w-32 min-w-0 bg-grey-2 dark:bg-grey-8") as tabs:
-                        scripts_tab = ui.tab("Scripts", icon="terminal")
-                        new_script_tab = ui.tab("New Script", icon="add")
-                        favorites_tab = ui.tab("Favorites", icon="star") if self.favorites_tab else None
-                with splitter.after:
-                    with ui.tab_panels(tabs, value=scripts_tab).props("vertical").classes("w-full bg-transparent"):
-                        with ui.tab_panel(scripts_tab).classes("bg-transparent"):
-                            self.script_manager_tab.build()
+        with ui.column().classes("w-full max-w-6xl mx-auto p-8 gap-8"):
+            # Horizontal Tabs
+            with ui.tabs().classes("w-full justify-start border-b border-slate-200 dark:border-slate-800") as tabs:
+                scripts_tab = ui.tab("Scripts", icon="terminal")
+                new_script_tab = ui.tab("New Script", icon="add")
+                favorites_tab = ui.tab("Favorites", icon="star") if self.favorites_tab else None
 
-                        with ui.tab_panel(new_script_tab).classes("bg-transparent"):
-                            self.new_script_tab.build()
+            with ui.tab_panels(tabs, value=scripts_tab).classes("w-full bg-transparent"):
+                with ui.tab_panel(scripts_tab):
+                    self.script_manager_tab.build()
 
-                        if favorites_tab and self.favorites_tab:
-                            with ui.tab_panel(favorites_tab).classes("bg-transparent"):
-                                self.favorites_tab.build()
+                with ui.tab_panel(new_script_tab):
+                    self.new_script_tab.build()
 
-            # Chain queue section
-            ui.label("Chain Queue:").style("font-weight: bold; margin-top: 10px; font-size: 1.1em; letter-spacing: 1px;")
-            self.chain_queue_display = ui.column().style("margin-bottom: 10px; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 4px rgba(33,150,243,0.03);").classes("bg-white dark:bg-grey-9 text-black dark:text-white")
-            self.refresh_chain_queue_display()
+                if favorites_tab and self.favorites_tab:
+                    with ui.tab_panel(favorites_tab):
+                        self.favorites_tab.build()
 
-            # Clear Chain Queue button
-            ui.button(
-                "Clear Chain Queue",
-                color="warning",
-                icon="clear_all",
-                on_click=self.clear_chain_queue,
-            ).style("width: 220px; margin-top: 10px; margin-bottom: 5px; border-radius: 8px; font-weight: 500;")
+            # Chain Queue Section
+            with ui.column().classes("w-full gap-4 mt-4"):
+                with ui.row().classes("w-full justify-between items-end"):
+                    ui.label("Chain Queue").classes("text-sm font-bold uppercase tracking-wider text-slate-500")
+                    with ui.row().classes("gap-2"):
+                        ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props("flat color=warning dense")
+                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.confirm_kill_all_sessions).props("flat color=negative dense")
 
-            # Clear All Jobs button
-            ui.button(
-                "Clear All Jobs",
-                color="negative",
-                icon="delete_forever",
-                on_click=self.tmux_manager.confirm_kill_all_sessions,
-            ).style("width: 220px; margin-top: 15px; margin-bottom: 15px; border-radius: 8px; font-weight: 500;")
+                self.chain_queue_display = ui.column().classes("modern-card w-full p-4 bg-white dark:bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
+                self.refresh_chain_queue_display()
 
             self.log_section.build()
 
@@ -606,8 +569,11 @@ class UserInterfaceManager:
             # Use the wrapper script for proper Redis tracking of scheduled jobs
             wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
 
+            # Use the current Python interpreter to ensure correct environment
+            python_exec = sys.executable
+
             if wrapper_script_path.exists():
-                scheduled_cmd = f"python3 '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
+                scheduled_cmd = f"{shlex.quote(python_exec)} '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
             else:
                 scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
 
@@ -651,10 +617,13 @@ class UserInterfaceManager:
         self.chain_queue_display.clear()
         with self.chain_queue_display:
             if not self.chain_queue:
-                ui.label("Chain queue is empty.")
+                ui.label("Chain queue is empty.").classes("text-slate-400 italic text-sm")
             else:
                 for idx, (script, args) in enumerate(self.chain_queue, 1):
-                    ui.label(f"{idx}. {Path(script).name} {args}")
+                    with ui.row().classes("w-full items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800"):
+                        ui.label(str(idx)).classes("bg-primary text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center font-bold")
+                        ui.label(Path(script).name).classes("font-semibold text-sm")
+                        ui.label(args).classes("text-xs text-slate-500 truncate flex-grow")
 
     def clear_chain_queue(self):
         """Clear all items from the chain queue."""

@@ -226,7 +226,8 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
             command = tmux_manager.get_job_completion_command("test_session", use_variable=True)
 
             # Verify command structure
-            self.assertIn("python3", command)
+            # Use sys.executable instead of hardcoded python3 as the implementation uses sys.executable
+            self.assertIn(sys.executable, command)
             self.assertIn("mark_job_finished.py", command)
             self.assertIn("test_session", command)
             self.assertIn("$SCRIPT_EXIT_CODE", command)
