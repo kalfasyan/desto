@@ -71,9 +71,21 @@ class TestDockerIntegration:
         assert "image: redis:7-alpine" in content
         assert "required for session tracking" in content  # Updated comment
 
-    @pytest.mark.skipif(not shutil.which("docker"), reason="Docker not available")
-    def test_docker_build(self):
+    @pytest.fixture(scope="session")
+    def docker_daemon_available(self):
+        """Check if Docker daemon is accessible (not just CLI)."""
+        try:
+            result = subprocess.run(["docker", "ps"], capture_output=True, text=True, timeout=10)
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @pytest.mark.skipif(not shutil.which("docker"), reason="Docker CLI not available")
+    def test_docker_build(self, docker_daemon_available):
         """Test that Docker image can be built successfully."""
+        if not docker_daemon_available:
+            pytest.skip("Docker daemon not accessible")
+
         repo_root = Path(__file__).parent.parent
 
         # Build the Docker image

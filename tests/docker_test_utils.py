@@ -185,12 +185,20 @@ def wait_for_file_contains(path, substring, timeout=5, interval=0.1):
 
 
 def ensure_docker_available():
-    """Check if Docker is available and accessible."""
+    """Check if Docker is available and the daemon is accessible."""
     try:
+        # First check CLI exists
         result = subprocess.run(["docker", "--version"], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            logger.debug(f"Docker available: {result.stdout.strip()}")
-            return True
+        if result.returncode != 0:
+            logger.debug("Docker CLI not found")
+            return False
+        # Then verify daemon is accessible (e.g., docker ps)
+        result = subprocess.run(["docker", "ps"], capture_output=True, text=True, timeout=10)
+        if result.returncode != 0:
+            logger.warning(f"Docker daemon not accessible: {result.stderr}")
+            return False
+        logger.debug(f"Docker available: {result.stdout.strip()}")
+        return True
     except Exception as e:
         logger.warning(f"Docker not available: {e}")
     return False
