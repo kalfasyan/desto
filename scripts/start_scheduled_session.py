@@ -96,6 +96,63 @@ def main():
     session_name = sys.argv[1]
     command = " ".join(sys.argv[2:])  # Join all remaining args as the command
 
+    # FIRST: Check if tmux session already exists BEFORE any Redis operations
+    # This prevents creating orphan jobs when the session is already running
+    tmux_check = subprocess.run(["tmux", "has-session", "-t", session_name], capture_output=True, text=True)
+    if tmux_check.returncode == 0:
+        # Tmux session already exists - find existing Redis session and update it
+        logger.info(f"[SCHEDULED WRAPPER] Tmux session '{session_name}' already exists. Checking Redis state.")
+        try:
+            from datetime import datetime
+
+            from src.desto.redis.client import DestoRedisClient
+            from src.desto.redis.desto_manager import DestoManager
+            from src.desto.redis.models import SessionStatus
+
+            client = DestoRedisClient()
+            if client.is_connected():
+                manager = DestoManager(client)
+
+                # Try to find existing session
+                existing_session = None
+                try:
+                    existing_session = manager.session_manager.get_session_by_name(session_name)
+                except Exception as e:
+                    logger.warning(f"[SCHEDULED WRAPPER] Could not check for existing session: {e}")
+
+                if existing_session:
+                    # Update existing session status to RUNNING
+                    session = existing_session
+                    session.status = SessionStatus.RUNNING
+                    session.start_time = datetime.now()
+                    manager.session_manager._update_session(session)
+                    logger.info(f"[SCHEDULED WRAPPER] Updated existing session '{session_name}' to RUNNING")
+
+                    # Update job status to RUNNING if needed
+                    if hasattr(session, "job_ids") and session.job_ids:
+                        first_job_id = session.job_ids.split(",")[0] if isinstance(session.job_ids, str) else session.job_ids[0]
+                        if first_job_id:
+                            job_key = f"desto:job:{first_job_id}"
+                            job_data = client.redis.hgetall(job_key)
+                            if job_data:
+                                current_status = job_data.get("status", "")
+                                if isinstance(current_status, bytes):
+                                    current_status = current_status.decode()
+                                if current_status not in ["running", "finished", "failed"]:
+                                    client.redis.hset(job_key, "status", "running")
+                                    logger.info(f"[SCHEDULED WRAPPER] Set job {first_job_id} status to RUNNING")
+                                else:
+                                    logger.info(f"[SCHEDULED WRAPPER] Job {first_job_id} already in status {current_status}")
+                            else:
+                                logger.warning(f"[SCHEDULED WRAPPER] Job {first_job_id} not found in Redis")
+                else:
+                    logger.warning(f"[SCHEDULED WRAPPER] Tmux session '{session_name}' exists but no Redis session found. Session may have been cleared.")
+
+                sys.exit(0)
+        except Exception as e:
+            logger.error(f"[SCHEDULED WRAPPER] Error handling existing tmux session: {e}")
+            sys.exit(0)  # Exit gracefully anyway since tmux session is running
+
     try:
         from src.desto.redis.client import DestoRedisClient
         from src.desto.redis.desto_manager import DestoManager
