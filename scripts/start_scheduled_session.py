@@ -162,7 +162,10 @@ def main():
 
                         redis_client = DestoRedisClient()
                     redis_client.redis.hset(job_key, "start_time", session.start_time.isoformat())
+                    # FIX: Also update job status to RUNNING so mark_job_finished.py can find it
+                    redis_client.redis.hset(job_key, "status", "running")
                     logger.info(f"[SCHEDULED WRAPPER] Set job {first_job_id} start_time to session start_time {session.start_time.isoformat()}")
+                    logger.info(f"[SCHEDULED WRAPPER] Set job {first_job_id} status to RUNNING")
 
             # Log job info if available
             if "job" in locals():

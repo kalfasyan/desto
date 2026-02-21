@@ -91,6 +91,16 @@ def main():
             .modern-card:hover {
                 box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             }
+            /* Dark mode card backgrounds */
+            body.dark .q-card {
+                background-color: #0f172a !important;
+            }
+            body.dark .q-header {
+                background-color: #0f172a !important;
+            }
+            body.dark .q-drawer {
+                background-color: #0f172a !important;
+            }
         </style>
     """
     )

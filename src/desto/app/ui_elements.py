@@ -227,7 +227,7 @@ class NewScriptTab:
         self.code_editor = None
 
     def build(self):
-        with ui.card().classes("modern-card w-full p-6 bg-white dark:bg-slate-900 rounded-xl shadow-sm"):
+        with ui.card().props("flat").classes("modern-card w-full p-6 dark:!bg-slate-900 rounded-xl shadow-sm"):
             ui.label("Create New Script").classes("text-lg font-bold text-slate-900 dark:text-white mb-4")
 
             with ui.row().classes("w-full gap-4 items-center mb-6"):
@@ -307,9 +307,9 @@ class LogSection:
                 ui.label("System Logs").classes("text-lg font-bold text-slate-900 dark:text-white")
                 show_logs = ui.switch("Show Logs", value=True).props("dense")
 
-            log_card = ui.card().classes("modern-card w-full p-0 bg-slate-900 rounded-xl shadow-lg overflow-hidden transition-all")
+            log_card = ui.card().classes("modern-card w-full p-0 bg-slate-100 dark:bg-slate-900 rounded-xl shadow-lg overflow-hidden transition-all")
             with log_card:
-                self.log_display = ui.textarea("").classes("w-full h-64 font-mono text-xs p-4 bg-transparent text-emerald-400 border-none").props("readonly borderless fill-viewport")
+                self.log_display = ui.textarea("").classes("w-full h-64 font-mono text-xs p-4 bg-transparent text-slate-700 dark:text-emerald-400 border-none").props("readonly borderless fill-viewport")
 
             def toggle_log_card_visibility(value):
                 log_card.set_visibility(value)
@@ -382,7 +382,7 @@ class ScriptManagerTab:
             ui.notification(f"Error: {e}", type="negative")
 
     def build(self):
-        with ui.card().classes("modern-card w-full p-6 bg-white dark:bg-slate-900 rounded-xl shadow-sm"):
+        with ui.card().props("flat").classes("modern-card w-full p-6 dark:!bg-slate-900 rounded-xl shadow-sm"):
             ui.label("Script Execution").classes("text-lg font-bold text-slate-900 dark:text-white mb-4")
 
             with ui.grid(columns=3).classes("w-full gap-4 mb-6"):

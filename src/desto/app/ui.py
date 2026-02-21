@@ -131,7 +131,7 @@ class UserInterfaceManager:
         update_dark_mode_ui(self._dark_mode.value)
 
         # Header
-        with ui.header(elevated=False).classes("bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 px-6 py-4 items-center justify-between"):
+        with ui.header(elevated=False).props("flat").classes("bg-white dark:!bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 px-6 py-4 items-center justify-between"):
             with ui.row().classes("items-center gap-4"):
                 ui.button(on_click=lambda: left_drawer.toggle(), icon="menu").props("flat round color=primary")
                 ui.label("desto").classes("text-2xl font-black tracking-tighter text-primary italic uppercase")
@@ -175,7 +175,7 @@ class UserInterfaceManager:
                         ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props("flat color=warning dense")
                         ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.confirm_kill_all_sessions).props("flat color=negative dense")
 
-                self.chain_queue_display = ui.column().classes("modern-card w-full p-4 bg-white dark:bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
+                self.chain_queue_display = ui.column().classes("modern-card w-full p-4 dark:!bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
                 self.refresh_chain_queue_display()
 
             self.log_section.build()

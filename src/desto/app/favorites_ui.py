@@ -38,7 +38,7 @@ class FavoritesTab:
         with self.favorites_container:
             with ui.grid(columns="repeat(auto-fill, minmax(300px, 1fr))").classes("w-full gap-4"):
                 for favorite in favorites:
-                    with ui.card().classes("modern-card p-6 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"):
+                    with ui.card().props("flat").classes("modern-card p-6 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"):
                         with ui.column().classes("w-full gap-3"):
                             with ui.row().classes("w-full justify-between items-start"):
                                 ui.label(favorite.name).classes("text-lg font-bold text-slate-900 dark:text-white")
@@ -155,7 +155,7 @@ class FavoritesTab:
 
     def build(self):
         """Build the favorites tab UI."""
-        with ui.card().classes("modern-card w-full p-6 bg-white dark:bg-slate-900 rounded-xl shadow-sm"):
+        with ui.card().props("flat").classes("modern-card w-full p-6 dark:!bg-slate-900 rounded-xl shadow-sm"):
             with ui.row().classes("w-full justify-between items-center mb-6"):
                 ui.label("Favorite Commands").classes("text-lg font-bold text-slate-900 dark:text-white")
                 self.search_input = ui.input(placeholder="Search favorites...").on("keyup", lambda: self.refresh_favorites_list()).props("dense outlined rounded").classes("w-64")
