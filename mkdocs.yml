@@ -52,3 +52,4 @@ plugins:
       ignore_urls:
         - localhost
         - pyproject.toml
+        - https://github.com/gitleaks/gitleaks-action
