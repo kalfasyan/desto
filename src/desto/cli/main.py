@@ -55,6 +55,7 @@ except ImportError:
     TYPER_AVAILABLE = False
 
 from desto.cli.scripts import scripts_app
+from desto.cli.service import ServiceManager
 from desto.cli.session_manager import CLISessionManager
 from desto.cli.sessions import sessions_app
 from desto.cli.utils import setup_logging
@@ -71,6 +72,83 @@ app.add_typer(sessions_app, name="sessions")
 
 # Add the scripts command group
 app.add_typer(scripts_app, name="scripts")
+
+# Add service management command group
+service_app = typer.Typer(help="Manage systemd service for auto-start on boot")
+app.add_typer(service_app, name="service")
+
+
+@service_app.command("install")
+def service_install(
+    system: bool = typer.Option(False, "--system", help="Install as system service (requires sudo)"),
+):
+    """Install systemd service for auto-start on boot."""
+    manager = ServiceManager()
+    if system:
+        manager.install_system_service()
+    else:
+        manager.install_user_service()
+
+
+@service_app.command("uninstall")
+def service_uninstall(
+    system: bool = typer.Option(False, "--system", help="Uninstall system service"),
+):
+    """Uninstall systemd service."""
+    manager = ServiceManager()
+    manager.uninstall_service(system=system)
+
+
+@service_app.command("start")
+def service_start():
+    """Start the systemd service."""
+    manager = ServiceManager()
+    manager.start_service()
+
+
+@service_app.command("stop")
+def service_stop():
+    """Stop the systemd service."""
+    manager = ServiceManager()
+    manager.stop_service()
+
+
+@service_app.command("restart")
+def service_restart():
+    """Restart the systemd service."""
+    manager = ServiceManager()
+    manager.restart_service()
+
+
+@service_app.command("status")
+def service_status():
+    """Show service status."""
+    manager = ServiceManager()
+    manager.status_service()
+
+
+@service_app.command("logs")
+def service_logs(
+    follow: bool = typer.Option(False, "-f", "--follow", help="Follow logs"),
+):
+    """Show service logs."""
+    manager = ServiceManager()
+    manager.logs_service(follow=follow)
+
+
+@service_app.command("enable")
+def service_enable():
+    """Enable service to start on boot."""
+    manager = ServiceManager()
+    manager.enable_service()
+
+
+@service_app.command("disable")
+def service_disable():
+    """Disable service from starting on boot."""
+    manager = ServiceManager()
+    manager.disable_service()
+
 
 console = Console()
 
@@ -144,6 +222,18 @@ def doctor():
         console.print(f"[green]✅ Logs directory exists ({logs_count} log files found)[/green]")
     else:
         console.print("[yellow]⚠️  Logs directory does not exist (will be created when needed)[/yellow]")
+
+    # Check systemd service
+    manager_service = ServiceManager()
+    if manager_service.is_systemd_available():
+        user_installed = manager_service.is_user_service_installed()
+        system_installed = manager_service.is_system_service_installed()
+        if user_installed:
+            console.print("[green]✅ systemd service: installed (user)[/green]")
+        elif system_installed:
+            console.print("[green]✅ systemd service: installed (system)[/green]")
+        else:
+            console.print("[yellow]⚠️  systemd service: not installed (auto-start disabled)[/yellow]")
 
     # Check active sessions
     sessions = manager.list_sessions()

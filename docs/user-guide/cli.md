@@ -56,6 +56,17 @@ desto-cli scripts show "name"              # Display script content
 desto-cli scripts delete "name"            # Delete script
 desto-cli scripts copy "src" "dest"        # Copy script
 desto-cli scripts run "name" [args]        # Run script directly or in tmux
+
+# Service Management (Auto-start)
+desto-cli service install                  # Install user systemd service
+desto-cli service install --system         # Install system systemd service (sudo)
+desto-cli service uninstall                # Uninstall service
+desto-cli service start                    # Start service
+desto-cli service stop                     # Stop service
+desto-cli service status                   # Show service status
+desto-cli service logs                     # View service logs
+desto-cli service enable                   # Enable auto-start on boot
+desto-cli service disable                  # Disable auto-start on boot
 ```
 
 ## Key Features

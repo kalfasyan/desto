@@ -242,6 +242,23 @@ Check [`pyproject.toml`](pyproject.toml)
    desto
    ```
 
+### 🔄 Auto-start on Boot (systemd)
+
+If you want `desto` to start automatically when your system boots, you can install a systemd service using the CLI. This works for **non-Docker** installations.
+
+```bash
+# Install as a user service (recommended)
+desto-cli service install
+
+# Or install as a system service (requires sudo)
+sudo desto-cli service install --system
+```
+
+This ensures the dashboard is always available after a reboot.
+
+> [!NOTE]
+> **Docker users:** If you are using Docker Compose, desto is already configured to auto-start via the `restart: always` policy in `docker-compose.yml`. No further action is needed.
+
 🎉 **Done!**  
 Open your browser and visit: [http://localhost:8809](http://localhost:8809) 🚀
 
