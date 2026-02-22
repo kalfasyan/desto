@@ -447,6 +447,7 @@ class ScriptManagerTab:
                         if self.ui_manager.chain_queue:
                             await self._launch_chained_scripts(session_name)
                             self.ui_manager.chain_queue.clear()
+                            self.ui_manager.refresh_chain_queue_display()
                         else:
                             selected_script = self.script_path_select.value
                             await self._launch_single_script(session_name, selected_script, arguments)

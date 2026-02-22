@@ -72,6 +72,14 @@ If you want to compose a new script, you can do it right here, or simply just pa
 <img src="docs/images/write_new_script.png" alt="Custom Template" title="Write New" width="300" style="border:2px solid #ccc; border-radius:6px;"/>
 
 </details>
+
+<details>
+<summary><strong>⭐ Favorite Commands</strong></summary>
+
+Save, organize, and quickly run your frequently used commands with usage tracking and search.
+
+<img src="docs/images/favorites.png" alt="Favorites Screenshot" title="Favorite Commands" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+</details>
   
 <details>
 <summary><strong>⚙️ Change settings</strong></summary>
@@ -88,7 +96,15 @@ More settings to be added!
 
 </details>
 
-</div>  
+<details>
+<summary><strong>🌙 Dark Mode</strong></summary>
+
+Switch to dark mode for comfortable viewing in low-light environments.
+
+<img src="docs/images/dark_mode.png" alt="Dark Mode Screenshot" title="Dark Mode" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
+</details>
+
+</div>
 
 ## ⚡ Quick Start with Docker 🐳  
 
@@ -329,7 +345,6 @@ This work is licensed under a
 ## TODO
 
 - [ ] Explore possibility to pause processes running inside a session
-- [ ] Add dark mode/theme toggle for the dashboard UI
 
 ---
 
