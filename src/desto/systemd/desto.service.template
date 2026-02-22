@@ -1,0 +1,22 @@
+[Unit]
+Description=desto - tmux session manager dashboard
+After=network.target redis.service
+Requires=redis.service
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{GROUP}}
+WorkingDirectory={{WORKING_DIR}}
+Environment="PATH={{PATH}}"
+Environment="HOME={{HOME}}"
+Environment="DESTO_SCRIPTS_DIR={{SCRIPTS_DIR}}"
+Environment="DESTO_LOGS_DIR={{LOGS_DIR}}"
+Environment="REDIS_HOST={{REDIS_HOST}}"
+Environment="REDIS_PORT={{REDIS_PORT}}"
+ExecStart={{EXEC_START}}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

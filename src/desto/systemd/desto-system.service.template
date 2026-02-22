@@ -1,0 +1,28 @@
+[Unit]
+Description=Desto Dashboard (System Service)
+After=network.target redis.service
+Wants=network.target
+Requires=redis.service
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{GROUP}}
+Environment="PATH={{PATH}}"
+Environment="HOME={{HOME}}"
+Environment="DESTO_SCRIPTS_DIR={{SCRIPTS_DIR}}"
+Environment="DESTO_LOGS_DIR={{LOGS_DIR}}"
+Environment="REDIS_HOST={{REDIS_HOST}}"
+Environment="REDIS_PORT={{REDIS_PORT}}"
+WorkingDirectory={{WORKING_DIR}}
+ExecStart={{EXEC_START}}
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=desto
+
+[Install]
+WantedBy=multi-user.target
