@@ -60,7 +60,7 @@ mkdocs==1.6.1
     #   mkdocs-include-markdown-plugin
     #   mkdocs-material
     #   mkdocstrings
-mkdocs-autorefs==1.4.3
+mkdocs-autorefs==1.4.4
     # via
     #   mkdocstrings
     #   mkdocstrings-python
