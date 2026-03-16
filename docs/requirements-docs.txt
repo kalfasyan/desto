@@ -64,7 +64,7 @@ mkdocs-autorefs==1.4.4
     # via
     #   mkdocstrings
     #   mkdocstrings-python
-mkdocs-get-deps==0.2.0
+mkdocs-get-deps==0.2.2
     # via mkdocs
 mkdocs-htmlproofer-plugin==1.5.0
 mkdocs-include-markdown-plugin==7.2.1
