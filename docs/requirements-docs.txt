@@ -78,7 +78,7 @@ packaging==26.1
     # via mkdocs
 paginate==0.5.7
     # via mkdocs-material
-pathspec==1.0.4
+pathspec==1.1.1
     # via mkdocs
 platformdirs==4.9.6
     # via mkdocs-get-deps
