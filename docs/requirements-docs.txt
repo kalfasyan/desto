@@ -2,7 +2,7 @@
 #    uv export --only-group docs --no-hashes --format requirements-txt -o docs/requirements-docs.txt
 babel==2.18.0
     # via mkdocs-material
-backrefs==6.2
+backrefs==7.0
     # via mkdocs-material
 beautifulsoup4==4.14.3
     # via mkdocs-htmlproofer-plugin
