@@ -71,6 +71,11 @@ class UISettings:
         retry_attempts: int = 3
         session_history_days: int = 7  # Number of days to keep session history
 
+    @dataclass
+    class SQLiteSettings:
+        enabled: bool = False  # Disabled by default, opt-in for long-term persistence
+        db_path: str = ""  # Defaults to desto_data/desto.db if empty
+
     header: Header = field(default_factory=Header)
     sidebar: Sidebar = field(default_factory=Sidebar)
     labels: Labels = field(default_factory=Labels)
@@ -80,6 +85,7 @@ class UISettings:
     script_settings: ScriptSettings = field(default_factory=ScriptSettings)
     main_content: MainContent = field(default_factory=MainContent)
     redis: RedisSettings = field(default_factory=RedisSettings)
+    sqlite: SQLiteSettings = field(default_factory=SQLiteSettings)
 
     def __post_init__(self):
         """Override settings with environment variables if available."""
@@ -91,6 +97,10 @@ class UISettings:
         self.redis.connection_timeout = int(os.getenv("REDIS_CONNECTION_TIMEOUT", self.redis.connection_timeout))
         self.redis.retry_attempts = int(os.getenv("REDIS_RETRY_ATTEMPTS", self.redis.retry_attempts))
         self.redis.session_history_days = int(os.getenv("REDIS_SESSION_HISTORY_DAYS", self.redis.session_history_days))
+
+        # SQLite configuration from environment variables
+        self.sqlite.enabled = os.getenv("SQLITE_ENABLED", "false").lower() in ("true", "1", "yes", "on")
+        self.sqlite.db_path = os.getenv("SQLITE_DB_PATH", self.sqlite.db_path)
 
 
 config = asdict(UISettings())

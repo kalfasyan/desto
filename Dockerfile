@@ -45,11 +45,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # Create directories for scripts and logs (ensure logs only, scripts are copied)
-RUN mkdir -p /app/desto_logs
+RUN mkdir -p /app/desto_logs /app/desto_data
 
 # Set environment variables
 ENV DESTO_SCRIPTS_DIR=/app/desto_scripts
 ENV DESTO_LOGS_DIR=/app/desto_logs
+ENV DESTO_DATA_DIR=/app/desto_data
 
 # Expose web dashboard port
 EXPOSE 8809

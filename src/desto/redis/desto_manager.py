@@ -1,6 +1,8 @@
 """Unified manager that coordinates sessions and jobs."""
 
-from typing import Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from loguru import logger
 
@@ -10,15 +12,19 @@ from .job_manager import JobManager
 from .models import DestoJob, DestoSession, SessionStatus
 from .session_manager import SessionManager
 
+if TYPE_CHECKING:
+    from .sqlite_store import SQLiteStore
+
 
 class DestoManager:
     """High-level manager that coordinates sessions and jobs."""
 
-    def __init__(self, redis_client: DestoRedisClient):
+    def __init__(self, redis_client: DestoRedisClient, sqlite_store: Optional["SQLiteStore"] = None):
         self.redis = redis_client
         self.session_manager = SessionManager(redis_client)
         self.job_manager = JobManager(redis_client)
         self.favorites_manager = FavoriteCommandsManager(redis_client)
+        self.sqlite_store = sqlite_store
 
     def start_session_with_job(self, session_name: str, command: str, script_path: str, status=None) -> Tuple[DestoSession, DestoJob]:
         """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""
@@ -41,6 +47,13 @@ class DestoManager:
             logger.info(f"Started session {session_name} with job {job.job_id}")
         else:
             logger.info(f"Scheduled session {session_name} with job {job.job_id}")
+
+        # Archive to SQLite for long-term persistence
+        # Re-fetch the session to get the updated status (RUNNING, not STARTING)
+        updated_session = self.session_manager.get_session(session.session_id)
+        self._sqlite_save_session(updated_session or session)
+        self._sqlite_save_job(job)
+
         return session, job
 
     def add_job_to_session(self, session_name: str, command: str, script_path: str) -> Optional[DestoJob]:
@@ -68,7 +81,15 @@ class DestoManager:
         if session.status == SessionStatus.FAILED:
             logger.info(f"Session {session_name} already failed, not marking as finished.")
             return False
-        return self.session_manager.finish_session(session.session_id, exit_code)
+        result = self.session_manager.finish_session(session.session_id, exit_code)
+
+        # Archive final state to SQLite
+        if result:
+            updated_session = self.session_manager.get_session(session.session_id)
+            if updated_session:
+                self._sqlite_save_session(updated_session)
+
+        return result
 
     def finish_job(self, session_name: str, exit_code: int = 0) -> bool:
         """Finish the current job in a session."""
@@ -83,6 +104,12 @@ class DestoManager:
 
         # Finish the job via JobManager
         success = self.job_manager.finish_job(current_job.job_id, exit_code)
+
+        # Archive job to SQLite
+        if success:
+            updated_job = self.job_manager.get_job(current_job.job_id)
+            if updated_job:
+                self._sqlite_save_job(updated_job)
 
         # If finished successfully, try to send a notification (Pushbullet) for redundancy.
         if success:
@@ -122,7 +149,15 @@ class DestoManager:
             logger.warning(f"No running job found for session {session_name}")
             return False
 
-        return self.job_manager.fail_job(current_job.job_id, error_message)
+        result = self.job_manager.fail_job(current_job.job_id, error_message)
+
+        # Archive failed job to SQLite
+        if result:
+            updated_job = self.job_manager.get_job(current_job.job_id)
+            if updated_job:
+                self._sqlite_save_job(updated_job)
+
+        return result
 
     def get_session_status(self, session_name: str) -> Optional[str]:
         """Get session status by name."""
@@ -171,3 +206,21 @@ class DestoManager:
             result[session.session_name] = session_data
 
         return result
+
+    # ─── SQLite Persistence Helpers ───────────────────────────────────────
+
+    def _sqlite_save_session(self, session: DestoSession):
+        """Persist session to SQLite if the store is enabled."""
+        if self.sqlite_store and self.sqlite_store.enabled:
+            try:
+                self.sqlite_store.save_session(session)
+            except Exception as e:
+                logger.debug(f"SQLite archive failed for session {session.session_id}: {e}")
+
+    def _sqlite_save_job(self, job: DestoJob):
+        """Persist job to SQLite if the store is enabled."""
+        if self.sqlite_store and self.sqlite_store.enabled:
+            try:
+                self.sqlite_store.save_job(job)
+            except Exception as e:
+                logger.debug(f"SQLite archive failed for job {job.job_id}: {e}")

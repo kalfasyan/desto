@@ -6,6 +6,7 @@ from .job_manager import JobManager
 from .models import DestoJob, DestoSession, JobStatus, SessionStatus
 from .pubsub import SessionPubSub
 from .session_manager import SessionManager
+from .sqlite_store import SQLiteStore
 
 __all__ = [
     "DestoRedisClient",
@@ -17,4 +18,5 @@ __all__ = [
     "SessionStatus",
     "JobStatus",
     "SessionPubSub",
+    "SQLiteStore",
 ]

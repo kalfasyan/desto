@@ -20,6 +20,7 @@ The key features are:
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Script chaining:** Queue multiple scripts to run sequentially in a single session.
 - **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
+- **Long-term persistence:** Optional [SQLite](https://www.sqlite.org/) database for durable session history that survives Redis key expiration—no extra services needed. [Learn more →](user-guide/sqlite-persistence.md)
 - **Scheduled job control:** Manage scheduled jobs with a dedicated table—cancel any scheduled job with a click.
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.

@@ -27,12 +27,14 @@ services:
     volumes:
       - ./desto_scripts:/app/desto_scripts
       - ./desto_logs:/app/desto_logs
+      - desto_data:/app/desto_data
       # Mount timezone information to sync with host
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
     environment:
       - DESTO_SCRIPTS_DIR=/app/desto_scripts
       - DESTO_LOGS_DIR=/app/desto_logs
+      - DESTO_DATA_DIR=/app/desto_data
       # Timezone configuration - set to match host system
       - TZ=Europe/Berlin
       # Redis configuration
@@ -41,6 +43,9 @@ services:
       - REDIS_DB=0
       - REDIS_ENABLED=true
       - REDIS_CONNECTION_TIMEOUT=5
+      # SQLite long-term persistence (optional, set to true to enable)
+      - SQLITE_ENABLED=true
+      - SQLITE_DB_PATH=/app/desto_data/desto.db
     depends_on:
       redis:
         condition: service_healthy
@@ -54,3 +59,4 @@ services:
 
 volumes:
   redis_data:
+  desto_data:

@@ -13,6 +13,7 @@ from nicegui import ui
 from desto.redis.at_job_manager import AtJobManager
 
 from .favorites_ui import FavoritesTab
+from .sqlite_ui import SQLiteHistoryTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
@@ -31,6 +32,7 @@ class UserInterfaceManager:
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
+        self.sqlite_history_tab = SQLiteHistoryTab(self, desto_manager) if desto_manager and getattr(desto_manager, "sqlite_store", None) and getattr(desto_manager.sqlite_store, "enabled", False) else None
         self.script_path_select = None  # Reference to the script select component
         self.session_name_input = None  # Reference to session name input
         self.arguments_input = None  # Reference to arguments input
@@ -155,6 +157,7 @@ class UserInterfaceManager:
                 scripts_tab = ui.tab("Scripts", icon="terminal")
                 new_script_tab = ui.tab("New Script", icon="add")
                 favorites_tab = ui.tab("Favorites", icon="star") if self.favorites_tab else None
+                history_tab = ui.tab("Session History", icon="storage") if self.sqlite_history_tab else None
 
             with ui.tab_panels(tabs, value=scripts_tab).classes("w-full bg-transparent"):
                 with ui.tab_panel(scripts_tab):
@@ -166,6 +169,10 @@ class UserInterfaceManager:
                 if favorites_tab and self.favorites_tab:
                     with ui.tab_panel(favorites_tab):
                         self.favorites_tab.build()
+
+                if history_tab and self.sqlite_history_tab:
+                    with ui.tab_panel(history_tab):
+                        self.sqlite_history_tab.build()
 
             # Chain Queue Section
             with ui.column().classes("w-full gap-4 mt-4"):
