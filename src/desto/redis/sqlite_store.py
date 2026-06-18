@@ -539,7 +539,7 @@ class SQLiteStore:
             start_time=datetime.fromisoformat(row["start_time"]) if row["start_time"] else None,
             end_time=datetime.fromisoformat(row["end_time"]) if row["end_time"] else None,
             last_heartbeat=datetime.fromisoformat(row["last_heartbeat"]) if row["last_heartbeat"] else None,
-            job_ids=row["job_ids"].split(",") if row["job_ids"] else [],
+            job_ids=[jid for jid in row["job_ids"].split(",") if jid] if row["job_ids"] else [],
             tmux_active=bool(row["tmux_active"]),
             at_job_id=row["at_job_id"] or None,
         )

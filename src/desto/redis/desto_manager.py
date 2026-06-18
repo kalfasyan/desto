@@ -203,7 +203,7 @@ class DestoManager:
             except Exception as e:
                 logger.debug(f"SQLite archive failed for session {session.session_id}: {e}")
 
-    def _sqlite_save_job(self, job):
+    def _sqlite_save_job(self, job: DestoJob):
         """Persist job to SQLite if the store is enabled."""
         if self.sqlite_store and self.sqlite_store.enabled:
             try:
