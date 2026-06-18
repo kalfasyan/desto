@@ -55,7 +55,19 @@ class TmuxManager:
             ui.notification(msg, type="negative")
             raise RuntimeError(msg)
         else:
-            self.desto_manager = DestoManager(self.redis_client)
+            # Initialize optional SQLite store for long-term persistence
+            sqlite_store = None
+            sqlite_config = ui_settings.get("sqlite", {})
+            if sqlite_config.get("enabled", False):
+                from desto.redis.sqlite_store import SQLiteStore
+
+                sqlite_store = SQLiteStore(
+                    db_path=sqlite_config.get("db_path") or None,
+                    enabled=True,
+                )
+                logger.info("SQLite enabled for long-term session persistence")
+
+            self.desto_manager = DestoManager(self.redis_client, sqlite_store=sqlite_store)
             self.pubsub = SessionPubSub(self.redis_client)
             # Attach JobManager for UI access
             from desto.redis.job_manager import JobManager

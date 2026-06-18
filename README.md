@@ -27,6 +27,7 @@ The key features are:
 - **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
 - **Script chaining:** Queue multiple scripts to run sequentially in a single session.
 - **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
+- **Long-term persistence:** Optional [SQLite](https://www.sqlite.org/) database for durable session history that survives Redis key expiration—no extra services needed.
 - **Scheduled job control:** Manage scheduled jobs with a dedicated table—cancel any scheduled job with a click.
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
@@ -172,6 +173,26 @@ docker logs -f desto-dashboard
 docker stop desto-dashboard && docker rm desto-dashboard
 ```
 </details>
+
+### 🗄️ Optional: Enable SQLite Long-Term Persistence
+
+By default, desto uses Redis for session tracking with a 7-day expiration. To keep session history indefinitely, enable the built-in SQLite store by setting the `SQLITE_ENABLED` environment variable:
+
+```yaml
+# In docker-compose.yml, change:
+- SQLITE_ENABLED=true
+```
+
+Or when running without Docker:
+```bash
+export SQLITE_ENABLED=true
+desto
+```
+
+The SQLite database is stored at `desto_data/desto.db` (configurable via `SQLITE_DB_PATH`). It requires **no additional services**—just a file on disk. Your data persists across Redis restarts and key expirations.
+
+> [!NOTE]
+> **Why SQLite over PostgreSQL?** SQLite requires zero configuration, no additional Docker service, and no network setup. It's ideal for single-node deployments like desto. For most users, it provides all the durability benefits of a SQL database without any installation hassle.
 
 ## 🖥️ CLI & 📊 Dashboard Installation with `uv` or `pip`  
 
