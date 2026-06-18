@@ -1,6 +1,8 @@
 """Unified manager that coordinates sessions and jobs."""
 
-from typing import Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from loguru import logger
 
@@ -9,13 +11,15 @@ from .favorites_manager import FavoriteCommandsManager
 from .job_manager import JobManager
 from .models import DestoJob, DestoSession, SessionStatus
 from .session_manager import SessionManager
-from .sqlite_store import SQLiteStore
+
+if TYPE_CHECKING:
+    from .sqlite_store import SQLiteStore
 
 
 class DestoManager:
     """High-level manager that coordinates sessions and jobs."""
 
-    def __init__(self, redis_client: DestoRedisClient, sqlite_store: Optional[SQLiteStore] = None):
+    def __init__(self, redis_client: DestoRedisClient, sqlite_store: Optional["SQLiteStore"] = None):
         self.redis = redis_client
         self.session_manager = SessionManager(redis_client)
         self.job_manager = JobManager(redis_client)
