@@ -32,12 +32,7 @@ class UserInterfaceManager:
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
-        self.sqlite_history_tab = (
-            SQLiteHistoryTab(self, desto_manager)
-            if desto_manager and getattr(desto_manager, "sqlite_store", None)
-            and getattr(desto_manager.sqlite_store, "enabled", False)
-            else None
-        )
+        self.sqlite_history_tab = SQLiteHistoryTab(self, desto_manager) if desto_manager and getattr(desto_manager, "sqlite_store", None) and getattr(desto_manager.sqlite_store, "enabled", False) else None
         self.script_path_select = None  # Reference to the script select component
         self.session_name_input = None  # Reference to session name input
         self.arguments_input = None  # Reference to arguments input

@@ -167,41 +167,26 @@ class FavoritesTab:
             with ui.card().classes("p-6 dark:!bg-slate-900 w-[420px]"):
                 with ui.row().classes("items-center gap-2 mb-4"):
                     ui.icon("warning", color="red").classes("text-3xl")
-                    ui.label("Delete ALL Favorites").classes(
-                        "text-xl font-bold text-red-600"
-                    )
-                ui.label(
-                    f"You are about to permanently delete all {count} favorite command(s). "
-                    "This will remove them from Redis and cannot be undone."
-                ).classes("text-slate-500 mb-4")
+                    ui.label("Delete ALL Favorites").classes("text-xl font-bold text-red-600")
+                ui.label(f"You are about to permanently delete all {count} favorite command(s). This will remove them from Redis and cannot be undone.").classes("text-slate-500 mb-4")
 
-                ui.label(
-                    'Type "DELETE" to confirm:'
-                ).classes("text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1")
-                confirm_input = ui.input(placeholder="DELETE").props(
-                    "dense outlined"
-                ).classes("w-full mb-4")
+                ui.label('Type "DELETE" to confirm:').classes("text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1")
+                confirm_input = ui.input(placeholder="DELETE").props("dense outlined").classes("w-full mb-4")
 
                 delete_btn = ui.button(
                     "Delete All Favorites",
                     icon="delete_forever",
-                    on_click=lambda: self._execute_clear_all_favorites(
-                        confirm_input, dialog
-                    ),
+                    on_click=lambda: self._execute_clear_all_favorites(confirm_input, dialog),
                 ).props("unelevated color=negative disable")
 
                 # Enable button only when "DELETE" is typed
                 confirm_input.on(
                     "update:model-value",
-                    lambda e: delete_btn.set_enabled(
-                        e.args == "DELETE"
-                    ),
+                    lambda e: delete_btn.set_enabled(e.args == "DELETE"),
                 )
 
                 with ui.row().classes("w-full justify-end mt-2"):
-                    ui.button("Cancel", on_click=dialog.close).props(
-                        "flat color=slate-500"
-                    )
+                    ui.button("Cancel", on_click=dialog.close).props("flat color=slate-500")
         dialog.open()
 
     def _execute_clear_all_favorites(self, confirm_input, dialog):
@@ -212,11 +197,7 @@ class FavoritesTab:
 
         deleted = self.desto_manager.favorites_manager.delete_all_favorites()
         # Also clear from SQLite if available
-        if (
-            hasattr(self.desto_manager, "sqlite_store")
-            and self.desto_manager.sqlite_store
-            and self.desto_manager.sqlite_store.enabled
-        ):
+        if hasattr(self.desto_manager, "sqlite_store") and self.desto_manager.sqlite_store and self.desto_manager.sqlite_store.enabled:
             try:
                 conn = self.desto_manager.sqlite_store._get_connection()
                 conn.execute("DELETE FROM favorites")

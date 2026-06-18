@@ -5,7 +5,6 @@ from datetime import datetime
 from loguru import logger
 from nicegui import ui
 
-
 # Status → (color, icon) mapping for badges
 _STATUS_STYLE = {
     "finished": ("positive", "check_circle"),
@@ -35,14 +34,10 @@ class SQLiteHistoryTab:
 
     def build(self):
         """Build the Session History tab UI."""
-        with ui.card().props("flat").classes(
-            "modern-card w-full p-6 dark:!bg-slate-900 rounded-xl shadow-sm"
-        ):
+        with ui.card().props("flat").classes("modern-card w-full p-6 dark:!bg-slate-900 rounded-xl shadow-sm"):
             # Header row
             with ui.row().classes("w-full justify-between items-center mb-6"):
-                ui.label("Session History").classes(
-                    "text-lg font-bold text-slate-900 dark:text-white"
-                )
+                ui.label("Session History").classes("text-lg font-bold text-slate-900 dark:text-white")
                 with ui.row().classes("items-center gap-3"):
                     self.status_filter = (
                         ui.select(
@@ -53,15 +48,8 @@ class SQLiteHistoryTab:
                         .props("dense outlined rounded")
                         .classes("w-36")
                     )
-                    self.search_input = (
-                        ui.input(placeholder="Search by name...")
-                        .on("keyup", lambda _: self._on_filter_change())
-                        .props("dense outlined rounded")
-                        .classes("w-64")
-                    )
-                    ui.button(icon="refresh", on_click=self._on_filter_change).props(
-                        "flat round color=primary dense"
-                    )
+                    self.search_input = ui.input(placeholder="Search by name...").on("keyup", lambda _: self._on_filter_change()).props("dense outlined rounded").classes("w-64")
+                    ui.button(icon="refresh", on_click=self._on_filter_change).props("flat round color=primary dense")
                     ui.button(
                         "Clear History",
                         icon="delete_sweep",
@@ -93,13 +81,9 @@ class SQLiteHistoryTab:
                 ("Failed", failed, "negative"),
                 ("Running", running, "warning"),
             ]:
-                with ui.row().classes(
-                    "items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800"
-                ):
+                with ui.row().classes("items-center gap-2 px-4 py-2 rounded-lg bg-slate-50 dark:bg-slate-800"):
                     ui.label(str(value)).classes(f"text-xl font-bold text-{color}")
-                    ui.label(label).classes(
-                        "text-xs uppercase tracking-wider text-slate-500"
-                    )
+                    ui.label(label).classes("text-xs uppercase tracking-wider text-slate-500")
 
     # ─── Session list ──────────────────────────────────────────────────
 
@@ -121,9 +105,7 @@ class SQLiteHistoryTab:
 
     def _load_sessions_page(self):
         """Load the next page of sessions into the container."""
-        search_query = (
-            self.search_input.value.strip() if self.search_input and self.search_input.value else ""
-        )
+        search_query = self.search_input.value.strip() if self.search_input and self.search_input.value else ""
         status = self._get_status_filter()
 
         if search_query:
@@ -142,15 +124,11 @@ class SQLiteHistoryTab:
 
         if not sessions and self._current_offset == 0:
             with self.sessions_container:
-                ui.label("No sessions found").classes(
-                    "text-slate-400 italic py-8 text-center w-full"
-                )
+                ui.label("No sessions found").classes("text-slate-400 italic py-8 text-center w-full")
             return
 
         with self.sessions_container:
-            with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes(
-                "w-full gap-4"
-            ):
+            with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes("w-full gap-4"):
                 for session in sessions:
                     self._render_session_card(session)
 
@@ -183,17 +161,12 @@ class SQLiteHistoryTab:
         jobs = self.sqlite_store.get_jobs_for_session(session.session_id)
         has_command = jobs and jobs[0].command
 
-        with ui.card().props("flat").classes(
-            "modern-card p-5 dark:!bg-slate-900 rounded-xl shadow-sm "
-            "border border-slate-100 dark:border-slate-800"
-        ):
+        with ui.card().props("flat").classes("modern-card p-5 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"):
             with ui.column().classes("w-full gap-3"):
                 # Top row: name + status badge
                 with ui.row().classes("w-full justify-between items-start"):
                     with ui.column().classes("gap-1"):
-                        ui.label(session.session_name).classes(
-                            "text-base font-bold text-slate-900 dark:text-white"
-                        )
+                        ui.label(session.session_name).classes("text-base font-bold text-slate-900 dark:text-white")
                         ui.badge(status_str.upper(), color=color).props("dense outline")
 
                     ui.button(
@@ -206,10 +179,7 @@ class SQLiteHistoryTab:
                     cmd_display = jobs[0].command
                     if len(cmd_display) > 80:
                         cmd_display = cmd_display[:77] + "…"
-                    ui.label(cmd_display).classes(
-                        "font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 "
-                        "text-slate-600 dark:text-slate-400 break-all w-full"
-                    )
+                    ui.label(cmd_display).classes("font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 break-all w-full")
 
                 # Timestamps
                 with ui.column().classes("gap-1 text-xs text-slate-500 dark:text-slate-400"):
@@ -241,9 +211,7 @@ class SQLiteHistoryTab:
 
                     ui.button(
                         icon="delete",
-                        on_click=lambda s=session: self._delete_session(
-                            s.session_id, s.session_name
-                        ),
+                        on_click=lambda s=session: self._delete_session(s.session_id, s.session_name),
                     ).props("flat round color=negative dense")
 
     # ─── Session detail dialog ────────────────────────────────────────
@@ -277,21 +245,13 @@ class SQLiteHistoryTab:
                         ("Last Heartbeat", _fmt_dt(session.last_heartbeat) if session.last_heartbeat else "—"),
                         ("At Job ID", session.at_job_id or "—"),
                     ]:
-                        ui.label(label).classes(
-                            "text-xs uppercase tracking-wider text-slate-500 font-semibold"
-                        )
-                        ui.label(str(value)).classes(
-                            "text-sm text-slate-800 dark:text-slate-200 font-mono break-all"
-                        )
+                        ui.label(label).classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
+                        ui.label(str(value)).classes("text-sm text-slate-800 dark:text-slate-200 font-mono break-all")
 
                     if session.start_time and session.end_time:
                         duration = session.end_time - session.start_time
-                        ui.label("Duration").classes(
-                            "text-xs uppercase tracking-wider text-slate-500 font-semibold"
-                        )
-                        ui.label(_fmt_duration(duration)).classes(
-                            "text-sm text-slate-800 dark:text-slate-200 font-mono"
-                        )
+                        ui.label("Duration").classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
+                        ui.label(_fmt_duration(duration)).classes("text-sm text-slate-800 dark:text-slate-200 font-mono")
 
                 # Jobs table
                 jobs = self.sqlite_store.get_jobs_for_session(session_id)
@@ -310,33 +270,27 @@ class SQLiteHistoryTab:
                     rows = []
                     for job in jobs:
                         job_status = job.status.value if hasattr(job.status, "value") else str(job.status)
-                        rows.append({
-                            "command": job.command or "—",
-                            "script_path": job.script_path or "—",
-                            "status": job_status,
-                            "exit_code": str(job.exit_code) if job.exit_code is not None else "—",
-                            "start_time": _fmt_dt(job.start_time) if job.start_time else "—",
-                            "end_time": _fmt_dt(job.end_time) if job.end_time else "—",
-                        })
+                        rows.append(
+                            {
+                                "command": job.command or "—",
+                                "script_path": job.script_path or "—",
+                                "status": job_status,
+                                "exit_code": str(job.exit_code) if job.exit_code is not None else "—",
+                                "start_time": _fmt_dt(job.start_time) if job.start_time else "—",
+                                "end_time": _fmt_dt(job.end_time) if job.end_time else "—",
+                            }
+                        )
 
-                    ui.table(columns=columns, rows=rows).props(
-                        "flat dense bordered separator=cell"
-                    ).classes("w-full text-xs")
+                    ui.table(columns=columns, rows=rows).props("flat dense bordered separator=cell").classes("w-full text-xs")
 
                     # Show error messages if any
                     for job in jobs:
                         if job.error_message:
                             with ui.card().classes("w-full p-3 mt-2 bg-red-50 dark:bg-red-900/20 rounded-lg"):
-                                ui.label(f"Error (job {job.job_id[:8]}…):").classes(
-                                    "text-xs font-bold text-red-600 dark:text-red-400"
-                                )
-                                ui.label(job.error_message).classes(
-                                    "text-xs font-mono text-red-500 dark:text-red-300 break-all"
-                                )
+                                ui.label(f"Error (job {job.job_id[:8]}…):").classes("text-xs font-bold text-red-600 dark:text-red-400")
+                                ui.label(job.error_message).classes("text-xs font-mono text-red-500 dark:text-red-300 break-all")
                 else:
-                    ui.label("No jobs recorded for this session.").classes(
-                        "text-slate-400 italic text-sm mt-2"
-                    )
+                    ui.label("No jobs recorded for this session.").classes("text-slate-400 italic text-sm mt-2")
 
                 # Action buttons
                 with ui.row().classes("w-full justify-between items-center mt-6"):
@@ -389,21 +343,13 @@ class SQLiteHistoryTab:
         """Delete a session from SQLite with confirmation."""
         with ui.dialog() as confirm_dialog:
             with ui.card().classes("p-6 dark:!bg-slate-900"):
-                ui.label(f"Delete '{session_name}' from history?").classes(
-                    "text-lg font-bold mb-2"
-                )
-                ui.label(
-                    "This will permanently remove the session and its jobs from the database."
-                ).classes("text-slate-500 mb-6")
+                ui.label(f"Delete '{session_name}' from history?").classes("text-lg font-bold mb-2")
+                ui.label("This will permanently remove the session and its jobs from the database.").classes("text-slate-500 mb-6")
                 with ui.row().classes("w-full justify-end gap-2"):
-                    ui.button("Cancel", on_click=confirm_dialog.close).props(
-                        "flat color=slate-500"
-                    )
+                    ui.button("Cancel", on_click=confirm_dialog.close).props("flat color=slate-500")
                     ui.button(
                         "Delete",
-                        on_click=lambda: self._confirm_delete(
-                            session_id, session_name, confirm_dialog
-                        ),
+                        on_click=lambda: self._confirm_delete(session_id, session_name, confirm_dialog),
                     ).props("unelevated color=negative")
         confirm_dialog.open()
 
@@ -429,20 +375,11 @@ class SQLiteHistoryTab:
 
         with ui.dialog() as dialog:
             with ui.card().classes("p-6 dark:!bg-slate-900"):
-                ui.label("Clear Session History").classes(
-                    "text-lg font-bold text-red-600 mb-2"
-                )
-                ui.label(
-                    f"This will permanently delete all {count} session(s) "
-                    "and their associated jobs from the database."
-                ).classes("text-slate-500 mb-2")
-                ui.label("This action cannot be undone.").classes(
-                    "text-slate-500 mb-6 font-semibold"
-                )
+                ui.label("Clear Session History").classes("text-lg font-bold text-red-600 mb-2")
+                ui.label(f"This will permanently delete all {count} session(s) and their associated jobs from the database.").classes("text-slate-500 mb-2")
+                ui.label("This action cannot be undone.").classes("text-slate-500 mb-6 font-semibold")
                 with ui.row().classes("w-full justify-end gap-2"):
-                    ui.button("Cancel", on_click=dialog.close).props(
-                        "flat color=slate-500"
-                    )
+                    ui.button("Cancel", on_click=dialog.close).props("flat color=slate-500")
                     ui.button(
                         "Clear All History",
                         icon="delete_sweep",
