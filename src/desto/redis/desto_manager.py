@@ -49,7 +49,9 @@ class DestoManager:
             logger.info(f"Scheduled session {session_name} with job {job.job_id}")
 
         # Archive to SQLite for long-term persistence
-        self._sqlite_save_session(session)
+        # Re-fetch the session to get the updated status (RUNNING, not STARTING)
+        updated_session = self.session_manager.get_session(session.session_id)
+        self._sqlite_save_session(updated_session or session)
         self._sqlite_save_job(job)
 
         return session, job
@@ -147,7 +149,15 @@ class DestoManager:
             logger.warning(f"No running job found for session {session_name}")
             return False
 
-        return self.job_manager.fail_job(current_job.job_id, error_message)
+        result = self.job_manager.fail_job(current_job.job_id, error_message)
+
+        # Archive failed job to SQLite
+        if result:
+            updated_job = self.job_manager.get_job(current_job.job_id)
+            if updated_job:
+                self._sqlite_save_job(updated_job)
+
+        return result
 
     def get_session_status(self, session_name: str) -> Optional[str]:
         """Get session status by name."""

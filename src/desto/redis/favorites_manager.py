@@ -145,6 +145,20 @@ class FavoriteCommandsManager:
         logger.info(f"Deleted favorite '{favorite.name}' (ID: {favorite_id})")
         return True
 
+    def delete_all_favorites(self) -> int:
+        """Delete all favorite commands.
+
+        Returns:
+            Number of favorites deleted.
+        """
+        favorites = self.list_favorites()
+        deleted = 0
+        for fav in favorites:
+            if self.delete_favorite(fav.favorite_id):
+                deleted += 1
+        logger.info(f"Deleted all favorites ({deleted} total)")
+        return deleted
+
     def update_favorite(self, favorite_id: str, name: Optional[str] = None, command: Optional[str] = None) -> Optional[FavoriteCommand]:
         """Update a favorite command's name or command.
 

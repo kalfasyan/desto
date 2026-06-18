@@ -277,6 +277,39 @@ class SQLiteStore:
             logger.error(f"SQLite: Failed to count sessions: {e}")
             return 0
 
+    def search_sessions(self, name_query: str, limit: int = 100, offset: int = 0, status: Optional[str] = None) -> List[DestoSession]:
+        """Search sessions by name using SQL LIKE.
+
+        Args:
+            name_query: Substring to match against session_name.
+            limit: Maximum number of sessions to return.
+            offset: Number of sessions to skip.
+            status: Optional status filter.
+
+        Returns:
+            List of matching DestoSession objects.
+        """
+        if not self.enabled:
+            return []
+
+        try:
+            conn = self._get_connection()
+            pattern = f"%{name_query}%"
+            if status:
+                cursor = conn.execute(
+                    "SELECT * FROM sessions WHERE session_name LIKE ? AND status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (pattern, status, limit, offset),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM sessions WHERE session_name LIKE ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (pattern, limit, offset),
+                )
+            return [self._row_to_session(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"SQLite: Failed to search sessions: {e}")
+            return []
+
     def delete_session(self, session_id: str) -> bool:
         """Delete a session and its associated jobs.
 
@@ -477,6 +510,28 @@ class SQLiteStore:
             return False
 
     # ─── Utility Methods ──────────────────────────────────────────────────
+
+    def clear_sessions_and_jobs(self) -> bool:
+        """Clear all sessions and jobs from the store, keeping favorites intact.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        if not self.enabled:
+            return False
+
+        try:
+            conn = self._get_connection()
+            conn.executescript("""
+                DELETE FROM jobs;
+                DELETE FROM sessions;
+            """)
+            conn.commit()
+            logger.warning("SQLite: All sessions and jobs cleared")
+            return True
+        except Exception as e:
+            logger.error(f"SQLite: Failed to clear sessions/jobs: {e}")
+            return False
 
     def clear_all(self) -> bool:
         """Clear all data from the store. Use with caution.

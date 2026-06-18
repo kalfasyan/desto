@@ -448,6 +448,25 @@ class TmuxManager:
 
         threading.Thread(target=monitor, daemon=True).start()
 
+    def get_unique_session_name(self, base_name: str) -> str:
+        """Generate a unique session name by appending an incrementing index if needed."""
+        taken = set(self.check_sessions().keys())
+        # Also include Redis session names (scheduled, starting, running)
+        if self.desto_manager:
+            try:
+                for s in self.desto_manager.session_manager.list_all_sessions():
+                    name = getattr(s, "session_name", None)
+                    if name:
+                        taken.add(name)
+            except Exception:
+                pass
+        if base_name not in taken:
+            return base_name
+        idx = 2
+        while f"{base_name}-{idx}" in taken:
+            idx += 1
+        return f"{base_name}-{idx}"
+
     def check_sessions(self):
         """Check the status of existing tmux sessions with detailed information."""
         active_sessions = {}
@@ -622,6 +641,9 @@ class TmuxManager:
             if self.desto_manager:
                 session, job = self.desto_manager.start_session_with_job(session_name=session_name, command=command, script_path=command)
                 logger.debug(f"Redis tracking started for session '{session_name}'")
+
+            # Start background monitoring to detect when the tmux session ends
+            self._start_redis_monitoring(session_name)
 
         except subprocess.CalledProcessError as e:
             error_output = e.stderr.strip() if e.stderr else "No stderr output"

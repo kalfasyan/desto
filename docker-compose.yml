@@ -44,7 +44,7 @@ services:
       - REDIS_ENABLED=true
       - REDIS_CONNECTION_TIMEOUT=5
       # SQLite long-term persistence (optional, set to true to enable)
-      - SQLITE_ENABLED=false
+      - SQLITE_ENABLED=true
       - SQLITE_DB_PATH=/app/desto_data/desto.db
     depends_on:
       redis:
