@@ -11,6 +11,7 @@ nav:
   - User Guide:
       - CLI: user-guide/cli.md
       - Favorites: user-guide/favorites.md
+      - SQLite Persistence: user-guide/sqlite-persistence.md
   - Reference:
       - Configuration: reference/configuration.md
   - Community:
