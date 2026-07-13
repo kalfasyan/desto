@@ -112,5 +112,5 @@ urllib3==2.7.0
     # via requests
 watchdog==6.0.0
     # via mkdocs
-wcmatch==10.1
+wcmatch==11.0
     # via mkdocs-include-markdown-plugin
