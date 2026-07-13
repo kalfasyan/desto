@@ -54,3 +54,4 @@ plugins:
         - localhost
         - pyproject.toml
         - https://github.com/gitleaks/gitleaks-action
+        - https://github.com/kalfasyan/desto/actions
