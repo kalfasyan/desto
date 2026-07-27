@@ -8,7 +8,7 @@ beautifulsoup4==4.15.0
     # via mkdocs-htmlproofer-plugin
 bracex==3.0.1
     # via wcmatch
-certifi==2026.6.17
+certifi==2026.7.22
     # via requests
 charset-normalizer==3.4.9
     # via requests
