@@ -13,6 +13,7 @@ import redis
 from loguru import logger
 from nicegui import ui
 
+from desto.app.log_tailer import LogTailer
 from desto.redis.client import DestoRedisClient
 from desto.redis.desto_manager import DestoManager
 from desto.redis.pubsub import SessionPubSub
@@ -1165,39 +1166,101 @@ class TmuxManager:
         self.update_sessions_status(ui)
 
     def view_log(self, session_name, ui):
-        """Pauses the app and opens a dialog to display the last 100 lines of the session's log file."""
+        """Pauses the app and opens a dialog that live-tails the session's log file (last 100 lines, then follows)."""
         logger.debug(f"User requested to view log for session: {session_name}")
         if self.pause_updates:
             self.pause_updates()  # Pause the global timer
 
         log_file = self.get_log_file(session_name)
-        try:
-            with log_file.open("r") as f:
-                lines = f.readlines()[-100:]  # Get the last 100 lines
-            log_content = "".join(lines)
-            logger.debug(f"Successfully read {len(lines)} lines from log file for session: {session_name}")
-        except FileNotFoundError:
-            log_content = f"Log file for session '{session_name}' not found."
-            logger.warning(f"Log file not found for session: {session_name}")
-        except Exception as e:
-            log_content = f"Error reading log file: {e}"
-            logger.error(f"Error reading log file for session {session_name}: {e}")
+        tailer = LogTailer(log_file)
+        closed = False
+
+        def close_dialog():
+            nonlocal closed
+            if closed:
+                return
+            closed = True
+            try:
+                timer.cancel()
+            except Exception:
+                logger.debug(f"Failed to cancel log follow timer for session: {session_name}")
+            try:
+                dialog.close()
+            except Exception:
+                logger.debug(f"Failed to close log dialog for session: {session_name}")
+            logger.debug(f"User closed log view for session: {session_name}")
+            if self.resume_updates:
+                self.resume_updates()  # Resume updates when the dialog is closed
+
+        def push_new_lines():
+            for line in tailer.poll():
+                log_view.push(line)
+
+        def set_live_state(active):
+            status_badge.text = "LIVE" if active else "ENDED"
+            status_badge.props(f"color={'positive' if active else 'grey'}")
+
+        def refresh():
+            try:
+                push_new_lines()
+            except Exception as e:
+                logger.error(f"Error refreshing log view for session {session_name}: {e}")
+            set_live_state(self.is_tmux_session_active(session_name))
+
+        def tick():
+            if closed or not auto_refresh.value:
+                return
+            try:
+                push_new_lines()
+            except Exception as e:
+                logger.error(f"Error following log for session {session_name}: {e}")
+                log_view.push(f"[desto] log follow error: {e}")
+                timer.cancel()
+                return
+            if not self.is_tmux_session_active(session_name):
+                try:
+                    push_new_lines()  # One final read after the session ended
+                except Exception as e:
+                    logger.error(f"Error during final log read for session {session_name}: {e}")
+                    log_view.push(f"[desto] log follow error: {e}")
+                set_live_state(False)
+                timer.cancel()
+
+        def download_log():
+            if not log_file.exists():
+                ui.notification(f"Log file for session '{session_name}' not found.", type="warning")
+                return
+            ui.download.file(log_file, filename=f"{session_name}.log", media_type="text/plain")
+
+        initial_lines = tailer.initial_lines(100)
+        is_active = self.is_tmux_session_active(session_name)
 
         with (
             ui.dialog() as dialog,
             ui.card().style("width: 100%; height: 80%;").classes("dark:!bg-slate-900"),
         ):
-            ui.label(f"Log for session '{session_name}'").style("font-weight: bold;")
-            with ui.scroll_area().style("width: 100%; height: 100%;"):
-                ui.label(log_content).style("white-space: pre-wrap;").classes("font-mono text-xs dark:text-slate-300")
-            ui.button(
-                "Close",
-                on_click=lambda: [
-                    logger.debug(f"User closed log view for session: {session_name}"),
-                    dialog.close(),
-                    self.resume_updates(),  # Resume updates when the dialog is closed
-                ],
-            ).props("color=primary")
+            with ui.row().style("align-items: center; gap: 10px;"):
+                ui.label(f"Log for session '{session_name}'").style("font-weight: bold;").classes("flex-grow")
+                status_badge = ui.badge("LIVE" if is_active else "ENDED", color="positive" if is_active else "grey")
+
+            log_view = ui.log(max_lines=2000).style("width: 100%; height: 65vh;").classes("font-mono text-xs dark:text-slate-300")
+            if initial_lines:
+                logger.debug(f"Successfully read {len(initial_lines)} lines from log file for session: {session_name}")
+                for line in initial_lines:
+                    log_view.push(line)
+            elif not log_file.exists():
+                log_view.push(f"Log file for session '{session_name}' not found.")
+                logger.warning(f"Log file not found for session: {session_name}")
+
+            with ui.row().style("align-items: center; gap: 10px;"):
+                auto_refresh = ui.switch("Auto-refresh", value=True)
+                ui.button("Refresh now", on_click=refresh).props("color=primary flat")
+                ui.button("Download log", on_click=download_log).props("color=secondary flat")
+                ui.button("Close", on_click=close_dialog).props("color=primary")
+            timer = ui.timer(1.0, tick)
+
+        dialog.on("hide", lambda: close_dialog())
+        dialog.on_value_change(lambda e: close_dialog() if not e.value else None)
         dialog.open()
 
     def kill_all_sessions(self):
