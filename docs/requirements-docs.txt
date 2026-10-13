@@ -74,7 +74,7 @@ mkdocs-material-extensions==1.3.1
 mkdocstrings==1.0.6
     # via mkdocstrings-python
 mkdocstrings-python==2.0.5
-packaging==26.2
+packaging==26.3
     # via mkdocs
 paginate==0.5.7
     # via mkdocs-material
