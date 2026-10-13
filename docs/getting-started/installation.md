@@ -51,7 +51,7 @@ docker compose up -d --build
 
 ```bash
 # Run the container directly (plain Docker)
-docker run -d -p 8809:8809 \
+docker run -d -p 127.0.0.1:8809:8809 \
   -v $PWD/desto_scripts:/app/desto_scripts \
   -v $PWD/desto_logs:/app/desto_logs \
   --name desto-dashboard \
