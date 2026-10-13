@@ -157,7 +157,7 @@ docker compose up -d --build
 
 ```bash
 # Run the container directly (plain Docker)
-docker run -d -p 8809:8809 \
+docker run -d -p 127.0.0.1:8809:8809 \
   -v $PWD/desto_scripts:/app/desto_scripts \
   -v $PWD/desto_logs:/app/desto_logs \
   --name desto-dashboard \
@@ -211,7 +211,7 @@ The SQLite database is stored at `desto_data/desto.db` (configurable via `SQLITE
 | `DESTO_PASSWORD` | *(unset)* | Enables the login page when set to a non-empty value. |
 | `DESTO_STORAGE_SECRET` | *(random per start)* | Signs the browser session cookie. Set a fixed value to keep logins valid across restarts. |
 
-Docker Compose already sets `DESTO_HOST=0.0.0.0`, and it publishes port 8809 on every host interface. To require a login, uncomment `DESTO_PASSWORD` in `docker-compose.yml` and restart the container. To keep the dashboard on the host only, change the port mapping to `127.0.0.1:8809:8809`.
+Docker Compose sets `DESTO_HOST=0.0.0.0` inside the container but publishes port 8809 (and Redis on 6380) on `127.0.0.1` only, so only the host machine can reach them. To open the dashboard to other machines, change the mapping to `"8809:8809"` and uncomment `DESTO_PASSWORD` in `docker-compose.yml`. Use a reverse proxy with TLS for anything reachable from the internet.
 
 ## 🖥️ CLI & 📊 Dashboard Installation with `uv` or `pip`  
 

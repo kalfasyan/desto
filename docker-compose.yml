@@ -4,7 +4,7 @@ services:
     image: redis:7-alpine
     container_name: desto-redis
     ports:
-      - "6380:6379"  # Use port 6380 on host to avoid conflict
+      - "127.0.0.1:6380:6379"  # Host port 6380 avoids conflicts; bound to localhost because Redis has no password
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -23,7 +23,8 @@ services:
       dockerfile: Dockerfile
     container_name: desto-dashboard
     ports:
-      - "8809:8809"
+      # Only this machine can open the dashboard. To allow other machines, use "8809:8809" and set DESTO_PASSWORD below.
+      - "127.0.0.1:8809:8809"
     volumes:
       - ./desto_scripts:/app/desto_scripts
       - ./desto_logs:/app/desto_logs
