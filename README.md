@@ -30,6 +30,7 @@ The key features are:
 - **Long-term persistence:** Optional [SQLite](https://www.sqlite.org/) database for durable session history that survives Redis key expiration—no extra services needed.
 - **Scheduled job control:** Manage scheduled jobs with a dedicated table—cancel any scheduled job with a click.
 - **Session & log cleanup:** Clear session history and delete logs for all or selected sessions.
+- **🔒 Optional password login:** Require a password to open the dashboard with `DESTO_PASSWORD`. The dashboard listens on localhost only by default. See the Security / Authentication section below.
 - **Notifications:** Optional Pushbullet notifications for job/session finishes — set the `DESTO_PUSHBULLET_API_KEY` environment variable or add the key in Settings to receive desktop/mobile pushes when jobs complete.
 - **Persistent script & log storage:** Scripts and logs are saved in dedicated folders for easy access.
 - **🖥️ Command-line interface:** Manage sessions, view logs, and control scripts from the terminal with our modern CLI. [Learn more →](https://desto.readthedocs.io/user-guide/cli/)
@@ -193,6 +194,24 @@ The SQLite database is stored at `desto_data/desto.db` (configurable via `SQLITE
 
 > [!NOTE]
 > **Why SQLite over PostgreSQL?** SQLite requires zero configuration, no additional Docker service, and no network setup. It's ideal for single-node deployments like desto. For most users, it provides all the durability benefits of a SQL database without any installation hassle.
+
+## 🔒 Security / Authentication
+
+`desto` can run any command on the machine it runs on, so treat the dashboard like a shell:
+
+- **Localhost by default:** the dashboard listens on `127.0.0.1`, so only the machine it runs on can open it. Set `DESTO_HOST=0.0.0.0` to accept connections from other machines. Earlier versions listened on all interfaces, so set `DESTO_HOST=0.0.0.0` to keep that behavior after upgrading.
+- **Password login:** set `DESTO_PASSWORD` to require a password for every page. A log-out button appears in the header while a password is set.
+- **Startup warning:** `desto` logs a warning when the dashboard is reachable from the network and no password is set.
+- **TLS for internet access:** the dashboard serves plain HTTP. If you expose it beyond your local network, put it behind a reverse proxy that terminates TLS.
+
+| Variable | Default | Description |
+|---|---|---|
+| `DESTO_HOST` | `127.0.0.1` | Interface to listen on. Use `0.0.0.0` for all interfaces. |
+| `DESTO_PORT` | `8809` | Port to listen on. |
+| `DESTO_PASSWORD` | *(unset)* | Enables the login page when set to a non-empty value. |
+| `DESTO_STORAGE_SECRET` | *(random per start)* | Signs the browser session cookie. Set a fixed value to keep logins valid across restarts. |
+
+Docker Compose already sets `DESTO_HOST=0.0.0.0`, and it publishes port 8809 on every host interface. To require a login, uncomment `DESTO_PASSWORD` in `docker-compose.yml` and restart the container. To keep the dashboard on the host only, change the port mapping to `127.0.0.1:8809:8809`.
 
 ## 🖥️ CLI & 📊 Dashboard Installation with `uv` or `pip`  
 

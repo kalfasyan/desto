@@ -35,6 +35,12 @@ services:
       - DESTO_SCRIPTS_DIR=/app/desto_scripts
       - DESTO_LOGS_DIR=/app/desto_logs
       - DESTO_DATA_DIR=/app/desto_data
+      # Dashboard network settings - listen on all container interfaces (reachable through the published port)
+      - DESTO_HOST=0.0.0.0
+      # Optional login - uncomment and set a password to require it for the dashboard
+      # - DESTO_PASSWORD=change-me
+      # Optional fixed secret for browser sessions (a random one is generated on each start when unset)
+      # - DESTO_STORAGE_SECRET=replace-with-a-long-random-string
       # Timezone configuration - set to match host system
       - TZ=Europe/Berlin
       # Redis configuration

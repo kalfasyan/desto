@@ -31,6 +31,17 @@ See [SQLite Long-Term Persistence](../user-guide/sqlite-persistence.md) for deta
 | `DESTO_LOGS_DIR` | `desto_logs/` | Directory for log files |
 | `DESTO_PUSHBULLET_API_KEY` | *(unset)* | Pushbullet API key for push notifications |
 
+### Dashboard and Login
+
+| Variable | Default | Description |
+|---|---|---|
+| `DESTO_HOST` | `127.0.0.1` | Interface the web dashboard listens on. Use `0.0.0.0` to accept connections from other machines (the Docker image sets this). An empty value falls back to `127.0.0.1`. |
+| `DESTO_PORT` | `8809` | Port the web dashboard listens on. |
+| `DESTO_PASSWORD` | *(unset)* | When set to a non-empty value, every page requires this password to log in. Unset means no login. |
+| `DESTO_STORAGE_SECRET` | *(random on each start)* | Secret that signs the browser session cookie. Set a fixed value to keep logins valid across restarts. |
+
+When the dashboard is reachable from the network and `DESTO_PASSWORD` is not set, desto logs a warning at startup.
+
 ## Project configuration (`pyproject.toml`)
 
 This project uses `pyproject.toml` for metadata and build configuration. Key sections:

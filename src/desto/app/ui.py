@@ -12,6 +12,7 @@ from nicegui import ui
 
 from desto.redis.at_job_manager import AtJobManager
 
+from .auth import logout
 from .favorites_ui import FavoritesTab
 from .sqlite_ui import SQLiteHistoryTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
@@ -117,7 +118,7 @@ class UserInterfaceManager:
 
         return display_value  # Return as-is if no icon
 
-    def build_ui(self):
+    def build_ui(self, show_logout: bool = False):
         # Listener to update CodeMirror themes and body class for Tailwind
         def update_dark_mode_ui(v):
             if v:
@@ -141,6 +142,8 @@ class UserInterfaceManager:
             with ui.row().classes("items-center gap-2"):
                 ui.button(icon="dark_mode", on_click=lambda: self._dark_mode.toggle()).props("flat round color=primary")
                 ui.button(on_click=lambda: right_drawer.toggle(), icon="settings").props("flat round color=primary")
+                if show_logout:
+                    ui.button(icon="logout", on_click=logout).props("flat round color=primary").tooltip("Log out")
 
         # Drawers
         with ui.left_drawer(value=True).classes("bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6") as left_drawer:

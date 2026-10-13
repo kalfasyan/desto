@@ -1,6 +1,7 @@
 from loguru import logger
 from nicegui import ui
 
+from desto.app.auth import get_auth_config, is_loopback, setup_auth
 from desto.app.config import config as ui_settings
 from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
@@ -49,6 +50,8 @@ def handle_instant_update(um: UserInterfaceManager, update_data):
 
 
 def main():
+    cfg = get_auth_config()
+
     # Configure modern colors for Quasar
     ui.colors(
         primary="#3b82f6",  # blue-500
@@ -121,7 +124,7 @@ def main():
     else:
         logger.warning("Redis pub/sub not available")
 
-    um.build_ui()
+    um.build_ui(show_logout=bool(cfg.password))
 
     # Create the global timer
     global global_timer
@@ -131,12 +134,23 @@ def main():
     tm.pause_updates = pause_global_timer
     tm.resume_updates = lambda: resume_global_timer(um, tm)
 
+    setup_auth(cfg.password)
+    if not is_loopback(cfg.host) and not cfg.password:
+        logger.warning(
+            f"desto dashboard is reachable on {cfg.host}:{cfg.port} without a password.\n"
+            "Anyone who can reach this address can run commands on this machine.\n"
+            "Set DESTO_PASSWORD to require a login, or set DESTO_HOST=127.0.0.1 to keep the dashboard local."
+        )
+    logger.info(f"Serving the desto dashboard at http://{cfg.host}:{cfg.port}")
+
     ui.run(
         title="desto dashboard",
-        port=8809,
+        host=cfg.host,
+        port=cfg.port,
         reload=False,
         show=False,
         binding_refresh_interval=0.1,
+        storage_secret=cfg.storage_secret,
     )
 
 

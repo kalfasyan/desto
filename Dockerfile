@@ -51,6 +51,8 @@ RUN mkdir -p /app/desto_logs /app/desto_data
 ENV DESTO_SCRIPTS_DIR=/app/desto_scripts
 ENV DESTO_LOGS_DIR=/app/desto_logs
 ENV DESTO_DATA_DIR=/app/desto_data
+# Listen on all container interfaces so the published port can reach the dashboard
+ENV DESTO_HOST=0.0.0.0
 
 # Expose web dashboard port
 EXPOSE 8809
