@@ -82,7 +82,7 @@ pathspec==1.1.1
     # via mkdocs
 platformdirs==4.12.4
     # via mkdocs-get-deps
-pygments==2.20.0
+pygments==2.21.0
     # via mkdocs-material
 pymdown-extensions==12.2
     # via
