@@ -84,7 +84,7 @@ platformdirs==4.12.4
     # via mkdocs-get-deps
 pygments==2.20.0
     # via mkdocs-material
-pymdown-extensions==12.2
+pymdown-extensions==11.0.1
     # via
     #   mkdocs-material
     #   mkdocstrings
@@ -104,7 +104,7 @@ requests==2.34.2
     #   mkdocs-material
 six==1.17.0
     # via python-dateutil
-soupsieve==2.10
+soupsieve==3.0.3
     # via beautifulsoup4
 typing-extensions==4.16.0
     # via beautifulsoup4
