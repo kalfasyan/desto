@@ -1545,56 +1545,5 @@ class TmuxManager:
         if not self.use_redis:
             return f"touch '{self.LOG_DIR}/{session_name}.finished'"
 
-        # Use dedicated script to mark job completion in Redis
-        # First try relative path from project root
-        script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_job_finished.py"
-
-        # If that doesn't exist, try from current working directory (Docker case)
-        if not script_path.exists():
-            script_path = Path.cwd() / "scripts" / "mark_job_finished.py"
-
-        # If still not found, try to find project root by looking for pyproject.toml
-        if not script_path.exists():
-            current = Path(__file__).parent
-            while current != current.parent:
-                if (current / "pyproject.toml").exists():
-                    script_path = current / "scripts" / "mark_job_finished.py"
-                    break
-                current = current.parent
-
-        # Use current interpreter to ensure correct environment
-        python_cmd = sys.executable
-
-        return f"{shlex.quote(python_cmd)} '{script_path}' '{session_name}' {exit_code_ref}"
-
-    def get_session_start_command(self, session_name: str, command: str):
-        """Get the appropriate command to mark session start using Redis.
-
-        Args:
-            session_name: Name of the session
-            command: Command being executed in the session
-        """
-        # Use dedicated script to mark session start
-        # First try relative path from project root
-        script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "mark_session_started.py"
-
-        # If that doesn't exist, try from current working directory (Docker case)
-        if not script_path.exists():
-            script_path = Path.cwd() / "scripts" / "mark_session_started.py"
-
-        # If still not found, try to find project root by looking for pyproject.toml
-        if not script_path.exists():
-            current = Path(__file__).parent
-            while current != current.parent:
-                if (current / "pyproject.toml").exists():
-                    script_path = current / "scripts" / "mark_session_started.py"
-                    break
-                current = current.parent
-
-        # Use current interpreter to ensure correct environment
-        python_cmd = sys.executable
-
-        # Escape quotes in command string for shell safety
-        escaped_command = command.replace("'", "'\"'\"'")
-
-        return f"{python_cmd} '{script_path}' '{session_name}' '{escaped_command}'"
+        # Use the bundled hook module so this works from an installed package, not just a source checkout
+        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
