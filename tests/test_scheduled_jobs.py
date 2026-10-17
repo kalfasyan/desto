@@ -29,6 +29,13 @@ def tmux_manager(mock_ui, mock_logger, tmp_path):
     return TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def cancel_all_recurring():
+    """Keep kill_scheduled_jobs from cancelling real recurring schedules in the local Redis."""
+    with patch("desto.redis.recurring.RecurringScheduleManager.cancel_all", return_value=0) as mock_cancel_all:
+        yield mock_cancel_all
+
+
 class TestScheduledJobs:
     """Test scheduled jobs functionality."""
 
@@ -124,6 +131,15 @@ class TestScheduledJobs:
         assert isinstance(errors, list)
         assert len(errors) == 2
         assert all("Unexpected error removing job" in msg for msg in errors)
+
+    @patch("desto.app.sessions.subprocess.run")
+    def test_kill_scheduled_jobs_cancels_recurring_schedules_first(self, mock_run, tmux_manager, cancel_all_recurring):
+        """Recurring series are stopped before their queued at jobs are removed, so a firing run cannot queue another."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+        tmux_manager.kill_scheduled_jobs()
+
+        cancel_all_recurring.assert_called_once_with(remove_pending_jobs=False)
 
     @patch("desto.app.sessions.subprocess.run")
     def test_kill_scheduled_jobs_partial_failure(self, mock_run, tmux_manager):
