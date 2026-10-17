@@ -24,7 +24,7 @@ The key features are:
 - **⭐ Favorite commands:** Save, organize, and quickly run your frequently used commands with usage tracking and search.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
-- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
+- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time, once or on repeat (every N minutes, hours, days, or weeks). [Learn more →](https://desto.readthedocs.io/user-guide/scheduling/)
 - **Script chaining:** Queue multiple scripts to run sequentially in a single session.
 - **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
 - **Long-term persistence:** Optional [SQLite](https://www.sqlite.org/) database for durable session history that survives Redis key expiration—no extra services needed.

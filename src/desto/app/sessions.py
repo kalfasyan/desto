@@ -127,6 +127,9 @@ class TmuxManager:
             # Telemetry: dialog opened
             self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
             ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            recurrence = self._get_recurring_info(at_job_id)
+            if recurrence:
+                ui.label(f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs.").classes("text-slate-600 dark:text-slate-400")
 
             def _cancel():
                 cancel()
@@ -150,6 +153,16 @@ class TmuxManager:
         from desto.redis.at_job_manager import AtJobManager
 
         try:
+            recurrence = self._get_recurring_info(at_job_id)
+            if recurrence:
+                from desto.redis.recurring import RecurringScheduleManager
+
+                if RecurringScheduleManager(self.redis_client).cancel(recurrence[0]):
+                    ui.notification(f"Cancelled recurring schedule ({recurrence[1]})", type="positive")
+                else:
+                    ui.notification(f"Failed to cancel recurring schedule for job {at_job_id}", type="negative")
+                return
+
             at_job_manager = AtJobManager(self.redis_client)
             success = at_job_manager.cancel(str(at_job_id))
             if success:
@@ -172,6 +185,16 @@ class TmuxManager:
                 ui.notification(f"Failed to cancel scheduled job {at_job_id}", type="negative")
         except Exception as e:
             ui.notification(f"Failed to cancel scheduled job {at_job_id}: {e}", type="negative")
+
+    def _get_recurring_info(self, at_job_id):
+        """Return (schedule_id, description) if the at job is a queued run of a recurring schedule, else None."""
+        try:
+            metadata = self.redis_client.redis.hgetall(f"desto:atjob:{at_job_id}")
+        except Exception:
+            return None
+        if metadata and metadata.get("recurring_id"):
+            return metadata["recurring_id"], metadata.get("recurrence", "recurring")
+        return None
 
     def is_tmux_session_active(self, session_name: str) -> bool:
         """Check if a tmux session with the given name exists."""
@@ -957,6 +980,9 @@ class TmuxManager:
                 if status in ["finished_internal", "running_internal"]:
                     continue
 
+                if metadata and metadata.get("recurring_id"):
+                    status = f"{status} · {metadata.get('recurrence', 'recurring')}"
+
                 scheduled_time = metadata.get("scheduled_time", job.get("datetime", "?")) if metadata else job.get("datetime", "?")
                 user = metadata.get("user", job.get("user", "?")) if metadata else job.get("user", "?")
 
@@ -1490,6 +1516,14 @@ class TmuxManager:
         """Kill all scheduled jobs and return summary.
         Returns a tuple: (success_count, total_count, error_messages).
         """
+        if self.desto_manager:
+            try:
+                from desto.redis.recurring import RecurringScheduleManager
+
+                RecurringScheduleManager(self.redis_client).cancel_all(remove_pending_jobs=False)
+            except Exception as e:
+                logger.warning(f"Failed to cancel recurring schedules: {e}")
+
         jobs = self.get_scheduled_jobs()
         total_count = len(jobs)
         success_count = 0
