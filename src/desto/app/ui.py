@@ -576,16 +576,9 @@ class UserInterfaceManager:
                 tmux_cmd = exec_cmd
                 script_paths = [str(script_file_path)]
 
-            # Use the wrapper script for proper Redis tracking of scheduled jobs
-            wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
-
-            # Use the current Python interpreter to ensure correct environment
-            python_exec = sys.executable
-
-            if wrapper_script_path.exists():
-                scheduled_cmd = f"{shlex.quote(python_exec)} '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
-            else:
-                scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
+            # Use the bundled wrapper for proper Redis tracking of scheduled jobs, with the
+            # current interpreter and logs directory so it matches this dashboard's environment
+            scheduled_cmd = f"DESTO_LOGS_DIR={shlex.quote(str(self.tmux_manager.LOG_DIR))} {shlex.quote(sys.executable)} -m desto.hooks.start_scheduled_session {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
 
             redis_client = DestoRedisClient()
             at_job_manager = AtJobManager(redis_client)
