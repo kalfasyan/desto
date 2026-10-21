@@ -27,6 +27,7 @@ class AtJobManager:
         session_name: str = "",
         script_path: list = None,  # Accept a list
         arguments: str = "",
+        extra_metadata: Optional[Dict[str, str]] = None,
     ) -> Optional[str]:
         """Schedule a command with 'at'. Returns the at job ID as a string, or None on failure. Also stores job metadata in Redis if enabled."""
         try:
@@ -81,6 +82,7 @@ class AtJobManager:
                 "arguments": arguments,
                 "error_message": "",
                 "execution_result": "",
+                **(extra_metadata or {}),
             }
             if self.redis_client and self.redis_client.is_connected():
                 key = f"desto:atjob:{job_id}"

@@ -13,6 +13,7 @@
 [![security: bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks-action)
 ![Contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/kalfasyan)
 
 ---
 
@@ -24,7 +25,7 @@ The key features are:
 - **⭐ Favorite commands:** Save, organize, and quickly run your frequently used commands with usage tracking and search.
 - **Live log viewer:** Watch script output in real time and view logs for each session.
 - **Live system stats:** See real-time CPU, memory, and disk usage at a glance.
-- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time.
+- **Scheduling:** Schedule scripts or script chains to launch at a specific date and time, once or on repeat (every N minutes, hours, days, or weeks). [Learn more →](https://desto.readthedocs.io/user-guide/scheduling/)
 - **Script chaining:** Queue multiple scripts to run sequentially in a single session.
 - **Session history:** [Redis](https://github.com/redis/redis-py) integration for persistent session tracking and history. [See what is Redis →](https://redis.io/about/)
 - **Long-term persistence:** Optional [SQLite](https://www.sqlite.org/) database for durable session history that survives Redis key expiration—no extra services needed.
@@ -381,6 +382,12 @@ desto-cli scripts run "my_script" --direct
 
 The CLI provides the same functionality as the web interface but optimized for terminal use, including rich formatting, real-time log viewing, and comprehensive session management.
 
+
+---
+
+## Support
+
+If **desto** is useful to you, you can [buy me a coffee](https://buymeacoffee.com/kalfasyan) ☕
 
 ---
 

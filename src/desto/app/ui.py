@@ -11,11 +11,14 @@ from loguru import logger
 from nicegui import ui
 
 from desto.redis.at_job_manager import AtJobManager
+from desto.redis.recurring import REPEAT_UNITS, RecurringScheduleManager, describe_interval
 
 from .auth import logout
 from .favorites_ui import FavoritesTab
 from .sqlite_ui import SQLiteHistoryTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
+
+REPEAT_OPTIONS = {"never": "Does not repeat", "minutes": "minute(s)", "hours": "hour(s)", "days": "day(s)", "weeks": "week(s)"}
 
 
 class UserInterfaceManager:
@@ -494,6 +497,13 @@ class UserInterfaceManager:
                 date_input = ui.date(value=datetime.now().strftime("%Y-%m-%d")).style("flex: 1; min-width: 150px;")
                 time_input = ui.time(value=datetime.now().strftime("%H:%M")).style("flex: 1; min-width: 120px;")
 
+            # Optional repetition: the date/time above is the first run
+            with ui.row().style("gap: 8px; align-items: center; margin-bottom: 8px;"):
+                ui.label("Repeat:")
+                repeat_count_input = ui.number(value=1, min=1, step=1, format="%d").props("dense outlined").style("width: 80px;")
+                repeat_select = ui.select(REPEAT_OPTIONS, value="never").props("dense outlined").style("min-width: 160px;")
+                repeat_count_input.bind_visibility_from(repeat_select, "value", backward=lambda v: v != "never")
+
             error_label = ui.label("").style("color: red;")
 
             # Buttons below the date/time inputs
@@ -501,11 +511,11 @@ class UserInterfaceManager:
                 ui.button("Cancel", on_click=schedule_dialog.close)
                 ui.button(
                     "Schedule",
-                    on_click=lambda: self.confirm_schedule(date_input, time_input, error_label, schedule_dialog),
+                    on_click=lambda: self.confirm_schedule(date_input, time_input, error_label, schedule_dialog, repeat_select, repeat_count_input),
                 )
         schedule_dialog.open()
 
-    def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog):
+    def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog, repeat_select=None, repeat_count_input=None):
         import shutil
         from datetime import datetime
 
@@ -537,9 +547,18 @@ class UserInterfaceManager:
             # Format time for 'at' (e.g., 'HH:MM YYYY-MM-DD')
             at_time_str = scheduled_dt.strftime("%H:%M %Y-%m-%d")
 
-            # Add Redis session with SCHEDULED status for scheduled scripts
+            interval_minutes = None
+            if repeat_select is not None and repeat_select.value != "never":
+                repeat_count = int(repeat_count_input.value or 0) if repeat_count_input is not None else 1
+                if repeat_count < 1:
+                    error_label.text = "Repeat interval must be at least 1."
+                    return
+                interval_minutes = repeat_count * REPEAT_UNITS[repeat_select.value]
+
+            # Add Redis session with SCHEDULED status for one-off scheduled scripts.
+            # Recurring runs each get their own session when they fire.
             redis_client = DestoRedisClient()
-            if redis_client.is_connected():
+            if interval_minutes is None and redis_client.is_connected():
                 manager = DestoManager(redis_client)
                 if self.chain_queue:
                     manager.start_session_with_job(
@@ -576,18 +595,14 @@ class UserInterfaceManager:
                 tmux_cmd = exec_cmd
                 script_paths = [str(script_file_path)]
 
-            # Use the wrapper script for proper Redis tracking of scheduled jobs
-            wrapper_script_path = Path(__file__).parent.parent.parent.parent / "scripts" / "start_scheduled_session.py"
+            if interval_minutes is not None:
+                self.create_recurring_schedule(redis_client, session_name, tmux_cmd, interval_minutes, scheduled_dt, script_paths, arguments, error_label, schedule_dialog)
+                return
 
-            # Use the current Python interpreter to ensure correct environment
-            python_exec = sys.executable
+            # Use the bundled wrapper for proper Redis tracking of scheduled jobs, with the
+            # current interpreter and logs directory so it matches this dashboard's environment
+            scheduled_cmd = f"DESTO_LOGS_DIR={shlex.quote(str(self.tmux_manager.LOG_DIR))} {shlex.quote(sys.executable)} -m desto.hooks.start_scheduled_session {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
 
-            if wrapper_script_path.exists():
-                scheduled_cmd = f"{shlex.quote(python_exec)} '{wrapper_script_path}' {shlex.quote(session_name)} {shlex.quote(tmux_cmd)}"
-            else:
-                scheduled_cmd = f"tmux new-session -d -s {shlex.quote(session_name)} bash -c {shlex.quote(tmux_cmd)}"
-
-            redis_client = DestoRedisClient()
             at_job_manager = AtJobManager(redis_client)
 
             # Call AtJobManager.schedule with all metadata fields
@@ -618,6 +633,34 @@ class UserInterfaceManager:
 
         except Exception as e:
             error_label.text = f"Invalid date/time: {e}"
+
+    def create_recurring_schedule(self, redis_client, session_name, command, interval_minutes, first_run, script_paths, arguments, error_label, schedule_dialog):
+        """Create a recurring schedule whose runs launch as '<session_name>-YYYYMMDD-HHMM' sessions."""
+        if not redis_client.is_connected():
+            error_label.text = "Recurring schedules need Redis, which is not available."
+            return
+        schedule_id = RecurringScheduleManager(redis_client).create(
+            session_name=session_name,
+            command=command,
+            interval_minutes=interval_minutes,
+            first_run=first_run,
+            log_dir=str(self.tmux_manager.LOG_DIR),
+            script_paths=[str(p) for p in script_paths],
+            arguments=arguments,
+        )
+        if not schedule_id:
+            error_label.text = "Failed to schedule the first run with 'at'."
+            return
+
+        what = f"Chain of {len(self.chain_queue)} scripts" if self.chain_queue else "Script"
+        ui.notification(
+            f"{what} will run {describe_interval(interval_minutes)} starting {first_run:%Y-%m-%d %H:%M}, as sessions named '{session_name}-<date>-<time>'",
+            type="info",
+        )
+        if self.chain_queue:
+            self.chain_queue.clear()
+            self.refresh_chain_queue_display()
+        schedule_dialog.close()
 
     def refresh_chain_queue_display(self):
         """Update the chain queue display in the UI."""
