@@ -384,6 +384,12 @@ The CLI provides the same functionality as the web interface but optimized for t
 
 ---
 
+## Support
+
+If **desto** is useful to you, you can [buy me a coffee](https://buymeacoffee.com/kalfasyan) ☕
+
+---
+
 ## License
 
 Shield: [![CC BY 4.0][cc-by-shield]][cc-by]
