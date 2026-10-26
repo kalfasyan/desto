@@ -6,7 +6,7 @@ backrefs==8.0
     # via mkdocs-material
 beautifulsoup4==4.15.0
     # via mkdocs-htmlproofer-plugin
-bracex==3.1
+bracex==3.2
     # via wcmatch
 certifi==2026.7.22
     # via requests
