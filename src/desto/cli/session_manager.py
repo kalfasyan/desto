@@ -5,6 +5,7 @@ import os
 import shlex
 import socket
 import subprocess
+import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +42,22 @@ class CLISessionManager:
         session_manager = SessionManager(redis_client)
         return redis_client, session_manager
 
+    @staticmethod
+    def _completion_hook(session_name: str, exit_code_ref: str) -> str:
+        """Shell snippet that records the job's outcome in Redis (same hook the dashboard uses)."""
+        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
+
+    @staticmethod
+    def _register_job(redis_client, session_manager, session, command: str) -> None:
+        """Create the job record so the dashboard can show status, exit code and offer Re-run."""
+        try:
+            from desto.redis.job_manager import JobManager
+
+            job = JobManager(redis_client).queue_job(session.session_id, command, command)
+            session_manager.add_job_to_session(session.session_id, job.job_id)
+        except Exception as e:
+            logger.warning(f"Could not register job for session '{session.session_name}': {e}")
+
     def _build_info_block(self, session_name: str, scripts: List[str]) -> str:
         username = getpass.getuser()
         hostname = socket.gethostname()
@@ -75,6 +92,7 @@ class CLISessionManager:
         # Create session in Redis with metadata
         session = session_manager.create_session(session_name, tmux_session_name=session_name)
         session_manager.start_session(session.session_id)
+        self._register_job(redis_client, session_manager, session, command)
 
         # Launch the actual command in tmux (for CLI usability)
         log_file = self.get_log_file(session_name)
@@ -95,7 +113,8 @@ class CLISessionManager:
                 return False
 
         redir = ">>" if append_mode else ">"
-        full_command = f"{command} {redir} {quoted_log_file} 2>&1"
+        # Run the command, then record finished/failed with its exit code.
+        full_command = f"({command}) {redir} {quoted_log_file} 2>&1; {self._completion_hook(session_name, '$?')}"
 
         try:
             subprocess.run(
@@ -179,6 +198,10 @@ class CLISessionManager:
         # metadata variable removed as it's not used by SessionManager.create_session
         session = session_manager.create_session(session_name, tmux_session_name=session_name)
         session_manager.start_session(session.session_id)
+        self._register_job(redis_client, session_manager, session, chain_command)
+
+        # Run the chain, then record finished/failed with its exit code.
+        chain_command = f"({chain_command}); DESTO_EXIT_CODE=$?; {self._completion_hook(session_name, '$DESTO_EXIT_CODE')}"
 
         try:
             subprocess.run(

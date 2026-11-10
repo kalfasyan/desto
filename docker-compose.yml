@@ -29,9 +29,10 @@ services:
       - ./desto_scripts:/app/desto_scripts
       - ./desto_logs:/app/desto_logs
       - desto_data:/app/desto_data
-      # Mount timezone information to sync with host
+      # Mount timezone information to sync with host. (/etc/timezone is not mounted:
+      # it is missing on many hosts, e.g. macOS and current GitHub runners, and the
+      # container fails to start when a bind-mount source does not exist.)
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
     environment:
       - DESTO_SCRIPTS_DIR=/app/desto_scripts
       - DESTO_LOGS_DIR=/app/desto_logs
