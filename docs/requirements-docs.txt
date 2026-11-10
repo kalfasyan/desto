@@ -88,7 +88,7 @@ pymdown-extensions==12.2
     # via
     #   mkdocs-material
     #   mkdocstrings
-python-dateutil==2.9.0.post0
+python-dateutil==3.0.0
     # via ghp-import
 pyyaml==6.0.3
     # via
