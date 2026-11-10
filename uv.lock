@@ -449,24 +449,24 @@ wheels = [
 name = "desto"
 source = { editable = "." }
 dependencies = [
-    { name = "ipython" },
     { name = "loguru" },
     { name = "nicegui" },
-    { name = "pre-commit" },
     { name = "psutil" },
-    { name = "pytest" },
-    { name = "pytest-instafail" },
-    { name = "pytest-xdist" },
     { name = "redis" },
     { name = "rich" },
-    { name = "twine" },
     { name = "typer" },
 ]
 
 [package.optional-dependencies]
 dev = [
+    { name = "ipython" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-instafail" },
+    { name = "pytest-xdist" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "twine" },
 ]
 docs = [
     { name = "loguru" },
@@ -493,7 +493,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ipython", specifier = ">=9.2.0" },
+    { name = "ipython", marker = "extra == 'dev'", specifier = ">=9.2.0" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "loguru", marker = "extra == 'docs'", specifier = ">=0.7.3" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.1" },
@@ -503,17 +503,17 @@ requires-dist = [
     { name = "mkdocstrings", marker = "extra == 'docs'", specifier = ">=0.30.0" },
     { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.18.2" },
     { name = "nicegui", specifier = ">=2.16.1,<4" },
-    { name = "pre-commit", specifier = ">=4.2.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "pymdown-extensions", marker = "extra == 'docs'", specifier = ">=10.16.1" },
-    { name = "pytest", specifier = ">=8.3.5" },
-    { name = "pytest-instafail", specifier = ">=0.5.0" },
-    { name = "pytest-xdist", specifier = ">=3.2.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.5" },
+    { name = "pytest-instafail", marker = "extra == 'dev'", specifier = ">=0.5.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.2.0" },
     { name = "redis", specifier = ">=4.0.0" },
     { name = "requests", marker = "extra == 'dev'", specifier = ">=2.31.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
-    { name = "twine", specifier = ">=6.1.0" },
+    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.1.0" },
     { name = "typer", specifier = ">=0.12.0" },
 ]
 provides-extras = ["dev", "docs"]

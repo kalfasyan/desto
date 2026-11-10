@@ -1,3 +1,5 @@
+from collections import deque
+
 from loguru import logger
 from nicegui import ui
 
@@ -6,47 +8,78 @@ from desto.app.config import config as ui_settings
 from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
 
-# Global variable to store the timer instance
-global_timer = None
+# Dashboard timers, each running only as often as its data changes:
+#   - fast (1s): system stats, live durations, pending Redis events, system log panel
+#   - sessions (2s): sessions table, rebuilt only when the data actually changed
+#   - scheduler (5s): fallback runner for overdue scheduled jobs
+FAST_INTERVAL = 1.0
+SESSIONS_INTERVAL = 2.0
+SCHEDULER_INTERVAL = 5.0
+
+global_timers = []
+
+# Redis pub/sub events arrive on a background thread; they are queued here and handled
+# on the UI timer, where it is safe to touch UI elements.
+_pending_updates = deque()
 
 
-def run_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
-    """Function to update the UI and session status."""
+def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
     um.update_ui_system_info()
-    tm.update_sessions_status()
-    tm.check_and_run_scheduled_jobs()
+    tm.tick_live_durations()
+    process_pending_updates(um)
     um.refresh_log_display()
 
 
+def run_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
+    """Run every periodic update once (kept for callers and tests)."""
+    run_fast_updates(um, tm)
+    tm.update_sessions_status(force=False)
+    tm.check_and_run_scheduled_jobs()
+
+
+def _create_timers(um: UserInterfaceManager, tm: TmuxManager) -> None:
+    global_timers.extend(
+        [
+            ui.timer(FAST_INTERVAL, lambda: run_fast_updates(um, tm)),
+            ui.timer(SESSIONS_INTERVAL, lambda: tm.update_sessions_status(force=False)),
+            ui.timer(SCHEDULER_INTERVAL, tm.check_and_run_scheduled_jobs),
+        ]
+    )
+
+
 def pause_global_timer():
-    """Pauses the global timer."""
-    global global_timer
-    if global_timer:
-        global_timer.deactivate()
+    """Pauses the periodic updates."""
+    for timer in global_timers:
+        timer.deactivate()
 
 
 def resume_global_timer(um: UserInterfaceManager, tm: TmuxManager):
-    """Resumes the global timer."""
-    global global_timer
-    if global_timer:
-        global_timer.activate()
+    """Resumes the periodic updates."""
+    if global_timers:
+        for timer in global_timers:
+            timer.activate()
     else:
-        global_timer = ui.timer(0.5, lambda: run_updates(um, tm))
+        _create_timers(um, tm)
 
 
 def handle_instant_update(um: UserInterfaceManager, update_data):
-    """Handle instant updates from Redis - happens immediately, not on timer."""
-    session_name = update_data.get("session_name")
-    status = update_data.get("status")
+    """Called from the Redis pub/sub thread: queue the event for the UI timer."""
+    _pending_updates.append(update_data)
 
-    # Instant notifications
-    if status == "finished":
-        ui.notification(f"Session '{session_name}' finished!", type="positive")
-    elif status == "failed":
-        ui.notification(f"Session '{session_name}' failed!", type="negative")
 
-    # Force immediate UI refresh (don't wait for 1-second timer)
-    um.tmux_manager.update_sessions_status()
+def process_pending_updates(um: UserInterfaceManager) -> None:
+    """Show notifications for queued Redis events and refresh the sessions table once."""
+    if not _pending_updates:
+        return
+    while _pending_updates:
+        update_data = _pending_updates.popleft()
+        session_name = update_data.get("session_name")
+        status = update_data.get("status")
+        if status == "finished":
+            ui.notification(f"Session '{session_name}' finished!", type="positive")
+        elif status == "failed":
+            ui.notification(f"Session '{session_name}' failed!", type="negative")
+    um.tmux_manager.update_sessions_status(force=False)
 
 
 def main():
@@ -126,9 +159,7 @@ def main():
 
     um.build_ui(show_logout=bool(cfg.password))
 
-    # Create the global timer
-    global global_timer
-    global_timer = ui.timer(0.5, lambda: run_updates(um, tm))
+    _create_timers(um, tm)
 
     # Pass pause and resume functions to TmuxManager
     tm.pause_updates = pause_global_timer

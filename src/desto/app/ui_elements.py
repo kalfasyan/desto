@@ -324,7 +324,9 @@ class LogSection:
 
     def refresh_log_display(self):
         if self.log_display:
-            self.log_display.value = "\n".join(self.log_messages)
+            text = "\n".join(self.log_messages)
+            if self.log_display.value != text:
+                self.log_display.value = text
 
 
 class ScriptManagerTab:
