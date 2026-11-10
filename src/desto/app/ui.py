@@ -4,6 +4,7 @@ import re
 import shlex
 import socket
 import sys
+import time
 from pathlib import Path
 
 import psutil
@@ -240,29 +241,39 @@ class UserInterfaceManager:
         if self.stats_panel.disk_used is not None:
             self.stats_panel.disk_used.text = f"{round(disk.used / (1024**3), 2)} GB Used"
         # --- tmux server stats ---
+        # Reuse one psutil.Process so cpu_percent() is non-blocking (interval=None measures
+        # since the previous call) instead of sleeping 100ms on every tick.
         tmux_cpu = "N/A"
         tmux_mem = "N/A"
         try:
-            tmux_procs = [p for p in psutil.process_iter(["name", "ppid", "cpu_percent", "memory_info", "cmdline"]) if p.info["name"] == "tmux" or "tmux" in p.info["name"]]
-            if tmux_procs:
-                server_proc = next((p for p in tmux_procs if p.info["ppid"] == 1), None)
-                if not server_proc:
-                    server_proc = min(tmux_procs, key=lambda p: p.info["ppid"])
-                tmux_cpu = f"{server_proc.cpu_percent(interval=0.1):.1f}%"
-                mem_mb = server_proc.memory_info().rss / (1024 * 1024)
-                tmux_mem = f"{mem_mb:.1f} MB"
-            else:
-                total_cpu = sum(p.cpu_percent(interval=0.1) for p in tmux_procs)
-                total_mem = sum(p.memory_info().rss for p in tmux_procs)
-                tmux_cpu = f"{total_cpu:.1f}%"
-                tmux_mem = f"{total_mem / (1024 * 1024):.1f} MB"
+            proc = self._get_tmux_server_proc()
+            if proc is not None:
+                tmux_cpu = f"{proc.cpu_percent(interval=None):.1f}%"
+                tmux_mem = f"{proc.memory_info().rss / (1024 * 1024):.1f} MB"
         except Exception:
-            tmux_cpu = "N/A"
-            tmux_mem = "N/A"
+            self._tmux_server_proc = None
         if self.stats_panel.tmux_cpu is not None:
             self.stats_panel.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
         if self.stats_panel.tmux_mem is not None:
             self.stats_panel.tmux_mem.text = f"tmux MEM: {tmux_mem}"
+
+    def _get_tmux_server_proc(self, rescan_interval: float = 10.0):
+        """Return the cached tmux server process, re-scanning the process list at most every 10s."""
+        proc = getattr(self, "_tmux_server_proc", None)
+        if proc is not None and proc.is_running():
+            return proc
+        now = time.monotonic()
+        if now - getattr(self, "_tmux_last_scan", 0.0) < rescan_interval:
+            return None
+        self._tmux_last_scan = now
+        candidates = [p for p in psutil.process_iter(["name", "ppid"]) if "tmux" in (p.info["name"] or "")]
+        if not candidates:
+            self._tmux_server_proc = None
+            return None
+        proc = next((p for p in candidates if p.info["ppid"] == 1), None) or min(candidates, key=lambda p: p.info["ppid"])
+        proc.cpu_percent(interval=None)  # prime the counter
+        self._tmux_server_proc = proc
+        return proc
 
     def update_script_preview(self, e):
         """Update the script preview editor when a new script is selected."""

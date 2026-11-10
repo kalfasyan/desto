@@ -1,6 +1,7 @@
 import getpass
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -33,6 +34,10 @@ class TmuxManager:
         self.logger = instance_logger
         self.pause_updates = None  # Function to pause updates
         self.resume_updates = None  # Function to resume updates
+        self.status_filter = None  # None, "running", "finished" or "failed"
+        self._last_render_signature = None  # Skip re-rendering when nothing changed
+        self._live_duration_labels = []  # (label, start datetime) for running sessions
+        self._atd_cache = (0.0, True)  # (checked_at, is_running)
 
         # Ensure log and scripts directories exist
         try:
@@ -232,7 +237,7 @@ class TmuxManager:
                 sessions[sname] = sdata
         return sessions
 
-    def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None):
+    def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None, counts=None):
         """Render the stats cards and control buttons (Refresh, Clear History, Clear Logs)."""
         from nicegui import ui
 
@@ -240,14 +245,14 @@ class TmuxManager:
         with ui.row().style("width: 100%; justify-content: space-between; align-items: center; margin-bottom: 20px;"):
             ui.label("Sessions Dashboard").style("font-size: 1.5em; font-weight: bold; margin-left: 10px;")
             with ui.row().style("gap: 10px;"):
-                ui.button("Refresh", icon="refresh", on_click=self.update_sessions_status).props("flat")
+                ui.button("Refresh", icon="refresh", on_click=lambda: self.update_sessions_status(force=True)).props("flat")
                 ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
                 ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
 
         # --- 'at' Daemon Status Check ---
         from desto.redis.at_job_manager import AtJobManager
 
-        at_running = AtJobManager.is_atd_running()
+        at_running = self._is_atd_running_cached(AtJobManager)
         if not at_running:
             with ui.row().style("width: 100%; align-items: center; margin-bottom: 20px; padding: 15px; border-radius: 8px;").classes("bg-orange-1 dark:bg-orange-9") as warning_row:
                 ui.icon("warning", color="orange").style("font-size: 2em; margin-right: 15px;")
@@ -259,37 +264,140 @@ class TmuxManager:
                 ui.button(icon="close", on_click=lambda: warning_row.delete()).props("flat round color=orange")
 
         # --- Stats Cards (Total, Finished, Failed, Running) ---
-        total_sessions = len(sessions_status)
-        finished_jobs = 0
-        failed_jobs = 0
-        running_jobs = 0
-        for session_name, session in sessions_status.items():
-            job_status = None
-            if self.desto_manager:
-                try:
-                    job_status = self.desto_manager.get_job_status(session_name)
-                except Exception:
-                    pass
-            if job_status == "finished":
-                finished_jobs += 1
-            elif job_status == "failed":
-                failed_jobs += 1
-            else:
-                running_jobs += 1
-
+        # Counts use the same classification as the table rows, and clicking a card filters the table.
+        if counts is None:
+            counts = self._count_by_category(sessions_status)
+        cards = [
+            (None, "Total Sessions", counts.get("total", 0), "#2196F3"),
+            ("finished", "Finished", counts.get("finished", 0), "#4CAF50"),
+            ("failed", "Failed", counts.get("failed", 0), "#F44336"),
+            ("running", "Running", counts.get("running", 0), "#FF9800"),
+        ]
         with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap; margin-left: 10px;"):
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:!bg-slate-900"):
-                ui.label(str(total_sessions)).style("font-size: 2em; font-weight: bold; color: #2196F3;")
-                ui.label("Total Sessions").style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:!bg-slate-900"):
-                ui.label(str(finished_jobs)).style("font-size: 2em; font-weight: bold; color: #4CAF50;")
-                ui.label("Finished").style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:!bg-slate-900"):
-                ui.label(str(failed_jobs)).style("font-size: 2em; font-weight: bold; color: #F44336;")
-                ui.label("Failed").style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
-            with ui.card().style("padding: 15px; min-width: 120px; text-align: center;").classes("bg-white dark:!bg-slate-900"):
-                ui.label(str(running_jobs)).style("font-size: 2em; font-weight: bold; color: #FF9800;")
-                ui.label("Running").style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
+            for category, title, value, color in cards:
+                active = self.status_filter == category
+                card = ui.card().style("padding: 15px; min-width: 120px; text-align: center; cursor: pointer;").classes("bg-white dark:!bg-slate-900")
+                if active and category is not None:
+                    card.classes("ring-2 ring-blue-500")
+                card.on("click", lambda c=category: self.set_status_filter(c))
+                with card:
+                    ui.label(str(value)).style(f"font-size: 2em; font-weight: bold; color: {color};")
+                    ui.label(title).style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
+                    card.tooltip("Show all sessions" if category is None else f"Show only {title.lower()} sessions")
+
+    def set_status_filter(self, category):
+        """Filter the sessions table by category; clicking the active filter (or Total) clears it."""
+        self.status_filter = None if category is None or category == self.status_filter else category
+        self.update_sessions_status(force=True)
+
+    def _is_atd_running_cached(self, at_job_manager_cls, ttl: float = 60.0) -> bool:
+        """The atd check spawns processes, so only run it once a minute."""
+        checked_at, running = self._atd_cache
+        now = time.monotonic()
+        if now - checked_at > ttl or checked_at == 0.0:
+            running = at_job_manager_cls.is_atd_running()
+            self._atd_cache = (now, running)
+        return running
+
+    @staticmethod
+    def _decode_hash(data):
+        return {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in data.items()}
+
+    def _job_info_by_session(self):
+        """Read every job once and summarise it per session id.
+
+        Returns {session_id: {"status", "exit_code", "command"}}. This replaces the per-row
+        get_job_status() lookups, which scanned all sessions and all jobs for every row.
+        """
+        result = {}
+        try:
+            r = self.redis_client.redis
+            keys = list(r.scan_iter(match="desto:job:*", count=500))
+            if not keys:
+                return result
+            pipe = r.pipeline(transaction=False)
+            for key in keys:
+                pipe.hgetall(key)
+            jobs_by_session = {}
+            for data in pipe.execute():
+                if data:
+                    job = self._decode_hash(data)
+                    jobs_by_session.setdefault(job.get("session_id", ""), []).append(job)
+        except Exception as e:
+            logger.debug(f"Could not read jobs from Redis: {e}")
+            return result
+
+        for session_id, jobs in jobs_by_session.items():
+            jobs.sort(key=lambda j: j.get("job_id", ""))
+            statuses = [j.get("status", "") for j in jobs]
+            if "running" in statuses:
+                overall = "running"
+            elif "failed" in statuses:
+                overall = "failed"
+            elif all(st == "finished" for st in statuses):
+                overall = "finished"
+            else:
+                overall = "queued"
+            exit_code = None
+            for job in jobs:
+                if job.get("status") in ("finished", "failed"):
+                    code = job.get("exit_code") or ""
+                    if not code:
+                        match = re.search(r"code:?\s*(-?\d+)", job.get("error_message") or "")
+                        code = match.group(1) if match else ""
+                    if code:
+                        exit_code = code
+            result[session_id] = {"status": overall, "exit_code": exit_code, "command": jobs[0].get("command", "")}
+        return result
+
+    @staticmethod
+    def _classify_session(session_name, session, tmux_active, job_info):
+        """Return (category, label, color) for a session row.
+
+        category is one of "running", "finished", "failed" or "scheduled".
+        """
+        info = job_info.get(session.get("session_id", ""), {}) if job_info else {}
+        status_field = (session.get("status", "") or "").lower()
+        job_status_field = (session.get("job_status", "") or info.get("status", "") or "").lower()
+        fields = (status_field, job_status_field)
+
+        if "finished" in fields:
+            category = "finished"
+        elif "failed" in fields:
+            category = "failed"
+        elif "scheduled" in fields:
+            category = "scheduled"
+        else:
+            category = "running"
+
+        # If tmux is not active, the session cannot still be running.
+        if category == "running" and not tmux_active and "running" in fields:
+            category = "finished" if session.get("end_time") else "failed"
+            if category == "failed":
+                return category, "❌ Failed (tmux closed)", "#F44336"
+
+        if category == "finished":
+            return category, "✅ Finished", "#4CAF50"
+        if category == "failed":
+            code = info.get("exit_code")
+            label = f"❌ Failed · exit {code}" if code not in (None, "", "0") else "❌ Failed"
+            return category, label, "#F44336"
+        if category == "scheduled":
+            return category, "📅 Scheduled", "#9C27B0"
+        return category, "🟡 Running", "#FF9800"
+
+    def _count_by_category(self, sessions_status, tmux_active=None, job_info=None):
+        if tmux_active is None:
+            tmux_active = set(self.check_sessions().keys())
+        job_info = job_info or {}
+        counts = {"total": 0, "running": 0, "finished": 0, "failed": 0}
+        for name, session in sessions_status.items():
+            category, _, _ = self._classify_session(name, session, name in tmux_active, job_info)
+            if category == "scheduled":
+                continue
+            counts["total"] += 1
+            counts[category] += 1
+        return counts
 
     def confirm_clear_history(self):
         """Show confirmation dialog before clearing session history. Pauses updates while dialog is open."""
@@ -679,20 +787,86 @@ class TmuxManager:
             logger.error(msg)
             ui.notification(msg, type="negative")
 
-    def update_sessions_status(self, ui_manager=None):
-        """Updates the sessions table with detailed information and adds a kill button and a view log button for each session.
-        Also renders the stats cards and control buttons above the table, as in the history tab.
-        Shows all sessions (active, finished, failed, scheduled) by aggregating from Redis, not just active tmux sessions.
+    def update_sessions_status(self, ui_manager=None, force=True):
+        """Render the sessions dashboard (stats cards, sessions table, scheduled jobs).
+
+        Data is gathered in a few cheap batched calls. With force=False (the periodic timer),
+        the dashboard is only rebuilt when something actually changed, so the page does not
+        flicker and scroll position or open menus are not reset. Live durations of running
+        sessions are updated in place by tick_live_durations().
         """
         sessions_status = self.get_all_sessions_status()
+        tmux_active = set(self.check_sessions().keys())
+        job_info = self._job_info_by_session()
+        scheduled_jobs = self._get_scheduled_jobs_with_metadata()
 
+        signature = json.dumps([sessions_status, sorted(tmux_active), job_info, scheduled_jobs, self.status_filter], sort_keys=True, default=str)
+        if not force and signature == self._last_render_signature:
+            return
+        self._last_render_signature = signature
+
+        counts = self._count_by_category(sessions_status, tmux_active, job_info)
         self.clear_sessions_container()
 
         def render():
-            self.render_sessions_controls_and_stats(sessions_status, ui_manager)
-            self.add_sessions_table(sessions_status, self.ui)
+            self.render_sessions_controls_and_stats(sessions_status, ui_manager, counts=counts)
+            self.add_sessions_table(sessions_status, self.ui, tmux_active=tmux_active, job_info=job_info, scheduled_jobs=scheduled_jobs)
 
         self.add_to_sessions_container(render)
+
+    def _get_scheduled_jobs_with_metadata(self):
+        """Return atq jobs plus the Redis metadata for each, without spawning `at -c` per job."""
+        jobs = self.get_scheduled_jobs(include_command=False)
+        if not jobs:
+            return []
+        try:
+            pipe = self.redis_client.redis.pipeline(transaction=False)
+            for job in jobs:
+                pipe.hgetall(f"desto:atjob:{job.get('id')}")
+            for job, metadata in zip(jobs, pipe.execute()):
+                job["metadata"] = self._decode_hash(metadata) if metadata else None
+        except Exception as e:
+            logger.debug(f"Could not read scheduled job metadata: {e}")
+            for job in jobs:
+                job.setdefault("metadata", None)
+        return jobs
+
+    def tick_live_durations(self):
+        """Update the duration labels of running sessions in place (no table rebuild)."""
+        for label, start_dt in self._live_duration_labels:
+            try:
+                now_dt = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
+                label.text = self._format_seconds(int((now_dt - start_dt).total_seconds()))
+            except Exception:
+                pass
+
+    @staticmethod
+    def _format_seconds(elapsed_seconds):
+        if elapsed_seconds < 0:
+            return "N/A"
+        hours, remainder = divmod(elapsed_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+
+    def rerun_session(self, session_name, command):
+        """Launch the same command again in a new session (name-2, name-3, ...)."""
+        if not command:
+            ui.notification(f"No command recorded for '{session_name}', cannot re-run.", type="warning")
+            return
+        base = session_name
+        match = re.match(r"^(.*)-(\d+)$", session_name)
+        if match:
+            known = set(self.check_sessions().keys())
+            if self.desto_manager:
+                try:
+                    known.update(getattr(s, "session_name", "") for s in self.desto_manager.session_manager.list_all_sessions())
+                except Exception:
+                    pass
+            if match.group(1) in known:
+                base = match.group(1)
+        new_name = self.get_unique_session_name(base)
+        self.start_tmux_session(new_name, command, logger)
+        self.update_sessions_status(force=True)
 
     def kill_tmux_session(self, session_name):
         """Kills a tmux session by name."""
@@ -754,8 +928,14 @@ class TmuxManager:
             # Fallback to current time
             return int(time.time() - created_time)
 
-    def add_sessions_table(self, sessions_status, ui):
+    def add_sessions_table(self, sessions_status, ui, tmux_active=None, job_info=None, scheduled_jobs=None):
         """Adds the sessions table to the UI, using the history tab's columns plus an Actions column."""
+        if tmux_active is None:
+            tmux_active = set(self.check_sessions().keys())
+        if job_info is None:
+            job_info = self._job_info_by_session()
+        self._live_duration_labels = []
+
         # Table header
         with ui.row().style("width: 100%; min-width: 1100px; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;").classes("bg-slate-100 dark:!bg-slate-800 text-slate-900 dark:text-slate-100"):
             ui.label("Session Name").style("flex: 2; min-width: 150px;")
@@ -767,61 +947,30 @@ class TmuxManager:
             ui.label("Tmux Active").style("flex: 1; min-width: 100px;")
             ui.label("Actions").style("flex: 1; min-width: 120px;")
 
-        # --- Only show non-scheduled sessions in the main table ---
-        display_sessions = {}
+        # --- Only show non-scheduled sessions in the main table, newest first, honouring the filter ---
+        rows = []
         for session_name, session in sessions_status.items():
-            status_field = session.get("status", "").lower()
-            job_status_field = session.get("job_status", "").lower()
-            if status_field == "scheduled" or job_status_field == "scheduled":
-                continue  # Skip scheduled sessions
-            display_sessions[session_name] = session
+            is_active = session_name in tmux_active
+            category, status, status_color = self._classify_session(session_name, session, is_active, job_info)
+            if category == "scheduled":
+                continue
+            if self.status_filter and category != self.status_filter:
+                continue
+            sort_key = str(session.get("start_time") or "")
+            if not sort_key and session.get("created"):
+                try:
+                    sort_key = datetime.fromtimestamp(float(session["created"])).isoformat()
+                except Exception:
+                    pass
+            rows.append((sort_key, session_name, session, is_active, status, status_color))
+        rows.sort(key=lambda r: r[0], reverse=True)
 
-        for session_name, session in display_sessions.items():
-            # Determine status for display
-            status = "unknown"
-            status_color = "#FF9800"
+        if not rows and self.status_filter:
+            ui.label(f"No {self.status_filter} sessions. Click the card again to show all.").style("padding: 12px;").classes("text-slate-500")
+
+        for _, session_name, session, tmux_active_row, status, status_color in rows:
             job_status = session.get("job_status", "") or session.get("status", "")
-            status_field = (session.get("status", "") or "").lower()
-            job_status_field = (session.get("job_status", "") or "").lower()
-            if job_status_field == "finished" or status_field == "finished":
-                status = "✅ Finished"
-                status_color = "#4CAF50"
-            elif job_status_field == "failed" or status_field == "failed":
-                status = "❌ Failed"
-                status_color = "#F44336"
-            elif job_status_field == "running" or status_field == "running":
-                status = "🟡 Running"
-                status_color = "#FF9800"
-            elif job_status_field == "scheduled" or status_field == "scheduled":
-                status = "📅 Scheduled"
-                status_color = "#9C27B0"
-            else:
-                status = "🟡 Running"
-                status_color = "#FF9800"
-
-            # Tmux active status: always check live tmux for accuracy
-            tmux_active = self.is_tmux_session_active(session_name)
-
-            # If tmux is not active, session cannot be 'Running'
-            if not tmux_active and (status_field == "running" or job_status_field == "running"):
-                # If Redis indicates the session has already finished (end_time present) or the
-                # job/session status is 'finished', prefer that authoritative state and show
-                # Finished instead of Failed even when tmux is no longer active.
-                if status_field == "finished" or job_status_field == "finished" or session.get("end_time"):
-                    status = "✅ Finished"
-                    status_color = "#4CAF50"
-                else:
-                    # As a fallback, ask the DestoManager whether the session is finished.
-                    try:
-                        if self.desto_manager and self.desto_manager.is_session_finished(session_name):
-                            status = "✅ Finished"
-                            status_color = "#4CAF50"
-                        else:
-                            status = "❌ Failed (tmux closed)"
-                            status_color = "#F44336"
-                    except Exception:
-                        status = "❌ Failed (tmux closed)"
-                        status_color = "#F44336"
+            command = job_info.get(session.get("session_id", ""), {}).get("command", "")
 
             # Times and durations
             created_time = session.get("created")
@@ -926,19 +1075,30 @@ class TmuxManager:
                 ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
                 ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
                 ui.label(job_duration).style("flex: 1; min-width: 120px;").classes("text-slate-700 dark:text-slate-400")
-                ui.label(session_duration).style("flex: 1; min-width: 130px;").classes("text-slate-700 dark:text-slate-400")
+                duration_label = ui.label(session_duration).style("flex: 1; min-width: 130px;").classes("text-slate-700 dark:text-slate-400")
+                if start_time and not end_time and tmux_active_row:
+                    try:
+                        self._live_duration_labels.append((duration_label, datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))))
+                    except Exception:
+                        pass
                 ui.label(formatted_start_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
                 ui.label(formatted_end_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
                 # Tmux Active column
-                icon = "check_circle" if tmux_active else "cancel"
-                color = "#4CAF50" if tmux_active else "#F44336"
+                icon = "check_circle" if tmux_active_row else "cancel"
+                color = "#4CAF50" if tmux_active_row else "#F44336"
                 ui.icon(icon).style(f"flex: 1; min-width: 100px; color: {color}; font-size: 1.5em; text-align: center;")
                 with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
-                    if tmux_active:
+                    # Kill while running; once the tmux session is gone, the slot becomes Re-run.
+                    if tmux_active_row:
                         ui.button(
                             "Kill",
                             on_click=lambda s=session_name: self.confirm_kill_session(s),
                         ).props("color=red flat")
+                    elif command:
+                        ui.button(
+                            "Re-run",
+                            on_click=lambda s=session_name, c=command: self.rerun_session(s, c),
+                        ).props("color=green flat").tooltip("Run the same command again in a new session")
                     else:
                         ui.button(
                             "Kill",
@@ -954,12 +1114,9 @@ class TmuxManager:
                     ).props("color=orange flat")
 
         # --- Scheduled Jobs Table (from atq + Redis metadata) ---
-        scheduled_jobs = self.get_scheduled_jobs()
+        if scheduled_jobs is None:
+            scheduled_jobs = self._get_scheduled_jobs_with_metadata()
         if scheduled_jobs:
-            from desto.redis.at_job_manager import AtJobManager
-
-            at_job_manager = AtJobManager(self.redis_client)
-
             with ui.row().style("margin-top: 40px; margin-bottom: 10px;"):
                 ui.label("Scheduled Jobs (with metadata)").style("font-size: 1.2em; font-weight: bold;")
 
@@ -973,7 +1130,7 @@ class TmuxManager:
 
             for job in scheduled_jobs:
                 job_id = job.get("id", "?")
-                metadata = at_job_manager.get_job_metadata(str(job_id)) if at_job_manager else None
+                metadata = job.get("metadata")
                 status = metadata.get("status", "scheduled") if metadata else "scheduled"
 
                 # Filter out jobs that have been handled by the internal scheduler
@@ -1189,7 +1346,7 @@ class TmuxManager:
             ui.notification(f"Failed to clear session '{session_name}' (see logs)", type="negative")
 
         # Refresh UI
-        self.update_sessions_status(ui)
+        self.update_sessions_status(force=True)
 
     def view_log(self, session_name, ui):
         """Pauses the app and opens a dialog that live-tails the session's log file (last 100 lines, then follows)."""
@@ -1446,9 +1603,10 @@ class TmuxManager:
 
         dialog.open()
 
-    def get_scheduled_jobs(self):
+    def get_scheduled_jobs(self, include_command=True):
         """Get a list of scheduled jobs from the 'at' command.
-        Returns a list of dictionaries with job info.
+        Returns a list of dictionaries with job info. include_command=False skips the
+        per-job `at -c` call (the dashboard table does not show the command).
         """
         try:
             result = subprocess.run(["atq"], capture_output=True, text=True)
@@ -1468,7 +1626,7 @@ class TmuxManager:
                         user = parts[-1]
 
                         # Try to get the actual command for this job
-                        command = self._get_scheduled_job_command(job_id)
+                        command = self._get_scheduled_job_command(job_id) if include_command else ""
 
                         # Format the datetime for better display
                         formatted_datetime = self._format_scheduled_datetime(date_time)
@@ -1477,7 +1635,12 @@ class TmuxManager:
 
             return jobs
         except Exception as e:
-            self.logger.warning(f"Failed to get scheduled jobs: {e}")
+            # Log once at warning level (e.g. `at` not installed), then quietly, since the dashboard polls this.
+            if not getattr(self, "_scheduled_jobs_warned", False):
+                self.logger.warning(f"Failed to get scheduled jobs: {e}")
+                self._scheduled_jobs_warned = True
+            else:
+                self.logger.debug(f"Failed to get scheduled jobs: {e}")
             return []
 
     def _get_scheduled_job_command(self, job_id):

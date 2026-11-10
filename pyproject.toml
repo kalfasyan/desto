@@ -5,24 +5,24 @@ description = "tmux session manager"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ipython>=9.2.0",
     "loguru>=0.7.3",
     "nicegui>=2.16.1,<4",
-    "pre-commit>=4.2.0",
     "psutil>=7.0.0",
-    "pytest>=8.3.5",
-    "pytest-xdist>=3.2.0",
-    "twine>=6.1.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
     "redis>=4.0.0",
-    "pytest-instafail>=0.5.0",
+    "requests>=2.31.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",
-    "requests>=2.31.0",
+    "ipython>=9.2.0",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-xdist>=3.2.0",
+    "pytest-instafail>=0.5.0",
+    "twine>=6.1.0",
 ]
 
 docs = [

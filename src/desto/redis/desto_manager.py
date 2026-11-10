@@ -138,7 +138,7 @@ class DestoManager:
 
         return success
 
-    def fail_job(self, session_name: str, error_message: str) -> bool:
+    def fail_job(self, session_name: str, error_message: str, exit_code: Optional[int] = None) -> bool:
         """Fail the current job in a session."""
         session = self.session_manager.get_session_by_name(session_name)
         if not session:
@@ -149,7 +149,7 @@ class DestoManager:
             logger.warning(f"No running job found for session {session_name}")
             return False
 
-        result = self.job_manager.fail_job(current_job.job_id, error_message)
+        result = self.job_manager.fail_job(current_job.job_id, error_message, exit_code=exit_code)
 
         # Archive failed job to SQLite
         if result:

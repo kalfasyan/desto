@@ -35,7 +35,7 @@ def main(argv=None) -> int:
                 manager.finish_job(session_name, exit_code)
                 print(f"Marked job '{session_name}' as finished in Redis")
             else:
-                manager.fail_job(session_name, f"Job exited with code {exit_code}")
+                manager.fail_job(session_name, f"Job exited with code {exit_code}", exit_code=exit_code)
                 print(f"Marked job '{session_name}' as failed in Redis (exit code: {exit_code})")
 
             # Fetch job_finished_time from Redis and set session end_time to match

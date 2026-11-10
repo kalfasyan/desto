@@ -61,7 +61,7 @@ class JobManager:
         self._try_start_next_job(job.session_id)
         return True
 
-    def fail_job(self, job_id: str, error_message: str) -> bool:
+    def fail_job(self, job_id: str, error_message: str, exit_code: Optional[int] = None) -> bool:
         """Mark job as failed."""
         job = self.get_job(job_id)
         if not job:
@@ -70,6 +70,8 @@ class JobManager:
         job.status = JobStatus.FAILED
         job.end_time = datetime.now()
         job.error_message = error_message
+        if exit_code is not None:
+            job.exit_code = exit_code
         self._update_job(job)
 
         logger.info(f"Failed job {job_id}: {error_message}")
