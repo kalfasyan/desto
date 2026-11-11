@@ -9,53 +9,8 @@ import sys
 from pathlib import Path
 from typing import Tuple
 
-try:
-    import typer
-    from rich.console import Console
-
-    TYPER_AVAILABLE = True
-except ImportError:
-    # Mock typer for development without dependencies
-    class MockTyper:
-        def __init__(self, name=None, help=None, add_completion=False):
-            self.name = name
-            self.help = help
-
-        def callback(self):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        def command(self, name=None):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        def add_typer(self, *args, **kwargs):
-            pass
-
-        def Typer(self, **kwargs):
-            return MockTyper(**kwargs)
-
-        def Option(self, default=None, *args, help=None, **kwargs):
-            return default
-
-        def Exit(self, code=0):
-            return SystemExit(code)
-
-        def __call__(self):
-            pass
-
-    typer = MockTyper()
-
-    class MockConsole:
-        def print(self, *args, **kwargs):
-            print(*args)
-
-    Console = MockConsole
-    TYPER_AVAILABLE = False
+import typer
+from rich.console import Console
 
 
 class ServiceManager:

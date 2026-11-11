@@ -3,58 +3,9 @@
 from pathlib import Path
 from typing import Optional
 
-try:
-    import typer
-    from rich.console import Console
-    from rich.table import Table
-
-    TYPER_AVAILABLE = True
-except ImportError:
-    # Mock typer for development without dependencies
-    class MockTyper:
-        def __init__(self, help=None):
-            self.help = help
-
-        def command(self, name=None):
-            def decorator(func):
-                return func
-
-            return decorator
-
-        def Typer(self, help=None):
-            return MockTyper(help)
-
-        def Argument(self, default=None, help=None):
-            return default
-
-        def Option(self, default=None, *args, help=None, **kwargs):
-            return default
-
-        def confirm(self, message):
-            return True
-
-        def Exit(self, code=0):
-            return SystemExit(code)
-
-    typer = MockTyper()
-
-    class MockConsole:
-        def print(self, *args, **kwargs):
-            print(*args)
-
-    class MockTable:
-        def __init__(self, title=None):
-            self.title = title
-
-        def add_column(self, *args, **kwargs):
-            pass
-
-        def add_row(self, *args, **kwargs):
-            pass
-
-    Console = MockConsole
-    Table = MockTable
-    TYPER_AVAILABLE = False
+import typer
+from rich.console import Console
+from rich.table import Table
 
 from .session_manager import CLISessionManager
 from .utils import format_duration, format_timestamp

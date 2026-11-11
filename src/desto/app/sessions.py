@@ -1,3 +1,14 @@
+"""TmuxManager: runs scripts in tmux sessions and tracks them in Redis.
+
+This module holds the tmux/session lifecycle. The rest of the dashboard behaviour is
+split by concern and mixed into TmuxManager:
+
+- scheduled_jobs.ScheduledJobsMixin: 'at' jobs and the internal fallback scheduler
+- sessions_dashboard.SessionsDashboardMixin: stats cards and sessions/scheduled tables
+- session_dialogs.SessionDialogsMixin: confirmation dialogs, log viewer and clean-up
+- session_format: pure formatting/classification helpers
+"""
+
 import getpass
 import json
 import os
@@ -10,17 +21,19 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import redis
 from loguru import logger
 from nicegui import ui
 
-from desto.app.log_tailer import LogTailer
+from desto.app.scheduled_jobs import ScheduledJobsMixin
+from desto.app.session_dialogs import SessionDialogsMixin
+from desto.app.session_format import decode_hash
+from desto.app.sessions_dashboard import SessionsDashboardMixin
 from desto.redis.client import DestoRedisClient
 from desto.redis.desto_manager import DestoManager
 from desto.redis.pubsub import SessionPubSub
 
 
-class TmuxManager:
+class TmuxManager(SessionsDashboardMixin, SessionDialogsMixin, ScheduledJobsMixin):
     def __init__(self, ui_instance, instance_logger, log_dir=None, scripts_dir=None):
         if not ui_instance or not instance_logger:
             raise ValueError("ui_instance and instance_logger are required")
@@ -106,101 +119,6 @@ class TmuxManager:
             # Never raise from telemetry
             logger.debug("Failed to emit telemetry event", exc_info=True)
 
-    def confirm_cancel_scheduled_job_by_id(self, at_job_id):
-        """Show a confirmation dialog before canceling a scheduled job by at_job_id.
-        Pauses updates while dialog is open.
-        """
-        from nicegui import ui
-
-        if self.pause_updates:
-            self.pause_updates()
-
-        def do_cancel():
-            self.cancel_scheduled_job(at_job_id)
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-            # Force UI refresh
-            self.update_sessions_status()
-
-        def cancel():
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            # Telemetry: dialog opened
-            self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
-            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-            recurrence = self._get_recurring_info(at_job_id)
-            if recurrence:
-                ui.label(f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs.").classes("text-slate-600 dark:text-slate-400")
-
-            def _cancel():
-                cancel()
-                self.telemetry_event("confirm_cancel_scheduled_job.cancel", {"at_job_id": str(at_job_id)})
-
-            def _confirm():
-                do_cancel()
-                self.telemetry_event("confirm_cancel_scheduled_job.confirm", {"at_job_id": str(at_job_id)})
-
-            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=_cancel).props("color=grey")
-                ui.button("Confirm Cancel", color="red", on_click=_confirm).props("icon=delete_forever")
-        dialog.open()
-
-    def cancel_scheduled_job(self, at_job_id, session_name=None):
-        """Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
-        If session_name is not provided, attempts to find the session by at_job_id in Redis.
-        """
-        from nicegui import ui
-
-        from desto.redis.at_job_manager import AtJobManager
-
-        try:
-            recurrence = self._get_recurring_info(at_job_id)
-            if recurrence:
-                from desto.redis.recurring import RecurringScheduleManager
-
-                if RecurringScheduleManager(self.redis_client).cancel(recurrence[0]):
-                    ui.notification(f"Cancelled recurring schedule ({recurrence[1]})", type="positive")
-                else:
-                    ui.notification(f"Failed to cancel recurring schedule for job {at_job_id}", type="negative")
-                return
-
-            at_job_manager = AtJobManager(self.redis_client)
-            success = at_job_manager.cancel(str(at_job_id))
-            if success:
-                ui.notification(f"Cancelled scheduled job {at_job_id}", type="positive")
-                # Try to update status in Redis
-                session_obj = None
-                if session_name and self.desto_manager:
-                    session_obj = self.desto_manager.session_manager.get_session_by_name(session_name)
-                elif self.desto_manager:
-                    # Try to find session by at_job_id
-                    for s in self.desto_manager.session_manager.list_all_sessions():
-                        if getattr(s, "at_job_id", None) == str(at_job_id):
-                            session_obj = s
-                            break
-                if session_obj:
-                    session_obj.status = "failed"
-                    session_obj.at_job_id = None
-                    self.desto_manager.session_manager._update_session(session_obj)
-            else:
-                ui.notification(f"Failed to cancel scheduled job {at_job_id}", type="negative")
-        except Exception as e:
-            ui.notification(f"Failed to cancel scheduled job {at_job_id}: {e}", type="negative")
-
-    def _get_recurring_info(self, at_job_id):
-        """Return (schedule_id, description) if the at job is a queued run of a recurring schedule, else None."""
-        try:
-            metadata = self.redis_client.redis.hgetall(f"desto:atjob:{at_job_id}")
-        except Exception:
-            return None
-        if metadata and metadata.get("recurring_id"):
-            return metadata["recurring_id"], metadata.get("recurrence", "recurring")
-        return None
-
     def is_tmux_session_active(self, session_name: str) -> bool:
         """Check if a tmux session with the given name exists."""
         try:
@@ -209,395 +127,6 @@ class TmuxManager:
         except Exception as e:
             logger.error(f"Error checking tmux session '{session_name}': {e}")
             return False
-
-    def get_all_sessions_status(self):
-        """Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it."""
-        sessions = {}
-        try:
-            # Get all session keys from Redis
-            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
-            for key in all_keys:
-                try:
-                    session_id = key.replace("desto:session:", "")
-                    session_data = self.redis_client.redis.hgetall(key)
-                    if session_data:
-                        session_info = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()}
-                        # Use session_name if present, else fallback to id
-                        display_session_name = session_info.get("session_name", session_id)
-                        sessions[display_session_name] = session_info
-                except Exception as e:
-                    logger.error(f"Error processing session key {key}: {e}")
-                    continue
-        except Exception as e:
-            logger.error(f"Error getting all sessions from Redis: {e}")
-        # Add active tmux sessions not in Redis (edge case)
-        active_tmux = self.check_sessions()
-        for sname, sdata in active_tmux.items():
-            if sname not in sessions:
-                sessions[sname] = sdata
-        return sessions
-
-    def render_sessions_controls_and_stats(self, sessions_status, ui_manager=None, counts=None):
-        """Render the stats cards and control buttons (Refresh, Clear History, Clear Logs)."""
-        from nicegui import ui
-
-        # --- Control Buttons (Refresh, Clear History, Clear Logs) ---
-        with ui.row().style("width: 100%; justify-content: space-between; align-items: center; margin-bottom: 20px;"):
-            ui.label("Sessions Dashboard").style("font-size: 1.5em; font-weight: bold; margin-left: 10px;")
-            with ui.row().style("gap: 10px;"):
-                ui.button("Refresh", icon="refresh", on_click=lambda: self.update_sessions_status(force=True)).props("flat")
-                ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
-                ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
-
-        # --- 'at' Daemon Status Check ---
-        from desto.redis.at_job_manager import AtJobManager
-
-        at_running = self._is_atd_running_cached(AtJobManager)
-        if not at_running:
-            with ui.row().style("width: 100%; align-items: center; margin-bottom: 20px; padding: 15px; border-radius: 8px;").classes("bg-orange-1 dark:bg-orange-9") as warning_row:
-                ui.icon("warning", color="orange").style("font-size: 2em; margin-right: 15px;")
-                with ui.column().style("flex-grow: 1;"):
-                    ui.label("System 'at' daemon is not running").style("font-weight: bold; color: #ef6c00;")
-                    ui.label("Scheduled jobs will be managed by desto's internal scheduler while the dashboard is open. For background execution, please enable 'atd' on your system.").style("font-size: 0.9em;")
-                    if sys.platform == "darwin":
-                        ui.label("On macOS: sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.atrun.plist").style("font-family: monospace; font-size: 0.8em; margin-top: 5px;")
-                ui.button(icon="close", on_click=lambda: warning_row.delete()).props("flat round color=orange")
-
-        # --- Stats Cards (Total, Finished, Failed, Running) ---
-        # Counts use the same classification as the table rows, and clicking a card filters the table.
-        if counts is None:
-            counts = self._count_by_category(sessions_status)
-        cards = [
-            (None, "Total Sessions", counts.get("total", 0), "#2196F3"),
-            ("finished", "Finished", counts.get("finished", 0), "#4CAF50"),
-            ("failed", "Failed", counts.get("failed", 0), "#F44336"),
-            ("running", "Running", counts.get("running", 0), "#FF9800"),
-        ]
-        with ui.row().style("gap: 30px; margin-bottom: 20px; flex-wrap: wrap; margin-left: 10px;"):
-            for category, title, value, color in cards:
-                active = self.status_filter == category
-                card = ui.card().style("padding: 15px; min-width: 120px; text-align: center; cursor: pointer;").classes("bg-white dark:!bg-slate-900")
-                if active and category is not None:
-                    card.classes("ring-2 ring-blue-500")
-                card.on("click", lambda c=category: self.set_status_filter(c))
-                with card:
-                    ui.label(str(value)).style(f"font-size: 2em; font-weight: bold; color: {color};")
-                    ui.label(title).style("font-size: 0.9em;").classes("text-slate-600 dark:text-slate-400")
-                    card.tooltip("Show all sessions" if category is None else f"Show only {title.lower()} sessions")
-
-    def set_status_filter(self, category):
-        """Filter the sessions table by category; clicking the active filter (or Total) clears it."""
-        self.status_filter = None if category is None or category == self.status_filter else category
-        self.update_sessions_status(force=True)
-
-    def _is_atd_running_cached(self, at_job_manager_cls, ttl: float = 60.0) -> bool:
-        """The atd check spawns processes, so only run it once a minute."""
-        checked_at, running = self._atd_cache
-        now = time.monotonic()
-        if now - checked_at > ttl or checked_at == 0.0:
-            running = at_job_manager_cls.is_atd_running()
-            self._atd_cache = (now, running)
-        return running
-
-    @staticmethod
-    def _decode_hash(data):
-        return {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in data.items()}
-
-    def _job_info_by_session(self):
-        """Read every job once and summarise it per session id.
-
-        Returns {session_id: {"status", "exit_code", "command"}}. This replaces the per-row
-        get_job_status() lookups, which scanned all sessions and all jobs for every row.
-        """
-        result = {}
-        try:
-            r = self.redis_client.redis
-            keys = list(r.scan_iter(match="desto:job:*", count=500))
-            if not keys:
-                return result
-            pipe = r.pipeline(transaction=False)
-            for key in keys:
-                pipe.hgetall(key)
-            jobs_by_session = {}
-            for data in pipe.execute():
-                if data:
-                    job = self._decode_hash(data)
-                    jobs_by_session.setdefault(job.get("session_id", ""), []).append(job)
-        except Exception as e:
-            logger.debug(f"Could not read jobs from Redis: {e}")
-            return result
-
-        for session_id, jobs in jobs_by_session.items():
-            jobs.sort(key=lambda j: j.get("job_id", ""))
-            statuses = [j.get("status", "") for j in jobs]
-            if "running" in statuses:
-                overall = "running"
-            elif "failed" in statuses:
-                overall = "failed"
-            elif all(st == "finished" for st in statuses):
-                overall = "finished"
-            else:
-                overall = "queued"
-            exit_code = None
-            for job in jobs:
-                if job.get("status") in ("finished", "failed"):
-                    code = job.get("exit_code") or ""
-                    if not code:
-                        match = re.search(r"code:?\s*(-?\d+)", job.get("error_message") or "")
-                        code = match.group(1) if match else ""
-                    if code:
-                        exit_code = code
-            result[session_id] = {"status": overall, "exit_code": exit_code, "command": jobs[0].get("command", "")}
-        return result
-
-    @staticmethod
-    def _classify_session(session_name, session, tmux_active, job_info):
-        """Return (category, label, color) for a session row.
-
-        category is one of "running", "finished", "failed" or "scheduled".
-        """
-        info = job_info.get(session.get("session_id", ""), {}) if job_info else {}
-        status_field = (session.get("status", "") or "").lower()
-        job_status_field = (session.get("job_status", "") or info.get("status", "") or "").lower()
-        fields = (status_field, job_status_field)
-
-        if "finished" in fields:
-            category = "finished"
-        elif "failed" in fields:
-            category = "failed"
-        elif "scheduled" in fields:
-            category = "scheduled"
-        else:
-            category = "running"
-
-        # If tmux is not active, the session cannot still be running.
-        if category == "running" and not tmux_active and "running" in fields:
-            category = "finished" if session.get("end_time") else "failed"
-            if category == "failed":
-                return category, "❌ Failed (tmux closed)", "#F44336"
-
-        if category == "finished":
-            return category, "✅ Finished", "#4CAF50"
-        if category == "failed":
-            code = info.get("exit_code")
-            label = f"❌ Failed · exit {code}" if code not in (None, "", "0") else "❌ Failed"
-            return category, label, "#F44336"
-        if category == "scheduled":
-            return category, "📅 Scheduled", "#9C27B0"
-        return category, "🟡 Running", "#FF9800"
-
-    def _count_by_category(self, sessions_status, tmux_active=None, job_info=None):
-        if tmux_active is None:
-            tmux_active = set(self.check_sessions().keys())
-        job_info = job_info or {}
-        counts = {"total": 0, "running": 0, "finished": 0, "failed": 0}
-        for name, session in sessions_status.items():
-            category, _, _ = self._classify_session(name, session, name in tmux_active, job_info)
-            if category == "scheduled":
-                continue
-            counts["total"] += 1
-            counts[category] += 1
-        return counts
-
-    def confirm_clear_history(self):
-        """Show confirmation dialog before clearing session history. Pauses updates while dialog is open."""
-        from nicegui import ui
-
-        if self.pause_updates:
-            self.pause_updates()
-
-        def close_dialog():
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
-            self.telemetry_event("confirm_clear_history.open", {})
-            ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-            ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
-            ui.label("This action cannot be undone.").style("margin-bottom: 20px;").classes("text-slate-600 dark:text-slate-400")
-
-            def _close_and_telemetry_cancel():
-                close_dialog()
-                self.telemetry_event("confirm_clear_history.cancel", {})
-
-            def _clear_and_telemetry_confirm():
-                self.clear_session_history()
-                close_dialog()
-                self.telemetry_event("confirm_clear_history.confirm", {})
-
-            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
-                ui.button("Cancel", on_click=_close_and_telemetry_cancel).props("color=grey")
-                ui.button("Clear History", color="red", on_click=_clear_and_telemetry_confirm).props("icon=delete_forever")
-        dialog.open()
-
-    def clear_session_history(self):
-        """Clear all session history from Redis."""
-        try:
-            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
-            if not all_keys:
-                ui.notification("No session history to clear", type="info")
-                return
-            deleted_count = 0
-            for key in all_keys:
-                try:
-                    self.redis_client.redis.delete(key)
-                    deleted_count += 1
-                except Exception as e:
-                    logger.error(f"Error deleting session key {key}: {e}")
-            if deleted_count > 0:
-                msg = f"Successfully cleared {deleted_count} session record(s) from history"
-                logger.info(msg)
-                ui.notification(msg, type="positive")
-                self.update_sessions_status()
-            else:
-                ui.notification("No sessions were cleared", type="warning")
-        except Exception as e:
-            error_msg = f"Error clearing session history: {e}"
-            logger.error(error_msg)
-            ui.notification(error_msg, type="negative")
-
-    def confirm_clear_logs(self):
-        """Show confirmation dialog before clearing log files. Pauses updates while dialog is open."""
-        from nicegui import ui
-
-        log_dir = self.LOG_DIR
-        log_files = []
-        if log_dir.exists():
-            log_files = list(log_dir.glob("*.log"))
-        if not log_files:
-            ui.notification("No log files found to clear", type="info")
-            return
-        if self.pause_updates:
-            self.pause_updates()
-
-        def close_dialog():
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
-            self.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
-            ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
-            ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
-            ui.label(str(log_dir)).style("font-family: monospace; padding: 5px; border-radius: 3px; margin-bottom: 15px;").classes("bg-slate-100 dark:!bg-slate-800")
-            if len(log_files) <= 5:
-                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
-                for log_file in log_files:
-                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
-            else:
-                ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
-                for log_file in log_files[:3]:
-                    ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
-                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; font-size: 0.9em;").classes("text-slate-600")
-
-            def _close_logs_cancel():
-                close_dialog()
-                self.telemetry_event("confirm_clear_logs.cancel", {})
-
-            def _confirm_clear_logs():
-                self.clear_log_files()
-                close_dialog()
-                self.telemetry_event("confirm_clear_logs.confirm", {})
-
-            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=_close_logs_cancel).props("color=grey")
-                ui.button("Clear Log Files", color="orange", on_click=_confirm_clear_logs).props("icon=folder_delete")
-        dialog.open()
-
-    def clear_log_files(self):
-        """Clear all log files from the logs directory."""
-        log_dir = self.LOG_DIR
-        if not log_dir.exists():
-            ui.notification("Logs directory not found", type="warning")
-            return
-        try:
-            log_files = list(log_dir.glob("*.log"))
-            finished_files = list(log_dir.glob("*.finished"))
-            all_files = log_files + finished_files
-            if not all_files:
-                ui.notification("No log files found to clear", type="info")
-                return
-            deleted_count = 0
-            errors = []
-            for file_path in all_files:
-                try:
-                    file_path.unlink()
-                    deleted_count += 1
-                    logger.info(f"Deleted log file: {file_path}")
-                except Exception as e:
-                    error_msg = f"Failed to delete {file_path.name}: {str(e)}"
-                    errors.append(error_msg)
-                    logger.error(error_msg)
-            if deleted_count > 0:
-                msg = f"Successfully deleted {deleted_count} log file(s)"
-                if errors:
-                    msg += f" ({len(errors)} errors)"
-                logger.info(msg)
-                ui.notification(msg, type="positive")
-                self.update_sessions_status()
-            if errors:
-                error_summary = "; ".join(errors[:3])
-                if len(errors) > 3:
-                    error_summary += f" (+{len(errors) - 3} more)"
-                ui.notification(f"Errors: {error_summary}", type="warning")
-        except Exception as e:
-            error_msg = f"Error clearing log files: {e}"
-            logger.error(error_msg)
-            ui.notification(error_msg, type="negative")
-
-    def _start_redis_monitoring(self, session_name):
-        """Monitor tmux session and update Redis."""
-        # Skip monitoring if Redis is not available
-        if not self.desto_manager:
-            return
-
-        def monitor():
-            # Give the session a moment to start up before monitoring
-            time.sleep(2)
-            logger.debug(f"Starting Redis monitoring for session {session_name}")
-
-            while True:
-                try:
-                    # Check if tmux session still exists
-                    sessions = self.check_sessions()
-                    if session_name not in sessions:
-                        # Session finished (entire tmux session ended)
-                        if self.desto_manager:
-                            self.desto_manager.finish_session(session_name, exit_code=0)
-                        logger.info(f"Session {session_name} monitoring ended - tmux session terminated")
-                        break
-
-                    # Update heartbeat
-                    if self.desto_manager:
-                        self.desto_manager.update_heartbeat(session_name)
-                        logger.debug(f"Updated heartbeat for session {session_name}")
-
-                    time.sleep(5)
-                except Exception as e:
-                    self.logger.error(f"Error monitoring session {session_name}: {e}")
-                    time.sleep(10)
-
-        threading.Thread(target=monitor, daemon=True).start()
-
-    def get_unique_session_name(self, base_name: str) -> str:
-        """Generate a unique session name by appending an incrementing index if needed."""
-        taken = set(self.check_sessions().keys())
-        # Also include Redis session names (scheduled, starting, running)
-        if self.desto_manager:
-            try:
-                for s in self.desto_manager.session_manager.list_all_sessions():
-                    name = getattr(s, "session_name", None)
-                    if name:
-                        taken.add(name)
-            except Exception:
-                pass
-        if base_name not in taken:
-            return base_name
-        idx = 2
-        while f"{base_name}-{idx}" in taken:
-            idx += 1
-        return f"{base_name}-{idx}"
 
     def check_sessions(self):
         """Check the status of existing tmux sessions with detailed information."""
@@ -641,25 +170,57 @@ class TmuxManager:
 
         return active_sessions
 
-    def kill_session(self, session_name):
-        """Kill a tmux session by name."""
-        msg = f"Attempting to kill session: '{session_name}'"
-        self.logger.info(msg)
-        escaped_session_name = shlex.quote(session_name)
-        result = subprocess.run(
-            ["tmux", "kill-session", "-t", escaped_session_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if result.returncode == 0:
-            msg = f"Session '{session_name}' killed successfully."
-            self.logger.info(msg)  # Changed from logger.success to logger.info
-            self.ui.notification(msg, type="positive")
-        else:
-            msg = f"Failed to kill session '{session_name}': {result.stderr}"
-            self.logger.warning(msg)
-            self.ui.notification(msg, type="negative")
+    def get_all_sessions_status(self):
+        """Return a list of all sessions (active, finished, failed, scheduled) from Redis, similar to the history tab, but independent of it."""
+        sessions = {}
+        try:
+            # Get all session keys from Redis
+            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
+            for key in all_keys:
+                try:
+                    session_id = key.replace("desto:session:", "")
+                    session_data = self.redis_client.redis.hgetall(key)
+                    if session_data:
+                        session_info = decode_hash(session_data)
+                        # Use session_name if present, else fallback to id
+                        display_session_name = session_info.get("session_name", session_id)
+                        sessions[display_session_name] = session_info
+                except Exception as e:
+                    logger.error(f"Error processing session key {key}: {e}")
+                    continue
+        except Exception as e:
+            logger.error(f"Error getting all sessions from Redis: {e}")
+        # Add active tmux sessions not in Redis (edge case)
+        active_tmux = self.check_sessions()
+        for sname, sdata in active_tmux.items():
+            if sname not in sessions:
+                sessions[sname] = sdata
+        return sessions
+
+    def get_unique_session_name(self, base_name: str) -> str:
+        """Generate a unique session name by appending an incrementing index if needed."""
+        taken = set(self.check_sessions().keys())
+        # Also include Redis session names (scheduled, starting, running)
+        if self.desto_manager:
+            try:
+                for s in self.desto_manager.session_manager.list_all_sessions():
+                    name = getattr(s, "session_name", None)
+                    if name:
+                        taken.add(name)
+            except Exception:
+                pass
+        if base_name not in taken:
+            return base_name
+        idx = 2
+        while f"{base_name}-{idx}" in taken:
+            idx += 1
+        return f"{base_name}-{idx}"
+
+    def get_log_file(self, session_name):
+        return self.LOG_DIR / f"{session_name}.log"
+
+    def get_script_file(self, script_name):
+        return self.SCRIPTS_DIR / script_name
 
     def clear_sessions_container(self):
         """Clears the sessions container."""
@@ -669,12 +230,6 @@ class TmuxManager:
         """Adds content to the sessions container."""
         with self.sessions_container:
             content()
-
-    def get_log_file(self, session_name):
-        return self.LOG_DIR / f"{session_name}.log"
-
-    def get_script_file(self, script_name):
-        return self.SCRIPTS_DIR / script_name
 
     def start_tmux_session(self, session_name, command, instance_logger):
         """Starts a new tmux session with the given name and command, redirecting output to a log file.
@@ -787,66 +342,55 @@ class TmuxManager:
             logger.error(msg)
             ui.notification(msg, type="negative")
 
-    def update_sessions_status(self, ui_manager=None, force=True):
-        """Render the sessions dashboard (stats cards, sessions table, scheduled jobs).
-
-        Data is gathered in a few cheap batched calls. With force=False (the periodic timer),
-        the dashboard is only rebuilt when something actually changed, so the page does not
-        flicker and scroll position or open menus are not reset. Live durations of running
-        sessions are updated in place by tick_live_durations().
-        """
-        sessions_status = self.get_all_sessions_status()
-        tmux_active = set(self.check_sessions().keys())
-        job_info = self._job_info_by_session()
-        scheduled_jobs = self._get_scheduled_jobs_with_metadata()
-
-        signature = json.dumps([sessions_status, sorted(tmux_active), job_info, scheduled_jobs, self.status_filter], sort_keys=True, default=str)
-        if not force and signature == self._last_render_signature:
+    def _start_redis_monitoring(self, session_name):
+        """Monitor tmux session and update Redis."""
+        # Skip monitoring if Redis is not available
+        if not self.desto_manager:
             return
-        self._last_render_signature = signature
 
-        counts = self._count_by_category(sessions_status, tmux_active, job_info)
-        self.clear_sessions_container()
+        def monitor():
+            # Give the session a moment to start up before monitoring
+            time.sleep(2)
+            logger.debug(f"Starting Redis monitoring for session {session_name}")
 
-        def render():
-            self.render_sessions_controls_and_stats(sessions_status, ui_manager, counts=counts)
-            self.add_sessions_table(sessions_status, self.ui, tmux_active=tmux_active, job_info=job_info, scheduled_jobs=scheduled_jobs)
+            while True:
+                try:
+                    # Check if tmux session still exists
+                    sessions = self.check_sessions()
+                    if session_name not in sessions:
+                        # Session finished (entire tmux session ended)
+                        if self.desto_manager:
+                            self.desto_manager.finish_session(session_name, exit_code=0)
+                        logger.info(f"Session {session_name} monitoring ended - tmux session terminated")
+                        break
 
-        self.add_to_sessions_container(render)
+                    # Update heartbeat
+                    if self.desto_manager:
+                        self.desto_manager.update_heartbeat(session_name)
+                        logger.debug(f"Updated heartbeat for session {session_name}")
 
-    def _get_scheduled_jobs_with_metadata(self):
-        """Return atq jobs plus the Redis metadata for each, without spawning `at -c` per job."""
-        jobs = self.get_scheduled_jobs(include_command=False)
-        if not jobs:
-            return []
-        try:
-            pipe = self.redis_client.redis.pipeline(transaction=False)
-            for job in jobs:
-                pipe.hgetall(f"desto:atjob:{job.get('id')}")
-            for job, metadata in zip(jobs, pipe.execute()):
-                job["metadata"] = self._decode_hash(metadata) if metadata else None
-        except Exception as e:
-            logger.debug(f"Could not read scheduled job metadata: {e}")
-            for job in jobs:
-                job.setdefault("metadata", None)
-        return jobs
+                    time.sleep(5)
+                except Exception as e:
+                    self.logger.error(f"Error monitoring session {session_name}: {e}")
+                    time.sleep(10)
 
-    def tick_live_durations(self):
-        """Update the duration labels of running sessions in place (no table rebuild)."""
-        for label, start_dt in self._live_duration_labels:
-            try:
-                now_dt = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
-                label.text = self._format_seconds(int((now_dt - start_dt).total_seconds()))
-            except Exception:
-                pass
+        threading.Thread(target=monitor, daemon=True).start()
 
-    @staticmethod
-    def _format_seconds(elapsed_seconds):
-        if elapsed_seconds < 0:
-            return "N/A"
-        hours, remainder = divmod(elapsed_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+    def get_job_completion_command(self, session_name, use_variable=False):
+        """Get the appropriate command to mark job completion.
+
+        Args:
+            session_name: Name of the session
+            use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
+        """
+        exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
+
+        # If Redis is not available, fall back to file-based markers
+        if not self.use_redis:
+            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
+
+        # Use the bundled hook module so this works from an installed package, not just a source checkout
+        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
 
     def rerun_session(self, session_name, command):
         """Launch the same command again in a new session (name-2, name-3, ...)."""
@@ -868,6 +412,26 @@ class TmuxManager:
         self.start_tmux_session(new_name, command, logger)
         self.update_sessions_status(force=True)
 
+    def kill_session(self, session_name):
+        """Kill a tmux session by name."""
+        msg = f"Attempting to kill session: '{session_name}'"
+        self.logger.info(msg)
+        escaped_session_name = shlex.quote(session_name)
+        result = subprocess.run(
+            ["tmux", "kill-session", "-t", escaped_session_name],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0:
+            msg = f"Session '{session_name}' killed successfully."
+            self.logger.info(msg)  # Changed from logger.success to logger.info
+            self.ui.notification(msg, type="positive")
+        else:
+            msg = f"Failed to kill session '{session_name}': {result.stderr}"
+            self.logger.warning(msg)
+            self.ui.notification(msg, type="negative")
+
     def kill_tmux_session(self, session_name):
         """Kills a tmux session by name."""
         try:
@@ -877,574 +441,6 @@ class TmuxManager:
             msg = f"Failed to kill tmux session '{session_name}': {e}"
             logger.warning(msg)
             ui.notification(msg, type="negative")
-
-    def confirm_kill_session(self, session_name):
-        """Displays a confirmation dialog before killing a tmux session and pauses updates."""
-        logger.debug(f"User requested to kill session: {session_name}")
-        if self.pause_updates:
-            self.pause_updates()  # Pause the global timer
-
-        with self.ui.dialog() as dialog, self.ui.card():
-            # Telemetry: dialog opened
-            self.telemetry_event("confirm_kill_session.open", {"session": session_name})
-            self.ui.label(f"Are you sure you want to kill the session '{session_name}'?")
-
-            def _confirm_kill():
-                logger.info(f"User confirmed killing session: {session_name}")
-                self.telemetry_event("confirm_kill_session.confirm", {"session": session_name})
-                self.kill_tmux_session(session_name)
-                dialog.close()
-                self.resume_updates()  # Resume updates after killing
-
-            def _cancel_kill():
-                logger.debug(f"User cancelled killing session: {session_name}")
-                self.telemetry_event("confirm_kill_session.cancel", {"session": session_name})
-                dialog.close()
-                self.resume_updates()  # Resume updates if canceled
-
-            with self.ui.row():
-                self.ui.button("Yes", on_click=_confirm_kill).props("color=red")
-                self.ui.button("No", on_click=_cancel_kill)
-
-        dialog.open()
-
-    # single-session confirmation shown above; do not open the 'kill all' dialog here
-
-    def get_script_run_time(self, created_time, session_name):
-        """Returns the elapsed time for a session using Redis data."""
-        try:
-            # Get session from Redis using new manager
-            session = self.desto_manager.session_manager.get_session_by_name(session_name)
-            if session and session.end_time:
-                # Session has ended, use the recorded end time
-                end_time = session.end_time.timestamp()
-            else:
-                # Session is still running, use current time
-                end_time = time.time()
-
-            return int(end_time - created_time)
-        except Exception as e:
-            logger.warning(f"Failed to get script run time for {session_name}: {e}")
-            # Fallback to current time
-            return int(time.time() - created_time)
-
-    def add_sessions_table(self, sessions_status, ui, tmux_active=None, job_info=None, scheduled_jobs=None):
-        """Adds the sessions table to the UI, using the history tab's columns plus an Actions column."""
-        if tmux_active is None:
-            tmux_active = set(self.check_sessions().keys())
-        if job_info is None:
-            job_info = self._job_info_by_session()
-        self._live_duration_labels = []
-
-        # Table header
-        with ui.row().style("width: 100%; min-width: 1100px; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;").classes("bg-slate-100 dark:!bg-slate-800 text-slate-900 dark:text-slate-100"):
-            ui.label("Session Name").style("flex: 2; min-width: 150px;")
-            ui.label("Status").style("flex: 1; min-width: 100px;")
-            ui.label("Job Duration").style("flex: 1; min-width: 120px;")
-            ui.label("Session Duration").style("flex: 1; min-width: 130px;")
-            ui.label("Started").style("flex: 2; min-width: 140px;")
-            ui.label("Finished").style("flex: 2; min-width: 140px;")
-            ui.label("Tmux Active").style("flex: 1; min-width: 100px;")
-            ui.label("Actions").style("flex: 1; min-width: 120px;")
-
-        # --- Only show non-scheduled sessions in the main table, newest first, honouring the filter ---
-        rows = []
-        for session_name, session in sessions_status.items():
-            is_active = session_name in tmux_active
-            category, status, status_color = self._classify_session(session_name, session, is_active, job_info)
-            if category == "scheduled":
-                continue
-            if self.status_filter and category != self.status_filter:
-                continue
-            sort_key = str(session.get("start_time") or "")
-            if not sort_key and session.get("created"):
-                try:
-                    sort_key = datetime.fromtimestamp(float(session["created"])).isoformat()
-                except Exception:
-                    pass
-            rows.append((sort_key, session_name, session, is_active, status, status_color))
-        rows.sort(key=lambda r: r[0], reverse=True)
-
-        if not rows and self.status_filter:
-            ui.label(f"No {self.status_filter} sessions. Click the card again to show all.").style("padding: 12px;").classes("text-slate-500")
-
-        for _, session_name, session, tmux_active_row, status, status_color in rows:
-            job_status = session.get("job_status", "") or session.get("status", "")
-            command = job_info.get(session.get("session_id", ""), {}).get("command", "")
-
-            # Times and durations
-            created_time = session.get("created")
-            start_time = session.get("start_time")
-            end_time = session.get("end_time")
-            # Fallback for start_time
-            if not start_time and created_time:
-                start_time = datetime.fromtimestamp(float(created_time)).isoformat()
-
-            # Format start time
-            if start_time:
-                try:
-                    dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
-                    formatted_start_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    formatted_start_time = str(start_time)[:19] if len(str(start_time)) > 19 else str(start_time)
-            else:
-                formatted_start_time = "Unknown"
-
-            # Format end time
-            if end_time:
-                try:
-                    dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
-                    formatted_end_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-                except Exception:
-                    formatted_end_time = str(end_time)[:19] if len(str(end_time)) > 19 else str(end_time)
-            else:
-                formatted_end_time = "Running" if job_status == "running" else "N/A"
-
-            # --- Job Duration (script execution time) ---
-            job_duration = "N/A"
-            # Try to calculate from start_time and end_time
-            if start_time and end_time:
-                try:
-                    start_dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
-                    end_dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
-                    elapsed_seconds = int((end_dt - start_dt).total_seconds())
-                    if elapsed_seconds >= 0:
-                        hours, remainder = divmod(elapsed_seconds, 3600)
-                        minutes, seconds = divmod(remainder, 60)
-                        job_duration = f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
-                except Exception:
-                    pass
-            # Fallback to job_elapsed or elapsed fields
-            if job_duration == "N/A":
-                job_duration = session.get("job_elapsed", session.get("elapsed", "N/A"))
-
-            # --- Session Duration (total session time) ---
-            session_duration = None
-            if start_time:
-                try:
-                    start_dt = datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))
-                    if end_time:
-                        end_dt = datetime.fromisoformat(str(end_time).replace("Z", "+00:00"))
-                        elapsed_seconds = int((end_dt - start_dt).total_seconds())
-                    else:
-                        now_dt = datetime.now(start_dt.tzinfo) if start_dt.tzinfo else datetime.now()
-                        elapsed_seconds = int((now_dt - start_dt).total_seconds())
-                    if elapsed_seconds >= 0:
-                        hours, remainder = divmod(elapsed_seconds, 3600)
-                        minutes, seconds = divmod(remainder, 60)
-                        session_duration = f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
-                    else:
-                        session_duration = "N/A"
-                except Exception:
-                    session_duration = "N/A"
-            else:
-                session_duration = "N/A"
-
-            def format_duration(duration_str):
-                if duration_str in ["N/A", "unknown", "Ongoing"]:
-                    return duration_str
-                if ":" in str(duration_str):
-                    try:
-                        if "day" in str(duration_str):
-                            parts = str(duration_str).split(", ")
-                            days_part = parts[0]
-                            time_part = parts[1] if len(parts) > 1 else "0:00:00"
-                            days = int(days_part.split()[0])
-                        else:
-                            days = 0
-                            time_part = str(duration_str)
-                        time_components = time_part.split(":")
-                        if len(time_components) >= 3:
-                            hours = int(time_components[0]) + (days * 24)
-                            minutes = int(time_components[1])
-                            seconds = int(float(time_components[2]))
-                            if hours > 0:
-                                return f"{hours}h {minutes}m {seconds}s"
-                            elif minutes > 0:
-                                return f"{minutes}m {seconds}s"
-                            else:
-                                return f"{seconds}s"
-                    except Exception:
-                        pass
-                return str(duration_str)
-
-            job_duration = format_duration(job_duration)
-            session_duration = format_duration(session_duration)
-
-            with ui.row().style("width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"):
-                ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
-                ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
-                ui.label(job_duration).style("flex: 1; min-width: 120px;").classes("text-slate-700 dark:text-slate-400")
-                duration_label = ui.label(session_duration).style("flex: 1; min-width: 130px;").classes("text-slate-700 dark:text-slate-400")
-                if start_time and not end_time and tmux_active_row:
-                    try:
-                        self._live_duration_labels.append((duration_label, datetime.fromisoformat(str(start_time).replace("Z", "+00:00"))))
-                    except Exception:
-                        pass
-                ui.label(formatted_start_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
-                ui.label(formatted_end_time).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
-                # Tmux Active column
-                icon = "check_circle" if tmux_active_row else "cancel"
-                color = "#4CAF50" if tmux_active_row else "#F44336"
-                ui.icon(icon).style(f"flex: 1; min-width: 100px; color: {color}; font-size: 1.5em; text-align: center;")
-                with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
-                    # Kill while running; once the tmux session is gone, the slot becomes Re-run.
-                    if tmux_active_row:
-                        ui.button(
-                            "Kill",
-                            on_click=lambda s=session_name: self.confirm_kill_session(s),
-                        ).props("color=red flat")
-                    elif command:
-                        ui.button(
-                            "Re-run",
-                            on_click=lambda s=session_name, c=command: self.rerun_session(s, c),
-                        ).props("color=green flat").tooltip("Run the same command again in a new session")
-                    else:
-                        ui.button(
-                            "Kill",
-                            on_click=lambda: ui.notification("Cannot kill: no active tmux session for this entry.", type="warning"),
-                        ).props("color=red flat disabled")
-                    ui.button(
-                        "View Log",
-                        on_click=lambda s=session_name: self.view_log(s, ui),
-                    ).props("color=blue flat")
-                    ui.button(
-                        "Clear",
-                        on_click=lambda s=session_name: self.confirm_clear_session(s, ui),
-                    ).props("color=orange flat")
-
-        # --- Scheduled Jobs Table (from atq + Redis metadata) ---
-        if scheduled_jobs is None:
-            scheduled_jobs = self._get_scheduled_jobs_with_metadata()
-        if scheduled_jobs:
-            with ui.row().style("margin-top: 40px; margin-bottom: 10px;"):
-                ui.label("Scheduled Jobs (with metadata)").style("font-size: 1.2em; font-weight: bold;")
-
-            # Table header for scheduled jobs
-            with ui.row().style("width: 100%; min-width: 700px; padding: 10px; border-radius: 4px; font-weight: bold;").classes("bg-slate-100 dark:!bg-slate-800 text-slate-900 dark:text-slate-100"):
-                ui.label("Job ID").style("flex: 1; min-width: 80px;")
-                ui.label("Scheduled Time").style("flex: 2; min-width: 180px;")
-                ui.label("User").style("flex: 1; min-width: 100px;")
-                ui.label("Status").style("flex: 1; min-width: 100px;")
-                ui.label("Actions").style("flex: 1; min-width: 120px;")
-
-            for job in scheduled_jobs:
-                job_id = job.get("id", "?")
-                metadata = job.get("metadata")
-                status = metadata.get("status", "scheduled") if metadata else "scheduled"
-
-                # Filter out jobs that have been handled by the internal scheduler
-                if status in ["finished_internal", "running_internal"]:
-                    continue
-
-                if metadata and metadata.get("recurring_id"):
-                    status = f"{status} · {metadata.get('recurrence', 'recurring')}"
-
-                scheduled_time = metadata.get("scheduled_time", job.get("datetime", "?")) if metadata else job.get("datetime", "?")
-                user = metadata.get("user", job.get("user", "?")) if metadata else job.get("user", "?")
-
-                def show_metadata_dialog(job_id=job_id, metadata=metadata):
-                    if self.pause_updates:
-                        self.pause_updates()
-
-                    def close_dialog():
-                        dialog.close()
-                        if self.resume_updates:
-                            self.resume_updates()
-
-                    with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
-                        ui.label(f"Job Metadata for ID: {job_id}").style("font-weight: bold; font-size: 1.1em;")
-                        if metadata:
-                            for k in sorted(metadata.keys()):
-                                v = metadata[k]
-                                if k == "script_path":
-                                    try:
-                                        v_list = json.loads(v) if isinstance(v, str) else v
-                                        v = ", ".join(str(item) for item in v_list)
-                                    except Exception:
-                                        pass
-                                with ui.row():
-                                    ui.label(f"{k}:").style("font-weight: bold; width: 120px;")
-                                    ui.label(str(v)).style("flex: 1;")
-                        else:
-                            ui.label("No metadata found.")
-                        ui.button("Close", on_click=close_dialog)
-                    dialog.open()
-
-                with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"):
-                    ui.button(str(job_id), on_click=show_metadata_dialog, color="primary", icon="info").style("flex: 1; min-width: 80px; font-weight: 500;")
-                    ui.label(str(scheduled_time)).style("flex: 2; min-width: 180px;").classes("text-slate-700 dark:text-slate-400")
-                    ui.label(str(user)).style("flex: 1; min-width: 100px;").classes("text-slate-700 dark:text-slate-400")
-                    ui.label(str(status)).style("flex: 1; min-width: 100px;").classes("text-slate-700 dark:text-slate-400")
-                    with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
-                        ui.button(
-                            "Cancel",
-                            on_click=lambda j=job_id: self.confirm_cancel_scheduled_job_by_id(j),
-                        ).props("color=red flat")
-
-    def confirm_clear_session(self, session_name, ui):
-        """Show confirmation dialog before clearing a session (deletes log and removes from Redis)."""
-        if self.pause_updates:
-            self.pause_updates()
-
-        def do_clear():
-            self.clear_session(session_name, ui)
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        def cancel():
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            self.telemetry_event("confirm_clear_session.open", {"session": session_name})
-            ui.label(f"Are you sure you want to clear session '{session_name}'?").style("font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
-            ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
-
-            def _cancel_clear_session():
-                cancel()
-                self.telemetry_event("confirm_clear_session.cancel", {"session": session_name})
-
-            def _confirm_clear_session():
-                do_clear()
-                self.telemetry_event("confirm_clear_session.confirm", {"session": session_name})
-
-            with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
-                ui.button("Cancel", on_click=_cancel_clear_session).props("color=grey")
-                ui.button("Clear Session", color="orange", on_click=_confirm_clear_session).props("icon=delete_forever")
-        dialog.open()
-
-    def check_and_run_scheduled_jobs(self):
-        """Check for overdue scheduled jobs in Redis and run them if 'at' hasn't."""
-        if not self.desto_manager:
-            return
-
-        try:
-            # Scan for all atjob metadata in Redis
-            for key in self.redis_client.redis.scan_iter(match="desto:atjob:*"):
-                try:
-                    metadata = self.redis_client.redis.hgetall(key)
-                    if not metadata:
-                        continue
-
-                    # Convert bytes to strings if necessary
-                    metadata = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in metadata.items()}
-
-                    status = metadata.get("status")
-                    if status != "scheduled":
-                        # If it was already picked up by internal scheduler and finished,
-                        # or if it's been running for a long time, we might want to clean it up.
-                        # For now, just skip non-scheduled jobs.
-                        continue
-
-                    scheduled_time_str = metadata.get("scheduled_time")
-                    if not scheduled_time_str:
-                        continue
-
-                    try:
-                        scheduled_time = datetime.fromisoformat(scheduled_time_str)
-                    except Exception:
-                        # Fallback for other formats if any
-                        continue
-
-                    if datetime.now() >= scheduled_time:
-                        job_id = metadata.get("job_id")
-                        command = metadata.get("command")
-                        session_name = metadata.get("session_name")
-
-                        self.logger.info(f"Internal scheduler detected overdue job {job_id} (scheduled for {scheduled_time_str}). Running now.")
-
-                        # Atomically check and update status to prevent double execution
-                        # We use a WATCH/MULTI/EXEC pattern for a simple distributed lock
-                        # or just check current status before updating.
-                        # Since we want to ensure only one runner picks it up:
-                        can_run = False
-                        with self.redis_client.redis.pipeline() as pipe:
-                            try:
-                                pipe.watch(key)
-                                # Read using the main client, not the pipeline
-                                current_status = self.redis_client.redis.hget(key, "status")
-                                if current_status and (current_status == "scheduled" or (hasattr(current_status, "decode") and current_status.decode() == "scheduled")):
-                                    pipe.multi()
-                                    pipe.hset(key, "status", "running_internal")
-                                    pipe.execute()
-                                    can_run = True
-                                else:
-                                    pipe.unwatch()
-                            except redis.WatchError:
-                                can_run = False
-
-                        if can_run:
-                            # Run the command in a separate thread to not block the UI
-                            def run_job(cmd, s_name, k):
-                                try:
-                                    # We use shell=True because the command might contain quotes and arguments
-                                    # The command is already constructed to call start_scheduled_session.py
-                                    subprocess.run(cmd, shell=True, check=True)
-                                    self.logger.info(f"Successfully started overdue job {job_id}")
-                                    # Mark as finished in atjob metadata so it's not picked up again
-                                    # and can be filtered out from the scheduled jobs view
-                                    self.redis_client.redis.hset(k, "status", "finished_internal")
-                                except Exception as e:
-                                    self.logger.error(f"Failed to run overdue job {job_id}: {e}")
-                                    self.redis_client.redis.hset(k, "status", "failed_internal")
-
-                            threading.Thread(target=run_job, args=(command, session_name, key), daemon=True).start()
-
-                except Exception as e:
-                    self.logger.error(f"Error processing scheduled job key {key}: {e}")
-        except Exception as e:
-            self.logger.error(f"Error scanning scheduled jobs: {e}")
-
-    def clear_session(self, session_name, ui):
-        """Deletes the session's log file and removes the session from Redis, then refreshes the UI."""
-        # Delete log file
-        log_file = self.get_log_file(session_name)
-        log_deleted = False
-        try:
-            if log_file.exists():
-                log_file.unlink()
-                log_deleted = True
-                logger.info(f"Deleted log file for session: {session_name}")
-        except Exception as e:
-            logger.warning(f"Failed to delete log file for session {session_name}: {e}")
-
-        # Remove session from Redis (find correct key)
-        redis_deleted = False
-        try:
-            # Find the correct Redis key for this session
-            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
-            found_key = None
-            for key in all_keys:
-                session_data = self.redis_client.redis.hgetall(key)
-                if session_data:
-                    session_info = {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in session_data.items()}
-                    display_session_name = session_info.get("session_name", key.replace("desto:session:", ""))
-                    if display_session_name == session_name:
-                        found_key = key
-                        break
-            if found_key:
-                result = self.redis_client.redis.delete(found_key)
-                if result:
-                    redis_deleted = True
-                    logger.info(f"Deleted Redis session: {session_name} (key: {found_key})")
-            else:
-                logger.warning(f"Could not find Redis key for session '{session_name}'")
-        except Exception as e:
-            logger.warning(f"Failed to delete Redis session {session_name}: {e}")
-
-        # Notify user
-        if log_deleted and redis_deleted:
-            ui.notification(f"Session '{session_name}' cleared (log and Redis entry deleted)", type="positive")
-        elif log_deleted:
-            ui.notification(f"Session '{session_name}' log deleted, but failed to remove from Redis", type="warning")
-        elif redis_deleted:
-            ui.notification(f"Session '{session_name}' removed from Redis, but log file not found/deleted", type="warning")
-        else:
-            ui.notification(f"Failed to clear session '{session_name}' (see logs)", type="negative")
-
-        # Refresh UI
-        self.update_sessions_status(force=True)
-
-    def view_log(self, session_name, ui):
-        """Pauses the app and opens a dialog that live-tails the session's log file (last 100 lines, then follows)."""
-        logger.debug(f"User requested to view log for session: {session_name}")
-        if self.pause_updates:
-            self.pause_updates()  # Pause the global timer
-
-        log_file = self.get_log_file(session_name)
-        tailer = LogTailer(log_file)
-        closed = False
-
-        def close_dialog():
-            nonlocal closed
-            if closed:
-                return
-            closed = True
-            try:
-                timer.cancel()
-            except Exception:
-                logger.debug(f"Failed to cancel log follow timer for session: {session_name}")
-            try:
-                dialog.close()
-            except Exception:
-                logger.debug(f"Failed to close log dialog for session: {session_name}")
-            logger.debug(f"User closed log view for session: {session_name}")
-            if self.resume_updates:
-                self.resume_updates()  # Resume updates when the dialog is closed
-
-        def push_new_lines():
-            for line in tailer.poll():
-                log_view.push(line)
-
-        def set_live_state(active):
-            status_badge.text = "LIVE" if active else "ENDED"
-            status_badge.props(f"color={'positive' if active else 'grey'}")
-
-        def refresh():
-            try:
-                push_new_lines()
-            except Exception as e:
-                logger.error(f"Error refreshing log view for session {session_name}: {e}")
-            set_live_state(self.is_tmux_session_active(session_name))
-
-        def tick():
-            if closed or not auto_refresh.value:
-                return
-            try:
-                push_new_lines()
-            except Exception as e:
-                logger.error(f"Error following log for session {session_name}: {e}")
-                log_view.push(f"[desto] log follow error: {e}")
-                timer.cancel()
-                return
-            if not self.is_tmux_session_active(session_name):
-                try:
-                    push_new_lines()  # One final read after the session ended
-                except Exception as e:
-                    logger.error(f"Error during final log read for session {session_name}: {e}")
-                    log_view.push(f"[desto] log follow error: {e}")
-                set_live_state(False)
-                timer.cancel()
-
-        def download_log():
-            if not log_file.exists():
-                ui.notification(f"Log file for session '{session_name}' not found.", type="warning")
-                return
-            ui.download.file(log_file, filename=f"{session_name}.log", media_type="text/plain")
-
-        initial_lines = tailer.initial_lines(100)
-        is_active = self.is_tmux_session_active(session_name)
-
-        with (
-            ui.dialog() as dialog,
-            ui.card().style("width: 100%; height: 80%;").classes("dark:!bg-slate-900"),
-        ):
-            with ui.row().style("align-items: center; gap: 10px;"):
-                ui.label(f"Log for session '{session_name}'").style("font-weight: bold;").classes("flex-grow")
-                status_badge = ui.badge("LIVE" if is_active else "ENDED", color="positive" if is_active else "grey")
-
-            log_view = ui.log(max_lines=2000).style("width: 100%; height: 65vh;").classes("font-mono text-xs dark:text-slate-300")
-            if initial_lines:
-                logger.debug(f"Successfully read {len(initial_lines)} lines from log file for session: {session_name}")
-                for line in initial_lines:
-                    log_view.push(line)
-            elif not log_file.exists():
-                log_view.push(f"Log file for session '{session_name}' not found.")
-                logger.warning(f"Log file not found for session: {session_name}")
-
-            with ui.row().style("align-items: center; gap: 10px;"):
-                auto_refresh = ui.switch("Auto-refresh", value=True)
-                ui.button("Refresh now", on_click=refresh).props("color=primary flat")
-                ui.button("Download log", on_click=download_log).props("color=secondary flat")
-                ui.button("Close", on_click=close_dialog).props("color=primary")
-            timer = ui.timer(1.0, tick)
-
-        dialog.on("hide", lambda: close_dialog())
-        dialog.on_value_change(lambda e: close_dialog() if not e.value else None)
-        dialog.open()
 
     def kill_all_sessions(self):
         """Kill all active tmux sessions.
@@ -1481,240 +477,6 @@ class TmuxManager:
         logger.info(f"Killed {success_count}/{total_count} sessions")
         return (success_count, total_count, error_messages)
 
-    def confirm_kill_all_sessions(self):
-        """Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates."""
-        if self.pause_updates:
-            self.pause_updates()  # Pause the global timer
-
-        sessions_status = self.check_sessions()
-        session_count = len(sessions_status)
-
-        # Get scheduled jobs
-        scheduled_jobs = self.get_scheduled_jobs()
-        job_count = len(scheduled_jobs)
-
-        if session_count == 0 and job_count == 0:
-            msg = "No active sessions or scheduled jobs to clear."
-            logger.info(msg)
-            self.ui.notification(msg, type="info")
-            if self.resume_updates:
-                self.resume_updates()
-            return
-
-        # Get session status from Redis
-        running_sessions = []
-        finished_sessions = []
-
-        for session_name in sessions_status.keys():
-            try:
-                job_status = self.desto_manager.get_job_status(session_name)
-                if job_status in ["finished", "failed"]:
-                    finished_sessions.append(session_name)
-                else:
-                    running_sessions.append(session_name)
-            except Exception as e:
-                logger.warning(f"Could not get status for session {session_name}: {e}")
-                # Assume running if we can't determine status
-                running_sessions.append(session_name)
-
-        running_count = len(running_sessions)
-        finished_count = len(finished_sessions)
-
-        def do_kill_all():
-            session_success, session_total, job_success, job_total, error_messages = self.kill_all_sessions_and_jobs()
-
-            results = []
-            if session_total > 0:
-                if session_success == session_total:
-                    results.append(f"Successfully cleared all {session_total} sessions")
-                else:
-                    results.append(f"Cleared {session_success}/{session_total} sessions")
-
-            if job_total > 0:
-                if job_success == job_total:
-                    results.append(f"Successfully cancelled all {job_total} scheduled jobs")
-                else:
-                    results.append(f"Cancelled {job_success}/{job_total} scheduled jobs")
-
-            if not results:
-                results.append("No items to clear")
-
-            msg = ". ".join(results) + "."
-
-            if error_messages:
-                msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
-                logger.warning(msg)
-                self.ui.notification(msg, type="warning")
-            else:
-                logger.success(msg)
-                self.ui.notification(msg, type="positive")
-
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        def cancel_kill_all():
-            logger.debug("User cancelled kill all sessions operation")
-            dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
-
-        with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
-            self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-
-            # Build warning text
-            warning_parts = []
-            if session_count > 0:
-                if running_count > 0 and finished_count > 0:
-                    warning_parts.append(f"{session_count} sessions ({running_count} running, {finished_count} finished)")
-                elif running_count > 0:
-                    warning_parts.append(f"{running_count} RUNNING sessions")
-                else:
-                    warning_parts.append(f"{finished_count} finished sessions")
-
-            if job_count > 0:
-                warning_parts.append(f"{job_count} scheduled jobs")
-
-            warning_text = "This will clear:\n• " + "\n• ".join(warning_parts)
-            if running_count > 0:
-                warning_text += "\n\n⚠️ This may interrupt active processes!"
-
-            self.ui.label(warning_text).style("margin-bottom: 15px; white-space: pre-line;")
-
-            # Show running sessions
-            if running_count > 0:
-                self.ui.label("Running sessions:").style("font-weight: bold; margin-bottom: 5px;")
-                for session in running_sessions[:5]:  # Show max 5 sessions
-                    self.ui.label(f"• {session}").style("margin-left: 10px; color: #d32f2f;")
-                if len(running_sessions) > 5:
-                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style("margin-left: 10px; color: #666;")
-
-            # Show scheduled jobs
-            if job_count > 0:
-                self.ui.label("Scheduled jobs:").style("font-weight: bold; margin-bottom: 5px; margin-top: 10px;")
-                for job in scheduled_jobs[:5]:  # Show max 5 jobs
-                    self.ui.label(f"• Job {job['id']}: {job['datetime']}").style("margin-left: 10px; color: #ff9800;")
-                if len(scheduled_jobs) > 5:
-                    self.ui.label(f"• ... and {len(scheduled_jobs) - 5} more").style("margin-left: 10px; color: #666;")
-
-            with self.ui.row().style("margin-top: 20px; gap: 10px;"):
-                self.ui.button("Cancel", on_click=cancel_kill_all).props("color=grey")
-                self.ui.button("Clear All Jobs", color="red", on_click=do_kill_all).props("icon=delete_forever")
-
-        dialog.open()
-
-    def get_scheduled_jobs(self, include_command=True):
-        """Get a list of scheduled jobs from the 'at' command.
-        Returns a list of dictionaries with job info. include_command=False skips the
-        per-job `at -c` call (the dashboard table does not show the command).
-        """
-        try:
-            result = subprocess.run(["atq"], capture_output=True, text=True)
-            if result.returncode != 0:
-                self.logger.debug("No scheduled jobs found or 'at' command failed")
-                return []
-
-            jobs = []
-            for line in result.stdout.splitlines():
-                if line.strip():
-                    # Parse atq output: job_id date time queue user
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        job_id = parts[0]
-                        # Combine date and time parts (Mon Jul 14 07:59:00 2025)
-                        date_time = " ".join(parts[1:6]) if len(parts) >= 6 else " ".join(parts[1:5])
-                        user = parts[-1]
-
-                        # Try to get the actual command for this job
-                        command = self._get_scheduled_job_command(job_id) if include_command else ""
-
-                        # Format the datetime for better display
-                        formatted_datetime = self._format_scheduled_datetime(date_time)
-
-                        jobs.append({"id": job_id, "datetime": formatted_datetime, "raw_datetime": date_time, "user": user, "command": command})
-
-            return jobs
-        except Exception as e:
-            # Log once at warning level (e.g. `at` not installed), then quietly, since the dashboard polls this.
-            if not getattr(self, "_scheduled_jobs_warned", False):
-                self.logger.warning(f"Failed to get scheduled jobs: {e}")
-                self._scheduled_jobs_warned = True
-            else:
-                self.logger.debug(f"Failed to get scheduled jobs: {e}")
-            return []
-
-    def _get_scheduled_job_command(self, job_id):
-        """Get the actual command for a scheduled job."""
-        try:
-            result = subprocess.run(["at", "-c", job_id], capture_output=True, text=True)
-            if result.returncode == 0:
-                lines = result.stdout.splitlines()
-                # The actual command is usually the last non-empty line
-                for line in reversed(lines):
-                    line = line.strip()
-                    if line and not line.startswith("#") and not line.startswith("cd ") and "export" not in line:
-                        # Truncate very long commands
-                        if len(line) > 60:
-                            return line[:57] + "..."
-                        return line
-                return "Unknown command"
-            else:
-                return "Unknown command"
-        except Exception:
-            return "Unknown command"
-
-    def _format_scheduled_datetime(self, date_time):
-        """Format datetime from atq output for better display."""
-        try:
-            from datetime import datetime
-
-            # Parse format like "Mon Jul 14 07:59:00 2025"
-            dt = datetime.strptime(date_time, "%a %b %d %H:%M:%S %Y")
-            return dt.isoformat()
-        except Exception:
-            # Fallback to original if parsing fails
-            return date_time
-
-    def kill_scheduled_jobs(self):
-        """Kill all scheduled jobs and return summary.
-        Returns a tuple: (success_count, total_count, error_messages).
-        """
-        if self.desto_manager:
-            try:
-                from desto.redis.recurring import RecurringScheduleManager
-
-                RecurringScheduleManager(self.redis_client).cancel_all(remove_pending_jobs=False)
-            except Exception as e:
-                logger.warning(f"Failed to cancel recurring schedules: {e}")
-
-        jobs = self.get_scheduled_jobs()
-        total_count = len(jobs)
-        success_count = 0
-        error_messages = []
-
-        if total_count == 0:
-            logger.debug("No scheduled jobs found to kill")
-            return (0, 0, [])
-
-        logger.info(f"Attempting to cancel {total_count} scheduled jobs")
-
-        for job in jobs:
-            try:
-                subprocess.run(["atrm", job["id"]], check=True)
-                success_count += 1
-                logger.info(f"Successfully removed scheduled job: {job['id']}")
-            except subprocess.CalledProcessError as e:
-                error_msg = f"Failed to remove job '{job['id']}': {e}"
-                error_messages.append(error_msg)
-                logger.warning(error_msg)
-            except Exception as e:
-                error_msg = f"Unexpected error removing job '{job['id']}': {str(e)}"
-                error_messages.append(error_msg)
-                logger.error(error_msg)
-
-        logger.info(f"Cancelled {success_count}/{total_count} scheduled jobs")
-        return (success_count, total_count, error_messages)
-
     def kill_all_sessions_and_jobs(self):
         """Kill all active tmux sessions and scheduled jobs.
         Returns a tuple: (session_success, session_total, job_success, job_total, all_error_messages).
@@ -1729,18 +491,20 @@ class TmuxManager:
 
         return (session_success, session_total, job_success, job_total, all_errors)
 
-    def get_job_completion_command(self, session_name, use_variable=False):
-        """Get the appropriate command to mark job completion.
+    def get_script_run_time(self, created_time, session_name):
+        """Returns the elapsed time for a session using Redis data."""
+        try:
+            # Get session from Redis using new manager
+            session = self.desto_manager.session_manager.get_session_by_name(session_name)
+            if session and session.end_time:
+                # Session has ended, use the recorded end time
+                end_time = session.end_time.timestamp()
+            else:
+                # Session is still running, use current time
+                end_time = time.time()
 
-        Args:
-            session_name: Name of the session
-            use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
-        """
-        exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
-
-        # If Redis is not available, fall back to file-based markers
-        if not self.use_redis:
-            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
-
-        # Use the bundled hook module so this works from an installed package, not just a source checkout
-        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
+            return int(end_time - created_time)
+        except Exception as e:
+            logger.warning(f"Failed to get script run time for {session_name}: {e}")
+            # Fallback to current time
+            return int(time.time() - created_time)

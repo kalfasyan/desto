@@ -26,11 +26,11 @@ def ui_manager(tmp_path):
 @pytest.fixture
 def backends():
     with (
-        patch("desto.app.ui.RecurringScheduleManager") as recurring,
-        patch("desto.app.ui.AtJobManager") as at_manager,
+        patch("desto.app.schedule_ui.RecurringScheduleManager") as recurring,
+        patch("desto.app.schedule_ui.AtJobManager") as at_manager,
         patch("desto.redis.client.DestoRedisClient") as redis_client,
         patch("desto.redis.desto_manager.DestoManager") as desto_manager,
-        patch("desto.app.ui.ui"),
+        patch("desto.app.schedule_ui.ui"),
         patch("shutil.which", return_value="/usr/bin/at"),
     ):
         redis_client.return_value.is_connected.return_value = True
