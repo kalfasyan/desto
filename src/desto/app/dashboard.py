@@ -16,63 +16,67 @@ FAST_INTERVAL = 1.0
 SESSIONS_INTERVAL = 2.0
 SCHEDULER_INTERVAL = 5.0
 
-global_timers = []
 
-# Redis pub/sub events arrive on a background thread; they are queued here and handled
-# on the UI timer, where it is safe to touch UI elements.
-_pending_updates = deque()
+class DashboardState:
+    """Timers and queued Redis events for one browser tab's dashboard."""
+
+    def __init__(self) -> None:
+        self.timers = []
+        # Redis pub/sub events arrive on a background thread; they are queued here and handled
+        # on the UI timer, where it is safe to touch UI elements.
+        self.pending_updates = deque()
 
 
-def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
+def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
     um.update_ui_system_info()
     tm.tick_live_durations()
-    process_pending_updates(um)
+    process_pending_updates(um, state)
     um.refresh_log_display()
 
 
-def run_updates(um: UserInterfaceManager, tm: TmuxManager) -> None:
+def run_updates(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
     """Run every periodic update once (kept for callers and tests)."""
-    run_fast_updates(um, tm)
+    run_fast_updates(um, tm, state)
     tm.update_sessions_status(force=False)
     tm.check_and_run_scheduled_jobs()
 
 
-def _create_timers(um: UserInterfaceManager, tm: TmuxManager) -> None:
-    global_timers.extend(
+def _create_timers(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
+    state.timers.extend(
         [
-            ui.timer(FAST_INTERVAL, lambda: run_fast_updates(um, tm)),
+            ui.timer(FAST_INTERVAL, lambda: run_fast_updates(um, tm, state)),
             ui.timer(SESSIONS_INTERVAL, lambda: tm.update_sessions_status(force=False)),
             ui.timer(SCHEDULER_INTERVAL, tm.check_and_run_scheduled_jobs),
         ]
     )
 
 
-def pause_global_timer():
+def pause_global_timer(state: DashboardState):
     """Pauses the periodic updates."""
-    for timer in global_timers:
+    for timer in state.timers:
         timer.deactivate()
 
 
-def resume_global_timer(um: UserInterfaceManager, tm: TmuxManager):
+def resume_global_timer(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState):
     """Resumes the periodic updates."""
-    if global_timers:
-        for timer in global_timers:
+    if state.timers:
+        for timer in state.timers:
             timer.activate()
     else:
-        _create_timers(um, tm)
+        _create_timers(um, tm, state)
 
 
-def handle_instant_update(um: UserInterfaceManager, update_data):
+def handle_instant_update(state: DashboardState, update_data):
     """Called from the Redis pub/sub thread: queue the event for the UI timer."""
-    _pending_updates.append(update_data)
+    state.pending_updates.append(update_data)
 
 
-def process_pending_updates(um: UserInterfaceManager) -> None:
+def process_pending_updates(um: UserInterfaceManager, state: DashboardState) -> None:
     """Show notifications for queued Redis events and refresh the sessions table once."""
-    if not _pending_updates:
+    if not state.pending_updates:
         return
-    while _pending_updates:
-        update_data = _pending_updates.popleft()
+    while state.pending_updates:
+        update_data = state.pending_updates.popleft()
         session_name = update_data.get("session_name")
         status = update_data.get("status")
         if status == "finished":
@@ -82,9 +86,8 @@ def process_pending_updates(um: UserInterfaceManager) -> None:
     um.tmux_manager.update_sessions_status(force=False)
 
 
-def main():
-    cfg = get_auth_config()
-
+def build_dashboard(show_logout: bool) -> None:
+    """Build the dashboard page for one browser tab."""
     # Configure modern colors for Quasar
     ui.colors(
         primary="#3b82f6",  # blue-500
@@ -141,29 +144,36 @@ def main():
     """
     )
 
+    state = DashboardState()
     tm = TmuxManager(ui, logger)
     um = UserInterfaceManager(ui, ui_settings, tm, desto_manager=tm.desto_manager)
 
-    logger.add(
+    log_sink_id = logger.add(
         lambda msg: um.log_section.update_log_messages(msg.strip()),
         format="{message}",
         level="INFO",
     )
+    # Stop sending log lines to this tab's log panel once the tab is gone.
+    ui.context.client.on_delete(lambda: logger.remove(log_sink_id))
 
     # Set up real-time updates using TmuxManager's Redis client
     if tm.pubsub:
-        tm.pubsub.subscribe_to_session_updates(lambda update: handle_instant_update(um, update))
+        tm.pubsub.subscribe_to_session_updates(lambda update: handle_instant_update(state, update))
         logger.info("Redis pub/sub enabled for real-time updates")
     else:
         logger.warning("Redis pub/sub not available")
 
-    um.build_ui(show_logout=bool(cfg.password))
+    um.build_ui(show_logout=show_logout)
 
-    _create_timers(um, tm)
+    _create_timers(um, tm, state)
 
     # Pass pause and resume functions to TmuxManager
-    tm.pause_updates = pause_global_timer
-    tm.resume_updates = lambda: resume_global_timer(um, tm)
+    tm.pause_updates = lambda: pause_global_timer(state)
+    tm.resume_updates = lambda: resume_global_timer(um, tm, state)
+
+
+def main():
+    cfg = get_auth_config()
 
     setup_auth(cfg.password)
     if not is_loopback(cfg.host) and not cfg.password:
@@ -174,7 +184,10 @@ def main():
         )
     logger.info(f"Serving the desto dashboard at http://{cfg.host}:{cfg.port}")
 
+    # The dashboard is built in a root function rather than at module level: NiceGUI 3 does not
+    # allow global-scope UI next to ui.page routes, and the login page is one of those.
     ui.run(
+        lambda: build_dashboard(show_logout=bool(cfg.password)),
         title="desto dashboard",
         host=cfg.host,
         port=cfg.port,
