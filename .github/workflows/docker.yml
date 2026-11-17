@@ -6,17 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   docker-build:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v7
-
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
-
+      uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
     - name: Build and start services with Docker Compose
       run: |
         docker compose up -d --build
@@ -31,11 +32,12 @@ jobs:
       run: |
         docker logs desto-dashboard
 
+    - name: Install uv
+      uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
     - name: Set up Python environment for integration tests
       run: |
-        python -m pip install --upgrade pip
-        pip install uv
-        uv sync --extra dev
+        uv sync --frozen --extra dev
 
     - name: Run Docker integration tests
       run: |
