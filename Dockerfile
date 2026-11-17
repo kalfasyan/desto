@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.5-debian-slim AS build
+FROM ghcr.io/astral-sh/uv:0.5-debian-slim@sha256:d59dc029f783ab1b2a7fcc39b2655727dedff2aa13eb5f0d41d0d374cc3a7fca AS build
 
 SHELL ["sh", "-exc"]
 
