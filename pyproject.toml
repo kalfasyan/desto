@@ -3,7 +3,7 @@ name = "desto"
 dynamic = ["version"]
 description = "tmux session manager"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "loguru>=0.7.3",
     "nicegui>=2.16.1,<4",
