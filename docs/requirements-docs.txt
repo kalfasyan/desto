@@ -104,7 +104,7 @@ requests==2.34.2
     #   mkdocs-material
 six==1.17.0
     # via python-dateutil
-soupsieve==4.0
+soupsieve==4.1.1
     # via beautifulsoup4
 typing-extensions==4.16.0
     # via beautifulsoup4
