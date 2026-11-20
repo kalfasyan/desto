@@ -1,21 +1,90 @@
-"""Scheduled ('at') jobs for the dashboard: listing, cancelling and the internal fallback scheduler."""
+"""Scheduled ('at') jobs: scheduling, listing, cancelling and the internal fallback scheduler."""
 
+import shlex
+import shutil
 import subprocess
+import sys
 import threading
 from datetime import datetime
 
 import redis
 from loguru import logger
-from nicegui import ui
 
-from desto.app.session_format import decode_hash, extract_at_command, format_scheduled_datetime, parse_atq_output
+from desto.core.formatting import decode_hash, extract_at_command, format_scheduled_datetime, parse_atq_output
+from desto.redis.at_job_manager import AtJobManager
+from desto.redis.models import SessionStatus
+from desto.redis.recurring import RecurringScheduleManager, describe_interval
+
+
+class ScheduleError(ValueError):
+    """A launch could not be scheduled; the message says why."""
 
 
 class ScheduledJobsMixin:
-    """Scheduled-job operations of TmuxManager.
+    """Scheduled-job operations of DestoService.
 
-    Expects the host class to provide redis_client, desto_manager and logger.
+    Expects the host class to provide redis_client, desto_manager, LOG_DIR, logger, notify
+    and on_sessions_changed.
     """
+
+    def schedule_launch(self, session_name, command, script_paths, arguments, when, interval_minutes=None):
+        """Run command as session_name at `when`, once or every interval_minutes.
+
+        A one-off run is queued with `at` and shows up as a scheduled session right away.
+        A recurring schedule launches each run as a '<session_name>-YYYYMMDD-HHMM' session.
+
+        Returns:
+            The at job id (one-off) or the recurring schedule id.
+
+        Raises:
+            ScheduleError: if the input is invalid or `at` refused the job.
+        """
+        script_paths = [str(p) for p in script_paths]
+        what = "Script" if len(script_paths) == 1 else f"Chain of {len(script_paths)} scripts"
+        if not session_name:
+            raise ScheduleError("Please enter a session name.")
+        if when < datetime.now():
+            raise ScheduleError("Scheduled time is in the past.")
+        if interval_minutes is not None and interval_minutes < 1:
+            raise ScheduleError("Repeat interval must be at least 1.")
+        if not shutil.which("at"):
+            raise ScheduleError("'at' command is not available on this system. Please install 'at' to use scheduling.")
+
+        if interval_minutes is not None:
+            schedule_id = RecurringScheduleManager(self.redis_client).create(
+                session_name=session_name,
+                command=command,
+                interval_minutes=interval_minutes,
+                first_run=when,
+                log_dir=str(self.LOG_DIR),
+                script_paths=script_paths,
+                arguments=arguments,
+            )
+            if not schedule_id:
+                raise ScheduleError("Failed to schedule the first run with 'at'.")
+            self.notify(f"{what} will run {describe_interval(interval_minutes)} starting {when:%Y-%m-%d %H:%M}, as sessions named '{session_name}-<date>-<time>'", "info")
+            return schedule_id
+
+        self.desto_manager.start_session_with_job(
+            session_name=session_name,
+            command=command,
+            script_path=script_paths[0] if len(script_paths) == 1 else f"Chain: {len(script_paths)} scripts",
+            status=SessionStatus.SCHEDULED,
+        )
+        # The bundled wrapper tracks the run in Redis, with this service's interpreter and logs directory
+        scheduled_cmd = f"DESTO_LOGS_DIR={shlex.quote(str(self.LOG_DIR))} {shlex.quote(sys.executable)} -m desto.hooks.start_scheduled_session {shlex.quote(session_name)} {shlex.quote(command)}"
+        job_id = AtJobManager(self.redis_client).schedule(
+            command=scheduled_cmd,
+            time_spec=when.strftime("%H:%M %Y-%m-%d"),
+            session_name=session_name,
+            script_path=script_paths,
+            arguments=arguments,
+        )
+        if not job_id:
+            raise ScheduleError("Failed to schedule job via AtJobManager.")
+        self.notify(f"{what} scheduled for {when} as session '{session_name}' (Job ID: {job_id})", "info")
+        self.on_sessions_changed()
+        return job_id
 
     def get_scheduled_jobs(self, include_command=True):
         """Get a list of scheduled jobs from the 'at' command.
@@ -73,7 +142,7 @@ class ScheduledJobsMixin:
                 job.setdefault("metadata", None)
         return jobs
 
-    def _get_recurring_info(self, at_job_id):
+    def get_recurring_info(self, at_job_id):
         """Return (schedule_id, description) if the at job is a queued run of a recurring schedule, else None."""
         try:
             metadata = self.redis_client.redis.hgetall(f"desto:atjob:{at_job_id}")
@@ -87,28 +156,24 @@ class ScheduledJobsMixin:
         """Cancels a scheduled job using AtJobManager and optionally updates the session status in Redis.
         If session_name is not provided, attempts to find the session by at_job_id in Redis.
         """
-        from desto.redis.at_job_manager import AtJobManager
-
         try:
-            recurrence = self._get_recurring_info(at_job_id)
+            recurrence = self.get_recurring_info(at_job_id)
             if recurrence:
-                from desto.redis.recurring import RecurringScheduleManager
-
                 if RecurringScheduleManager(self.redis_client).cancel(recurrence[0]):
-                    ui.notification(f"Cancelled recurring schedule ({recurrence[1]})", type="positive")
+                    self.notify(f"Cancelled recurring schedule ({recurrence[1]})", "positive")
                 else:
-                    ui.notification(f"Failed to cancel recurring schedule for job {at_job_id}", type="negative")
+                    self.notify(f"Failed to cancel recurring schedule for job {at_job_id}", "negative")
                 return
 
             at_job_manager = AtJobManager(self.redis_client)
             success = at_job_manager.cancel(str(at_job_id))
             if success:
-                ui.notification(f"Cancelled scheduled job {at_job_id}", type="positive")
+                self.notify(f"Cancelled scheduled job {at_job_id}", "positive")
                 self._mark_cancelled_session(at_job_id, session_name)
             else:
-                ui.notification(f"Failed to cancel scheduled job {at_job_id}", type="negative")
+                self.notify(f"Failed to cancel scheduled job {at_job_id}", "negative")
         except Exception as e:
-            ui.notification(f"Failed to cancel scheduled job {at_job_id}: {e}", type="negative")
+            self.notify(f"Failed to cancel scheduled job {at_job_id}: {e}", "negative")
 
     def _mark_cancelled_session(self, at_job_id, session_name=None):
         """Mark the session behind a cancelled at job as failed, looking it up by name or by at_job_id."""
@@ -134,8 +199,6 @@ class ScheduledJobsMixin:
         """
         if self.desto_manager:
             try:
-                from desto.redis.recurring import RecurringScheduleManager
-
                 RecurringScheduleManager(self.redis_client).cancel_all(remove_pending_jobs=False)
             except Exception as e:
                 logger.warning(f"Failed to cancel recurring schedules: {e}")

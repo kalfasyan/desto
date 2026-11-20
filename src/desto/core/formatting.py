@@ -4,6 +4,7 @@ Nothing in here touches tmux, Redis or the UI, so it can be unit tested directly
 """
 
 import re
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -232,3 +233,83 @@ def format_scheduled_datetime(date_time):
         return datetime.strptime(date_time, "%a %b %d %H:%M:%S %Y").isoformat()
     except Exception:
         return date_time
+
+
+@dataclass(frozen=True)
+class SessionRow:
+    """One row of a sessions table."""
+
+    name: str
+    session: dict
+    tmux_active: bool
+    category: str  # "running", "finished" or "failed"
+    label: str
+    color: str
+    command: str
+
+
+def session_rows(sessions_status, tmux_active, job_info):
+    """Return a SessionRow for every session that is not merely scheduled, newest first."""
+    rows = []
+    for session_name, session in sessions_status.items():
+        is_active = session_name in tmux_active
+        category, label, color = classify_session(session_name, session, is_active, job_info)
+        if category == "scheduled":
+            continue
+        command = (job_info or {}).get(session.get("session_id", ""), {}).get("command", "")
+        rows.append((session_sort_key(session), SessionRow(session_name, session, is_active, category, label, color, command)))
+    rows.sort(key=lambda r: r[0], reverse=True)
+    return [row for _, row in rows]
+
+
+def count_by_category(rows):
+    """Count SessionRows as {"total", "running", "finished", "failed"}."""
+    counts = {"total": len(rows), "running": 0, "finished": 0, "failed": 0}
+    for row in rows:
+        counts[row.category] += 1
+    return counts
+
+
+@dataclass(frozen=True)
+class ScheduledJobRow:
+    """One row of the scheduled jobs table."""
+
+    job_id: str
+    scheduled_time: str
+    user: str
+    status: str
+    metadata: dict | None
+
+
+def scheduled_job_rows(jobs):
+    """Turn atq jobs with their Redis metadata into rows, hiding jobs the internal scheduler already handled."""
+    rows = []
+    for job in jobs:
+        metadata = job.get("metadata")
+        status = metadata.get("status", "scheduled") if metadata else "scheduled"
+        if status in ("finished_internal", "running_internal"):
+            continue
+        if metadata and metadata.get("recurring_id"):
+            status = f"{status} · {metadata.get('recurrence', 'recurring')}"
+        meta = metadata or {}
+        rows.append(
+            ScheduledJobRow(
+                job_id=str(job.get("id", "?")),
+                scheduled_time=str(meta.get("scheduled_time", job.get("datetime", "?"))),
+                user=str(meta.get("user", job.get("user", "?"))),
+                status=status,
+                metadata=metadata,
+            )
+        )
+    return rows
+
+
+def session_event_message(update):
+    """Return (message, level) for a Redis session update worth telling the user about, else None."""
+    session_name = update.get("session_name")
+    status = update.get("status")
+    if status == "finished":
+        return f"Session '{session_name}' finished!", "positive"
+    if status == "failed":
+        return f"Session '{session_name}' failed!", "negative"
+    return None

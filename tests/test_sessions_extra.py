@@ -9,15 +9,14 @@ from desto.app.sessions import TmuxManager
 pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
-@patch("desto.app.sessions.ui")
-def test_init_log_dir_creation_error(mock_ui):
-    mock_logger = MagicMock()
+def test_init_log_dir_creation_error():
+    mock_ui, mock_logger = MagicMock(), MagicMock()
     with patch.object(Path, "mkdir", side_effect=OSError("fail")):
         with pytest.raises(OSError):
             TmuxManager(mock_ui, mock_logger, log_dir="/bad/dir", scripts_dir="/bad/dir")
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_start_tmux_session_logfile_append(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -29,7 +28,7 @@ def test_start_tmux_session_logfile_append(mock_subprocess, tmp_path):
     assert log_file.exists()
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_view_log_missing_file(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -41,7 +40,7 @@ def test_view_log_missing_file(mock_subprocess, tmp_path):
     mock_ui.dialog.assert_called_once()
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_view_log_existing_file_builds_dialog(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -60,7 +59,7 @@ def test_view_log_existing_file_builds_dialog(mock_subprocess, tmp_path):
     mock_ui.dialog.assert_called_once()
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_view_log_follows_and_stops_when_session_ends(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -119,7 +118,7 @@ def test_view_log_follows_and_stops_when_session_ends(mock_subprocess, tmp_path)
     dialog.close.assert_called_once()
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_view_log_poll_error_cancels_timer(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -150,7 +149,7 @@ def test_view_log_poll_error_cancels_timer(mock_subprocess, tmp_path):
     assert str(log_element.push.call_args_list[-1].args[0]).startswith("[desto] log follow error: boom")
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_view_log_download_guard(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()
@@ -180,7 +179,7 @@ def test_get_log_and_script_file(tmp_path):
     assert tmux.get_script_file("myscript.sh").name == "myscript.sh"
 
 
-@patch("desto.app.sessions.subprocess")
+@patch("desto.core.service.subprocess")
 def test_kill_session_failure(mock_subprocess, tmp_path):
     mock_logger = MagicMock()
     mock_ui = MagicMock()

@@ -1,13 +1,13 @@
 import getpass
 import os
-import re
 import socket
-import time
 from pathlib import Path
 
-import psutil
 from loguru import logger
 from nicegui import ui
+
+from desto.core import scripts
+from desto.core.system_stats import SystemMonitor
 
 from .auth import logout
 from .favorites_ui import FavoritesTab
@@ -27,6 +27,7 @@ class UserInterfaceManager(ScheduleLaunchMixin):
         self.desto_manager = desto_manager
         self.tmux_manager = tmux_manager
         self.stats_panel = SystemStatsPanel(ui_settings)
+        self.system_monitor = SystemMonitor()
         self.new_script_tab = NewScriptTab(tmux_manager, self)
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
@@ -41,43 +42,20 @@ class UserInterfaceManager(ScheduleLaunchMixin):
 
     def get_script_files(self):
         """Return a list of script filenames in the scripts directory."""
-        script_extensions = self.ui_settings.get("script_settings", {}).get("supported_extensions", [".sh", ".py"])
-        scripts = []
-        for ext in script_extensions:
-            pattern = f"*{ext}"
-            scripts.extend([f.name for f in self.tmux_manager.SCRIPTS_DIR.glob(pattern) if f.is_file()])
-        return sorted(scripts)
+        extensions = self.ui_settings.get("script_settings", {}).get("supported_extensions", scripts.DEFAULT_EXTENSIONS)
+        return scripts.list_scripts(self.tmux_manager.SCRIPTS_DIR, extensions)
 
-    def get_script_type(self, script_name):
-        """Determine script type from extension."""
-        if script_name.endswith(".py"):
-            return "python"
-        elif script_name.endswith(".sh"):
-            return "bash"
-        return "unknown"
+    get_script_type = staticmethod(scripts.script_type)
+    get_script_icon = staticmethod(scripts.script_icon)
+    is_valid_script_name = staticmethod(scripts.is_valid_name)
 
-    def get_script_icon(self, script_type):
-        """Get icon for script type."""
-        icons = {"python": "🐍", "bash": "🐚", "unknown": "📄"}
-        return icons.get(script_type, "📄")
+    @property
+    def python_executable(self):
+        return self.ui_settings.get("script_settings", {}).get("python_executable", "python3")
 
     def build_execution_command(self, script_path, arguments):
         """Build the appropriate execution command based on script type."""
-        script_name = Path(script_path).name
-        script_type = self.get_script_type(script_name)
-
-        if script_type == "python":
-            python_exec = self.ui_settings.get("script_settings", {}).get("python_executable", "python3")
-            return f"{python_exec} '{script_path}' {arguments}"
-        elif script_type == "bash":
-            return f"bash '{script_path}' {arguments}"
-        else:
-            # Fallback: try to execute directly (relies on shebang)
-            return f"'{script_path}' {arguments}"
-
-    @staticmethod
-    def is_valid_script_name(name):
-        return re.match(r"^[\w\-]{1,15}$", name) is not None
+        return scripts.build_execution_command(script_path, arguments, self.python_executable)
 
     def refresh_script_list(self):
         script_files = self.get_script_files()
@@ -196,78 +174,33 @@ class UserInterfaceManager(ScheduleLaunchMixin):
 
     def update_ui_system_info(self):
         """Update system stats in the UI."""
-        cpu_percent = psutil.cpu_percent(interval=None)
-        if self.stats_panel.cpu_percent is not None:
-            self.stats_panel.cpu_percent.text = f"{cpu_percent:.1f}%"
-        if self.stats_panel.cpu_bar is not None:
-            self.stats_panel.cpu_bar.value = cpu_percent / 100
+        panel = self.stats_panel
+        show_cores = bool(getattr(panel.show_cpu_cores, "value", False)) and bool(panel.cpu_core_labels)
+        stats = self.system_monitor.read(per_core=show_cores)
 
-        # Update CPU cores if they're visible and initialized
-        show_cores = getattr(self.stats_panel.show_cpu_cores, "value", False)
-        if show_cores and self.stats_panel.cpu_core_labels and self.stats_panel.cpu_core_bars:
-            try:
-                core_percentages = psutil.cpu_percent(percpu=True, interval=None)
-                for i, core_percent in enumerate(core_percentages):
-                    if i < len(self.stats_panel.cpu_core_labels) and i < len(self.stats_panel.cpu_core_bars):
-                        if self.stats_panel.cpu_core_labels[i] is not None:
-                            self.stats_panel.cpu_core_labels[i].text = f"{core_percent:.1f}%"
-                        if self.stats_panel.cpu_core_bars[i] is not None:
-                            self.stats_panel.cpu_core_bars[i].value = core_percent / 100
-            except Exception as e:
-                logger.debug(f"Error updating CPU core data: {e}")
+        def set_text(element, text):
+            if element is not None:
+                element.text = text
 
-        memory = psutil.virtual_memory()
-        if self.stats_panel.memory_percent is not None:
-            self.stats_panel.memory_percent.text = f"{memory.percent}%"
-        if self.stats_panel.memory_bar is not None:
-            self.stats_panel.memory_bar.value = memory.percent / 100
-        if self.stats_panel.memory_available is not None:
-            self.stats_panel.memory_available.text = f"{round(memory.available / (1024**3), 2)} GB Available"
-        if self.stats_panel.memory_used is not None:
-            self.stats_panel.memory_used.text = f"{round(memory.used / (1024**3), 2)} GB Used"
-        disk = psutil.disk_usage("/")
-        if self.stats_panel.disk_percent is not None:
-            self.stats_panel.disk_percent.text = f"{disk.percent}%"
-        if self.stats_panel.disk_bar is not None:
-            self.stats_panel.disk_bar.value = disk.percent / 100
-        if self.stats_panel.disk_free is not None:
-            self.stats_panel.disk_free.text = f"{round(disk.free / (1024**3), 2)} GB Free"
-        if self.stats_panel.disk_used is not None:
-            self.stats_panel.disk_used.text = f"{round(disk.used / (1024**3), 2)} GB Used"
-        # --- tmux server stats ---
-        # Reuse one psutil.Process so cpu_percent() is non-blocking (interval=None measures
-        # since the previous call) instead of sleeping 100ms on every tick.
-        tmux_cpu = "N/A"
-        tmux_mem = "N/A"
-        try:
-            proc = self._get_tmux_server_proc()
-            if proc is not None:
-                tmux_cpu = f"{proc.cpu_percent(interval=None):.1f}%"
-                tmux_mem = f"{proc.memory_info().rss / (1024 * 1024):.1f} MB"
-        except Exception:
-            self._tmux_server_proc = None
-        if self.stats_panel.tmux_cpu is not None:
-            self.stats_panel.tmux_cpu.text = f"tmux CPU: {tmux_cpu}"
-        if self.stats_panel.tmux_mem is not None:
-            self.stats_panel.tmux_mem.text = f"tmux MEM: {tmux_mem}"
+        def set_bar(element, percent):
+            if element is not None:
+                element.value = percent / 100
 
-    def _get_tmux_server_proc(self, rescan_interval: float = 10.0):
-        """Return the cached tmux server process, re-scanning the process list at most every 10s."""
-        proc = getattr(self, "_tmux_server_proc", None)
-        if proc is not None and proc.is_running():
-            return proc
-        now = time.monotonic()
-        if now - getattr(self, "_tmux_last_scan", 0.0) < rescan_interval:
-            return None
-        self._tmux_last_scan = now
-        candidates = [p for p in psutil.process_iter(["name", "ppid"]) if "tmux" in (p.info["name"] or "")]
-        if not candidates:
-            self._tmux_server_proc = None
-            return None
-        proc = next((p for p in candidates if p.info["ppid"] == 1), None) or min(candidates, key=lambda p: p.info["ppid"])
-        proc.cpu_percent(interval=None)  # prime the counter
-        self._tmux_server_proc = proc
-        return proc
+        set_text(panel.cpu_percent, f"{stats.cpu_percent:.1f}%")
+        set_bar(panel.cpu_bar, stats.cpu_percent)
+        for label, bar, core_percent in zip(panel.cpu_core_labels, panel.cpu_core_bars, stats.cpu_cores):
+            set_text(label, f"{core_percent:.1f}%")
+            set_bar(bar, core_percent)
+        set_text(panel.memory_percent, f"{stats.memory_percent}%")
+        set_bar(panel.memory_bar, stats.memory_percent)
+        set_text(panel.memory_available, f"{stats.memory_available_gb} GB Available")
+        set_text(panel.memory_used, f"{stats.memory_used_gb} GB Used")
+        set_text(panel.disk_percent, f"{stats.disk_percent}%")
+        set_bar(panel.disk_bar, stats.disk_percent)
+        set_text(panel.disk_free, f"{stats.disk_free_gb} GB Free")
+        set_text(panel.disk_used, f"{stats.disk_used_gb} GB Used")
+        set_text(panel.tmux_cpu, f"tmux CPU: {stats.tmux_cpu}")
+        set_text(panel.tmux_mem, f"tmux MEM: {stats.tmux_mem}")
 
     def update_script_preview(self, e):
         """Update the script preview editor when a new script is selected."""

@@ -9,6 +9,7 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
   - User Guide:
+      - Terminal UI: user-guide/tui.md
       - CLI: user-guide/cli.md
       - Favorites: user-guide/favorites.md
       - Scheduling: user-guide/scheduling.md

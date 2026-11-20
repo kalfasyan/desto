@@ -4,18 +4,17 @@ import json
 import sys
 import time
 
-from loguru import logger
 from nicegui import ui
 
-from desto.app.session_format import (
+from desto.core.formatting import (
     classify_session,
     decode_hash,
     format_seconds,
     parse_iso,
+    scheduled_job_rows,
     seconds_since,
     session_row_times,
-    session_sort_key,
-    summarize_jobs,
+    session_rows,
 )
 
 
@@ -65,49 +64,6 @@ class SessionsDashboardMixin:
                 label.text = format_seconds(seconds_since(start_dt))
             except Exception:
                 pass
-
-    # --- Data gathering -------------------------------------------------------------
-
-    def _job_info_by_session(self):
-        """Read every job once and summarise it per session id.
-
-        Returns {session_id: {"status", "exit_code", "command"}}. This replaces the per-row
-        get_job_status() lookups, which scanned all sessions and all jobs for every row.
-        """
-        result = {}
-        try:
-            r = self.redis_client.redis
-            keys = list(r.scan_iter(match="desto:job:*", count=500))
-            if not keys:
-                return result
-            pipe = r.pipeline(transaction=False)
-            for key in keys:
-                pipe.hgetall(key)
-            jobs_by_session = {}
-            for data in pipe.execute():
-                if data:
-                    job = decode_hash(data)
-                    jobs_by_session.setdefault(job.get("session_id", ""), []).append(job)
-        except Exception as e:
-            logger.debug(f"Could not read jobs from Redis: {e}")
-            return result
-
-        for session_id, jobs in jobs_by_session.items():
-            result[session_id] = summarize_jobs(jobs)
-        return result
-
-    def _count_by_category(self, sessions_status, tmux_active=None, job_info=None):
-        if tmux_active is None:
-            tmux_active = set(self.check_sessions().keys())
-        job_info = job_info or {}
-        counts = {"total": 0, "running": 0, "finished": 0, "failed": 0}
-        for name, session in sessions_status.items():
-            category, _, _ = classify_session(name, session, name in tmux_active, job_info)
-            if category == "scheduled":
-                continue
-            counts["total"] += 1
-            counts[category] += 1
-        return counts
 
     def _is_atd_running_cached(self, at_job_manager_cls, ttl: float = 60.0) -> bool:
         """The atd check spawns processes, so only run it once a minute."""
@@ -186,35 +142,17 @@ class SessionsDashboardMixin:
 
         self._render_sessions_header(ui)
 
-        rows = self._session_rows(sessions_status, tmux_active, job_info)
+        rows = [row for row in session_rows(sessions_status, tmux_active, job_info) if not self.status_filter or row.category == self.status_filter]
         if not rows and self.status_filter:
             ui.label(f"No {self.status_filter} sessions. Click the card again to show all.").style("padding: 12px;").classes("text-slate-500")
 
-        for session_name, session, is_active, status, status_color in rows:
-            command = job_info.get(session.get("session_id", ""), {}).get("command", "")
-            self._render_session_row(ui, session_name, session, is_active, status, status_color, command)
+        for row in rows:
+            self._render_session_row(ui, row.name, row.session, row.tmux_active, row.label, row.color, row.command)
 
         if scheduled_jobs is None:
             scheduled_jobs = self._get_scheduled_jobs_with_metadata()
         if scheduled_jobs:
             self._render_scheduled_jobs_table(ui, scheduled_jobs)
-
-    def _session_rows(self, sessions_status, tmux_active, job_info):
-        """Return the non-scheduled sessions matching the status filter, newest first.
-
-        Each row is a (session_name, session, tmux_active, status_label, status_color) tuple.
-        """
-        rows = []
-        for session_name, session in sessions_status.items():
-            is_active = session_name in tmux_active
-            category, status, status_color = classify_session(session_name, session, is_active, job_info)
-            if category == "scheduled":
-                continue
-            if self.status_filter and category != self.status_filter:
-                continue
-            rows.append((session_sort_key(session), session_name, session, is_active, status, status_color))
-        rows.sort(key=lambda r: r[0], reverse=True)
-        return [row[1:] for row in rows]
 
     @staticmethod
     def _render_sessions_header(ui):
@@ -284,20 +222,8 @@ class SessionsDashboardMixin:
             ui.label("Status").style("flex: 1; min-width: 100px;")
             ui.label("Actions").style("flex: 1; min-width: 120px;")
 
-        for job in scheduled_jobs:
-            job_id = job.get("id", "?")
-            metadata = job.get("metadata")
-            status = metadata.get("status", "scheduled") if metadata else "scheduled"
-
-            # Hide jobs the internal scheduler has already handled
-            if status in ["finished_internal", "running_internal"]:
-                continue
-
-            if metadata and metadata.get("recurring_id"):
-                status = f"{status} · {metadata.get('recurrence', 'recurring')}"
-
-            scheduled_time = metadata.get("scheduled_time", job.get("datetime", "?")) if metadata else job.get("datetime", "?")
-            user = metadata.get("user", job.get("user", "?")) if metadata else job.get("user", "?")
+        for row in scheduled_job_rows(scheduled_jobs):
+            job_id, metadata, scheduled_time, user, status = row.job_id, row.metadata, row.scheduled_time, row.user, row.status
 
             with ui.row().style("width: 100%; min-width: 700px; padding: 8px 10px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"):
                 ui.button(

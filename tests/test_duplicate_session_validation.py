@@ -36,13 +36,13 @@ class TestDuplicateSessionValidation:
         mock_logger = Mock()
 
         # Patch Redis to be available since it's now required
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_instance = Mock()
             mock_redis_instance.is_connected.return_value = True
             mock_redis_class.return_value = mock_redis_instance
 
             # Also need to mock the DestoManager
-            with patch("src.desto.app.sessions.DestoManager") as mock_desto_manager_class:
+            with patch("desto.core.service.DestoManager") as mock_desto_manager_class:
                 mock_desto_manager = Mock()
                 # Configure the mock to return the expected tuple format
                 mock_session = Mock()
@@ -51,7 +51,7 @@ class TestDuplicateSessionValidation:
                 mock_desto_manager_class.return_value = mock_desto_manager
 
                 # Mock PubSub
-                with patch("src.desto.app.sessions.SessionPubSub") as mock_pubsub_class:
+                with patch("desto.core.service.SessionPubSub") as mock_pubsub_class:
                     mock_pubsub = Mock()
                     mock_pubsub_class.return_value = mock_pubsub
 
@@ -64,8 +64,8 @@ class TestDuplicateSessionValidation:
         """Test that duplicate session validation prevents creating sessions with same name."""
         session_name = "test_duplicate_session"
 
-        # Mock ui.notification to avoid import issues
-        with patch("src.desto.app.sessions.ui.notification") as mock_notification:
+        # TmuxManager shows notifications through its ui instance
+        with patch.object(tmux_manager.ui, "notification") as mock_notification:
             # Patch list_all_sessions to return a list
             with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
                 # Start first session
@@ -108,8 +108,8 @@ class TestDuplicateSessionValidation:
         test_script.write_text("#!/bin/bash\necho 'Test script started'\nsleep 5\necho 'Test script finished'\n")
         test_script.chmod(0o755)
 
-        # Mock ui.notification to avoid import issues
-        with patch("src.desto.app.sessions.ui.notification") as mock_notification:
+        # TmuxManager shows notifications through its ui instance
+        with patch.object(tmux_manager.ui, "notification") as mock_notification:
             # Patch list_all_sessions to return a list
             with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
                 # Start first session (simulating a chain)
@@ -148,14 +148,14 @@ class TestDuplicateSessionValidation:
         session_name2 = "test_session_2"
 
         # Mock ui.notification and check_sessions
-        with patch("src.desto.app.sessions.ui.notification") as mock_notification:
+        with patch.object(tmux_manager.ui, "notification") as mock_notification:
             with patch.object(tmux_manager, "check_sessions") as mock_check_sessions:
                 # Mock that no sessions exist initially
                 mock_check_sessions.return_value = {}
                 # Patch list_all_sessions to return a list
                 with patch.object(tmux_manager.desto_manager.session_manager, "list_all_sessions", return_value=[]):
                     # Mock subprocess.run to simulate successful tmux session creation
-                    with patch("src.desto.app.sessions.subprocess.run") as mock_subprocess:
+                    with patch("desto.core.service.subprocess.run") as mock_subprocess:
                         mock_subprocess.return_value.returncode = 0
 
                         # Start first session

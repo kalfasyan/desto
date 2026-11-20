@@ -1,0 +1,194 @@
+/* Styles of the desto terminal UI. Colors come from the active Textual theme (ctrl+p → "theme"). */
+
+#stats {
+    height: 1;
+    padding: 0 2;
+    background: $boost;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+TabPane {
+    padding: 1 2 0 2;
+}
+
+.section-title {
+    text-style: bold;
+    color: $accent;
+    margin: 1 0 0 0;
+}
+
+.field-label {
+    color: $text-muted;
+    margin: 1 0 0 0;
+}
+
+.error {
+    color: $error;
+    margin: 1 0 0 0;
+}
+
+.hint {
+    color: $text-muted;
+    margin: 1 0 0 0;
+}
+
+.buttons {
+    height: auto;
+    margin: 1 0 0 0;
+}
+
+.buttons Button {
+    margin: 0 1 0 0;
+}
+
+.form-row {
+    height: auto;
+}
+
+.form-row > Vertical {
+    width: 1fr;
+    height: auto;
+    margin: 0 1 0 0;
+}
+
+/* Sessions tab */
+
+#counts {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+#counts .count {
+    width: 1fr;
+    margin: 0 1 0 0;
+}
+
+#counts .count.active {
+    border: tall $accent;
+    text-style: bold;
+}
+
+#sessions-table {
+    height: 2fr;
+}
+
+#scheduled-table {
+    height: 1fr;
+}
+
+/* Scripts tab */
+
+#script-list-col {
+    width: 32;
+    margin: 0 2 0 0;
+}
+
+#script-list {
+    height: 1fr;
+}
+
+#script-editor-col {
+    width: 1fr;
+}
+
+#editor {
+    height: 1fr;
+    margin: 1 0 0 0;
+}
+
+#chain-row {
+    height: auto;
+    margin: 1 0 0 0;
+    padding: 0 1;
+    background: $boost;
+}
+
+#chain {
+    width: 1fr;
+    height: auto;
+    padding: 1 0;
+}
+
+/* Favorites tab */
+
+#favorites-search {
+    margin: 0 0 1 0;
+}
+
+#favorites-table {
+    height: 1fr;
+}
+
+/* desto's own log, toggled with g */
+
+#desto-log {
+    display: none;
+    height: 8;
+    border-top: solid $primary;
+    background: $surface;
+}
+
+/* Modals */
+
+ModalScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+.dialog {
+    width: 72;
+    max-width: 90%;
+    height: auto;
+    max-height: 90%;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+
+.dialog-title {
+    text-style: bold;
+    width: 1fr;
+}
+
+.dialog-body {
+    margin: 1 0;
+}
+
+.dialog-buttons {
+    height: auto;
+    align-horizontal: right;
+    margin: 1 0 0 0;
+}
+
+.dialog-buttons Button {
+    margin: 0 0 0 1;
+}
+
+.log-dialog {
+    width: 95%;
+    height: 90%;
+}
+
+.log-header {
+    height: 1;
+}
+
+#live-badge {
+    background: $panel;
+    color: $text-muted;
+}
+
+#live-badge.live {
+    background: $success;
+    color: $text;
+    text-style: bold;
+}
+
+#log-view {
+    height: 1fr;
+    margin: 1 0 0 0;
+    border: round $panel;
+}

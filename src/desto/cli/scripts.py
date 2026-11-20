@@ -12,6 +12,8 @@ from rich.prompt import Confirm
 from rich.syntax import Syntax
 from rich.table import Table
 
+from desto.core import scripts as core_scripts
+
 from .session_manager import CLISessionManager
 
 # Create the scripts command group
@@ -61,19 +63,9 @@ if __name__ == "__main__":
 """
 
 
-def get_script_type(filename: str) -> str:
-    """Determine script type from file extension."""
-    if filename.endswith(".py"):
-        return "python"
-    elif filename.endswith(".sh"):
-        return "bash"
-    return "unknown"
-
-
-def get_script_icon(script_type: str) -> str:
-    """Get icon for script type."""
-    icons = {"python": "🐍", "bash": "🐚", "unknown": "📄"}
-    return icons.get(script_type, "📄")
+# Shared with the dashboard and the terminal UI
+get_script_type = core_scripts.script_type
+get_script_icon = core_scripts.script_icon
 
 
 def validate_script_name(name: str) -> str:

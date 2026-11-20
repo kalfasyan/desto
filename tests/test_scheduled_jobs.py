@@ -39,7 +39,7 @@ def cancel_all_recurring():
 class TestScheduledJobs:
     """Test scheduled jobs functionality."""
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_get_scheduled_jobs_empty(self, mock_run, tmux_manager):
         """Test getting scheduled jobs when none exist."""
         # Mock empty atq output
@@ -50,7 +50,7 @@ class TestScheduledJobs:
         assert jobs == []
         mock_run.assert_called_once_with(["atq"], capture_output=True, text=True)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_get_scheduled_jobs_with_jobs(self, mock_run, tmux_manager):
         """Test getting scheduled jobs when they exist."""
         # Mock atq output with sample jobs
@@ -74,7 +74,7 @@ class TestScheduledJobs:
         mock_run.assert_any_call(["at", "-c", "40"], capture_output=True, text=True)
         mock_run.assert_any_call(["at", "-c", "41"], capture_output=True, text=True)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_get_scheduled_jobs_command_fails(self, mock_run, tmux_manager):
         """Test getting scheduled jobs when atq command fails."""
         # Mock failed atq command
@@ -85,7 +85,7 @@ class TestScheduledJobs:
         assert jobs == []
         mock_run.assert_called_once_with(["atq"], capture_output=True, text=True)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_get_scheduled_jobs_exception(self, mock_run, tmux_manager):
         """Test getting scheduled jobs when an exception occurs."""
         # Mock exception
@@ -96,7 +96,7 @@ class TestScheduledJobs:
         assert jobs == []
         tmux_manager.logger.warning.assert_called_once()
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_kill_scheduled_jobs_empty(self, mock_run, tmux_manager):
         """Test killing scheduled jobs when none exist."""
         # Mock empty atq output
@@ -109,7 +109,7 @@ class TestScheduledJobs:
         assert errors == []
         mock_run.assert_called_once_with(["atq"], capture_output=True, text=True)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_kill_scheduled_jobs_success(self, mock_run, tmux_manager):
         """Test successfully killing scheduled jobs."""
         # Mock atq output first, then atrm success
@@ -132,7 +132,7 @@ class TestScheduledJobs:
         assert len(errors) == 2
         assert all("Unexpected error removing job" in msg for msg in errors)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_kill_scheduled_jobs_cancels_recurring_schedules_first(self, mock_run, tmux_manager, cancel_all_recurring):
         """Recurring series are stopped before their queued at jobs are removed, so a firing run cannot queue another."""
         mock_run.return_value = MagicMock(returncode=0, stdout="")
@@ -141,7 +141,7 @@ class TestScheduledJobs:
 
         cancel_all_recurring.assert_called_once_with(remove_pending_jobs=False)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_kill_scheduled_jobs_partial_failure(self, mock_run, tmux_manager):
         """Test killing scheduled jobs with some failures."""
         # Mock atq output
@@ -164,7 +164,7 @@ class TestScheduledJobs:
         assert len(errors) == 2
         assert all("Unexpected error removing job" in msg for msg in errors)
 
-    @patch("desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_kill_scheduled_jobs_unexpected_error(self, mock_run, tmux_manager):
         """Test killing scheduled jobs with unexpected errors."""
         # Mock atq output

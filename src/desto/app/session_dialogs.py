@@ -1,14 +1,13 @@
-"""Confirmation dialogs, the live log viewer and the clean-up actions behind them."""
+"""Confirmation dialogs and the live log viewer of the web dashboard."""
 
 from loguru import logger
 from nicegui import ui
 
-from desto.app.log_tailer import LogTailer
-from desto.app.session_format import decode_hash
+from desto.core.log_tailer import LogTailer
 
 
 class SessionDialogsMixin:
-    """Dialogs and clean-up actions of TmuxManager.
+    """Dialogs of TmuxManager; the actions behind them live in DestoService.
 
     Every dialog pauses the dashboard timers while it is open (pause_updates/resume_updates).
     Expects the host class to provide redis_client, desto_manager, LOG_DIR, ui and the
@@ -42,7 +41,7 @@ class SessionDialogsMixin:
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
             ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-            recurrence = self._get_recurring_info(at_job_id)
+            recurrence = self.get_recurring_info(at_job_id)
             if recurrence:
                 ui.label(f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs.").classes("text-slate-600 dark:text-slate-400")
 
@@ -165,7 +164,7 @@ class SessionDialogsMixin:
             self.pause_updates()
 
         def do_clear():
-            self.clear_session(session_name, ui)
+            self.clear_session(session_name)
             dialog.close()
             self._resume()
 
@@ -213,7 +212,7 @@ class SessionDialogsMixin:
         finished_count = len(finished_sessions)
 
         def do_kill_all():
-            self._notify_kill_all_result(*self.kill_all_sessions_and_jobs())
+            self.kill_all_and_notify()
             dialog.close()
             self._resume()
 
@@ -275,30 +274,6 @@ class SessionDialogsMixin:
                 logger.warning(f"Could not get status for session {session_name}: {e}")
                 running.append(session_name)
         return running, finished
-
-    def _notify_kill_all_result(self, session_success, session_total, job_success, job_total, error_messages):
-        results = []
-        if session_total > 0:
-            if session_success == session_total:
-                results.append(f"Successfully cleared all {session_total} sessions")
-            else:
-                results.append(f"Cleared {session_success}/{session_total} sessions")
-        if job_total > 0:
-            if job_success == job_total:
-                results.append(f"Successfully cancelled all {job_total} scheduled jobs")
-            else:
-                results.append(f"Cancelled {job_success}/{job_total} scheduled jobs")
-        if not results:
-            results.append("No items to clear")
-
-        msg = ". ".join(results) + "."
-        if error_messages:
-            msg += f" Errors: {'; '.join(error_messages[:3])}"  # Show first 3 errors
-            logger.warning(msg)
-            self.ui.notification(msg, type="warning")
-        else:
-            logger.success(msg)
-            self.ui.notification(msg, type="positive")
 
     # --- Live log viewer -------------------------------------------------------------
 
@@ -398,115 +373,3 @@ class SessionDialogsMixin:
         dialog.on("hide", lambda: close_dialog())
         dialog.on_value_change(lambda e: close_dialog() if not e.value else None)
         dialog.open()
-
-    # --- Clean-up actions ------------------------------------------------------------
-
-    def clear_session_history(self):
-        """Clear all session history from Redis."""
-        try:
-            all_keys = list(self.redis_client.redis.scan_iter(match="desto:session:*"))
-            if not all_keys:
-                ui.notification("No session history to clear", type="info")
-                return
-            deleted_count = 0
-            for key in all_keys:
-                try:
-                    self.redis_client.redis.delete(key)
-                    deleted_count += 1
-                except Exception as e:
-                    logger.error(f"Error deleting session key {key}: {e}")
-            if deleted_count > 0:
-                msg = f"Successfully cleared {deleted_count} session record(s) from history"
-                logger.info(msg)
-                ui.notification(msg, type="positive")
-                self.update_sessions_status()
-            else:
-                ui.notification("No sessions were cleared", type="warning")
-        except Exception as e:
-            error_msg = f"Error clearing session history: {e}"
-            logger.error(error_msg)
-            ui.notification(error_msg, type="negative")
-
-    def clear_log_files(self):
-        """Clear all log files from the logs directory."""
-        log_dir = self.LOG_DIR
-        if not log_dir.exists():
-            ui.notification("Logs directory not found", type="warning")
-            return
-        try:
-            all_files = list(log_dir.glob("*.log")) + list(log_dir.glob("*.finished"))
-            if not all_files:
-                ui.notification("No log files found to clear", type="info")
-                return
-            deleted_count = 0
-            errors = []
-            for file_path in all_files:
-                try:
-                    file_path.unlink()
-                    deleted_count += 1
-                    logger.info(f"Deleted log file: {file_path}")
-                except Exception as e:
-                    error_msg = f"Failed to delete {file_path.name}: {str(e)}"
-                    errors.append(error_msg)
-                    logger.error(error_msg)
-            if deleted_count > 0:
-                msg = f"Successfully deleted {deleted_count} log file(s)"
-                if errors:
-                    msg += f" ({len(errors)} errors)"
-                logger.info(msg)
-                ui.notification(msg, type="positive")
-                self.update_sessions_status()
-            if errors:
-                error_summary = "; ".join(errors[:3])
-                if len(errors) > 3:
-                    error_summary += f" (+{len(errors) - 3} more)"
-                ui.notification(f"Errors: {error_summary}", type="warning")
-        except Exception as e:
-            error_msg = f"Error clearing log files: {e}"
-            logger.error(error_msg)
-            ui.notification(error_msg, type="negative")
-
-    def clear_session(self, session_name, ui):
-        """Deletes the session's log file and removes the session from Redis, then refreshes the UI."""
-        log_file = self.get_log_file(session_name)
-        log_deleted = False
-        try:
-            if log_file.exists():
-                log_file.unlink()
-                log_deleted = True
-                logger.info(f"Deleted log file for session: {session_name}")
-        except Exception as e:
-            logger.warning(f"Failed to delete log file for session {session_name}: {e}")
-
-        redis_deleted = False
-        try:
-            found_key = self._find_session_key(session_name)
-            if found_key:
-                if self.redis_client.redis.delete(found_key):
-                    redis_deleted = True
-                    logger.info(f"Deleted Redis session: {session_name} (key: {found_key})")
-            else:
-                logger.warning(f"Could not find Redis key for session '{session_name}'")
-        except Exception as e:
-            logger.warning(f"Failed to delete Redis session {session_name}: {e}")
-
-        if log_deleted and redis_deleted:
-            ui.notification(f"Session '{session_name}' cleared (log and Redis entry deleted)", type="positive")
-        elif log_deleted:
-            ui.notification(f"Session '{session_name}' log deleted, but failed to remove from Redis", type="warning")
-        elif redis_deleted:
-            ui.notification(f"Session '{session_name}' removed from Redis, but log file not found/deleted", type="warning")
-        else:
-            ui.notification(f"Failed to clear session '{session_name}' (see logs)", type="negative")
-
-        self.update_sessions_status(force=True)
-
-    def _find_session_key(self, session_name):
-        """Return the Redis key of the session hash whose display name is session_name, or None."""
-        for key in list(self.redis_client.redis.scan_iter(match="desto:session:*")):
-            session_data = self.redis_client.redis.hgetall(key)
-            if session_data:
-                session_info = decode_hash(session_data)
-                if session_info.get("session_name", key.replace("desto:session:", "")) == session_name:
-                    return key
-        return None

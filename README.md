@@ -26,6 +26,7 @@
   <a href="#-features">Features</a> ·
   <a href="#-screenshots">Screenshots</a> ·
   <a href="#-security">Security</a> ·
+  <a href="#%EF%B8%8F-terminal-ui">Terminal UI</a> ·
   <a href="#%EF%B8%8F-command-line-interface">CLI</a> ·
   <a href="https://desto.readthedocs.io/">Docs</a>
 </p>
@@ -68,11 +69,14 @@ You need Python 3.11+, [`tmux`](https://github.com/tmux/tmux), a running [Redis]
 # Debian/Ubuntu (use dnf or pacman on Fedora or Arch)
 sudo apt install tmux at redis-server
 
-# Install desto as a tool (gives you both `desto` and `desto-cli`)
+# Install desto as a tool (gives you `desto`, `desto-tui` and `desto-cli`)
 uv tool install desto      # or: pip install desto
 
 # Start the dashboard
 desto
+
+# ...or use it right in the terminal
+desto-tui
 ```
 
 desto creates `desto_scripts/` and `desto_logs/` in the current directory. Drop your `.sh` and `.py` files into `desto_scripts/` and they show up in the dashboard.
@@ -119,7 +123,8 @@ docker compose down              # stop and remove the containers
 | 🔔 **Notify** | Optional [Pushbullet](https://www.pushbullet.com/) push to your phone or desktop when a job finishes, with its exit code. Set `DESTO_PUSHBULLET_API_KEY` or add the key in Settings. |
 | 🗄️ **History** | Session tracking in [Redis](https://redis.io/about/), plus an optional [SQLite](https://www.sqlite.org/) store that keeps history forever. [Learn more →](https://desto.readthedocs.io/user-guide/sqlite-persistence/) |
 | 🔒 **Secure** | Listens on localhost by default, with an optional password login. See [Security](#-security). |
-| 🖥️ **CLI** | Everything from the terminal too, with `desto-cli`. See [below](#%EF%B8%8F-command-line-interface). |
+| ⌨️ **Terminal UI** | The whole dashboard in your terminal with `desto-tui`, great over `ssh`. See [below](#%EF%B8%8F-terminal-ui). |
+| 🖥️ **CLI** | Scriptable commands with `desto-cli`. See [below](#%EF%B8%8F-command-line-interface). |
 | 🌙 **Dark mode** | One click, top right. |
 
 ## 📸 Screenshots
@@ -196,6 +201,20 @@ The most common settings, all set through environment variables:
 | `DESTO_PUSHBULLET_API_KEY` | *(unset)* | Pushbullet key for finish/fail notifications. |
 
 See the [configuration reference](https://desto.readthedocs.io/reference/configuration/) for the full list.
+
+## ⌨️ Terminal UI
+
+Prefer the terminal? `desto-tui` is the dashboard as a keyboard-driven terminal app: launch, chain and schedule scripts, follow logs live, attach to a session's `tmux`, kill, re-run and manage favorites, all without a browser. It works on the same sessions as the web dashboard, so you can use both.
+
+```bash
+desto-tui
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kalfasyan/desto/main/docs/images/tui.png" alt="desto terminal UI" width="800"/>
+</p>
+
+Press `1` `2` `3` to switch between Sessions, Scripts and Favorites, and `?` to see every key. 📖 [Terminal UI guide →](https://desto.readthedocs.io/user-guide/tui/)
 
 ## 🖥️ Command-line interface
 

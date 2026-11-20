@@ -47,7 +47,7 @@ class TestTmuxManagerLogging:
         mock_logger = Mock()
 
         # Patch Redis to be unavailable for consistent file-based testing
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("src.desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_instance = Mock()
             mock_redis_instance.is_connected.return_value = False
             mock_redis_class.return_value = mock_redis_instance
