@@ -1,3 +1,5 @@
+import socket
+import sys
 from collections import deque
 
 from loguru import logger
@@ -169,8 +171,30 @@ def build_dashboard(show_logout: bool) -> None:
     tm.resume_updates = lambda: resume_global_timer(um, tm, state)
 
 
+def port_is_free(host: str, port: int) -> bool:
+    """Return True if the dashboard can listen on host:port."""
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
+        # Same option uvicorn uses, so a port left in TIME_WAIT still counts as free.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind((host.strip("[]"), port))
+        except OSError:
+            return False
+    return True
+
+
 def main():
     cfg = get_auth_config()
+
+    if not port_is_free(cfg.host, cfg.port):
+        logger.error(
+            f"Port {cfg.port} on {cfg.host} is already in use, so the dashboard can't start.\n"
+            f"Is desto already running? Open http://localhost:{cfg.port} to check, or stop it first "
+            "(for Docker, run 'docker compose down' in the desto folder).\n"
+            f"To run on another port instead: DESTO_PORT={cfg.port + 1} desto"
+        )
+        sys.exit(1)
 
     setup_auth(cfg.password)
     if not is_loopback(cfg.host) and not cfg.password:
