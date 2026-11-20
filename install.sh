@@ -108,7 +108,7 @@ install_desto() {
     fi
 
     say "Installing desto"
-    uv tool install --upgrade desto
+    uv tool install --upgrade --refresh-package desto desto  # ignore a stale cached index
 }
 
 main() {
