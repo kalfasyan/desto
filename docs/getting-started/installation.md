@@ -16,7 +16,7 @@ curl -LsSf https://raw.githubusercontent.com/kalfasyan/desto/main/install.sh | s
 
 Then start the dashboard with `desto`, or the terminal UI with `desto-tui`.
 
-The [script](https://github.com/kalfasyan/desto/blob/main/install.sh) is short, so feel free to read it first. It:
+The script ([`install.sh`](https://github.com/kalfasyan/desto) in the repository root) is short, so feel free to read it first. It:
 
 1. Installs `tmux`, `at` and Redis with your package manager (apt, dnf, pacman or Homebrew), skipping any you already have. It uses `sudo` when you are not root. On Arch it installs Valkey, the drop-in Redis replacement Arch ships.
 2. Starts Redis and `atd`, and enables them on boot.
