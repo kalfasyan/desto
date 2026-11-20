@@ -1,142 +1,119 @@
 # Installation
 
-There are three ways to install `desto`. Pick one:
+Pick one way to install. Each one has its matching uninstall right below it.
 
-- **[One-line installer](#one-line-installer)**: the quickest way on Linux and macOS.
-- **[Docker Compose](#docker-compose)**: everything, Redis included, in containers.
-- **[Manually with `uv` or `pip`](#manual-install-with-uv-or-pip)**: full control over each piece.
+| Method | Best for |
+|---|---|
+| [One-line installer](#one-line-installer) | The quickest start on Linux or macOS |
+| [Docker Compose](#docker-compose) | Keeping everything, Redis included, in containers |
+| [`uv` or `pip`](#uv-or-pip) | Setting up `tmux` and Redis yourself |
+| [From source](#from-source) | Trying the latest code or contributing |
 
-Whichever you choose, the dashboard runs at [http://localhost:8809](http://localhost:8809).
+Once installed, start the web dashboard with `desto` and open [http://localhost:8809](http://localhost:8809), or start the terminal UI with `desto-tui`.
 
 ## One-line installer
+
+**Install**
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/kalfasyan/desto/main/install.sh | sh
 ```
 
-Then start the dashboard with `desto`, or the terminal UI with `desto-tui`.
+The [script](https://github.com/kalfasyan/desto) (`install.sh` in the repository) installs `tmux`, `at` and Redis with your package manager (apt, dnf, pacman or Homebrew, using `sudo`), starts Redis, installs [`uv`](https://docs.astral.sh/uv/) if needed, and runs `uv tool install desto`. Run it again to upgrade.
 
-The script ([`install.sh`](https://github.com/kalfasyan/desto) in the repository root) is short, so feel free to read it first. It:
+Already running Redis elsewhere, for example in Docker? End the command with `| DESTO_SKIP_PACKAGES=1 sh` to install only desto.
 
-1. Installs `tmux`, `at` and Redis with your package manager (apt, dnf, pacman or Homebrew), skipping any you already have. It uses `sudo` when you are not root. On Arch it installs Valkey, the drop-in Redis replacement Arch ships.
-2. Starts Redis and `atd`, and enables them on boot.
-3. Installs [`uv`](https://docs.astral.sh/uv/) if it is missing.
-4. Runs `uv tool install desto`, which puts `desto`, `desto-tui` and `desto-cli` on your `PATH`.
-
-If you already run Redis somewhere else (for example in Docker), skip steps 1 and 2:
+**Uninstall**
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/kalfasyan/desto/main/install.sh | DESTO_SKIP_PACKAGES=1 sh
+uv tool uninstall desto
 ```
-
-Run the same command again to upgrade desto. Check that everything is in place with `desto-cli doctor`.
 
 ## Docker Compose
 
 You only need [Docker](https://docs.docker.com/get-docker/).
+
+**Install**
 
 ```bash
 git clone https://github.com/kalfasyan/desto.git && cd desto
 docker compose up -d
 ```
 
-Scripts in `desto_scripts/` and logs in `desto_logs/` inside the clone are shared with the container.
-
-desto is installed inside the container, not on your machine, so `desto-tui` and `desto-cli` run there too:
+Your scripts go in `desto_scripts/` and logs land in `desto_logs/`, both inside the `desto` folder. desto runs inside the container, so run the terminal UI and CLI there too:
 
 ```bash
 docker compose exec dashboard uv run desto-tui
 docker compose exec dashboard uv run desto-cli sessions list
 ```
 
-Handy commands:
+To upgrade, run `git pull && docker compose up -d --build`.
+
+**Uninstall**
+
+From inside the `desto` folder. This deletes your scripts and logs too, so copy out anything you want to keep first.
 
 ```bash
-docker compose logs -f           # follow the logs
-docker compose up -d --build     # rebuild after pulling changes
-docker compose down              # stop and remove the containers
+docker compose down -v --rmi all   # containers, network, volumes and images
+cd .. && sudo rm -rf desto         # the folder (sudo, because the container writes logs as root)
 ```
 
-## Manual install with `uv` or `pip`
+## `uv` or `pip`
 
-### Requirements
-
-- Python 3.11+
-- [tmux](https://github.com/tmux/tmux)
-- A running [Redis](https://redis.io/docs/latest/operate/oss_and_stack/install/) server. desto stores its session state there and will not start without it.
-- [at](https://en.wikipedia.org/wiki/At_(command)), only needed for scheduling.
+**Requirements:** Python 3.11+, `tmux`, a running Redis server (desto won't start without it), and `at` for scheduling.
 
 ```bash
 # Debian/Ubuntu
 sudo apt install tmux at redis-server
 
 # Fedora/AlmaLinux
-sudo dnf install tmux at redis
-sudo systemctl enable --now redis atd
+sudo dnf install tmux at redis && sudo systemctl enable --now redis atd
 
-# Arch Linux (Arch ships Valkey, a drop-in Redis replacement)
-sudo pacman -S tmux at valkey
-sudo systemctl enable --now valkey atd
+# Arch Linux (Valkey is Arch's drop-in Redis replacement)
+sudo pacman -S tmux at valkey && sudo systemctl enable --now valkey atd
 
 # macOS
-brew install tmux redis
-brew services start redis
+brew install tmux redis && brew services start redis
 ```
 
-By default desto connects to Redis on `localhost:6379`. Set `REDIS_HOST` and `REDIS_PORT` to use another server.
+desto looks for Redis on `localhost:6379`. Set `REDIS_HOST` and `REDIS_PORT` to use another server.
 
-### Install desto
-
-As a global tool with [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended):
+**Install**
 
 ```bash
-uv tool install desto
+uv tool install desto    # or: pip install desto
 ```
 
-This installs `desto` (web dashboard), `desto-tui` (terminal UI) and `desto-cli` (command line).
+To upgrade, run `uv tool upgrade desto` (or `pip install -U desto`).
 
-Or add it to an existing `uv` project:
+**Uninstall**
 
 ```bash
-uv add desto
+uv tool uninstall desto  # or: pip uninstall desto
 ```
 
-Or with pip:
+## From source
+
+Needs the same requirements as [`uv` or `pip`](#uv-or-pip).
+
+**Install**
 
 ```bash
-pip install desto
+git clone https://github.com/kalfasyan/desto.git && cd desto
+uv tool install .
 ```
 
-To install from a local clone instead, run `uv tool install . --force` in the repository.
+Or install the latest `main` without cloning: `uv tool install git+https://github.com/kalfasyan/desto`.
 
-### Run it
-
-```bash
-desto
-```
-
-desto creates `desto_scripts/` and `desto_logs/` in the current directory.
-
-## Uninstall
-
-### One-line installer or `uv tool install`
+**Uninstall**
 
 ```bash
-desto-cli service uninstall   # only if you set up the systemd service
 uv tool uninstall desto
+cd .. && rm -rf desto
 ```
 
-`tmux`, `at`, Redis and `uv` stay installed, since other tools may use them. Remove them with your package manager if you don't need them, for example `sudo apt remove tmux at redis-server`. Your `desto_scripts/` and `desto_logs/` folders stay where you ran desto.
+## What uninstalling leaves behind
 
-If you installed with `pip`, run `pip uninstall desto` instead.
-
-### Docker Compose
-
-From inside the `desto` folder:
-
-```bash
-docker compose down -v --rmi all   # containers, network, volumes and images
-cd .. && sudo rm -rf desto         # the clone, including desto_scripts/ and desto_logs/
-```
-
-`sudo` is needed because the container writes its logs as root. Copy out any scripts you want to keep first.
+- **`tmux`, `at`, Redis and `uv`** stay installed, since other tools may use them. Remove them with your package manager if you don't need them, for example `sudo apt remove tmux at redis-server`.
+- **Your scripts and logs** in `desto_scripts/` and `desto_logs/` stay in the folder where you ran desto.
+- **The systemd service**, if you set one up, needs removing before you uninstall: `desto-cli service uninstall`.

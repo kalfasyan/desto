@@ -50,76 +50,55 @@ desto puts all of that in one page:
 
 ## ⚡ Quick start
 
-### 🚀 One-line install (Linux and macOS)
+Pick one way to install. Each comes with its matching uninstall.
+
+### 🚀 One-line installer (Linux and macOS)
+
+Sets up everything desto needs (`tmux`, `at`, Redis, `uv`) and then desto itself. [Read the script](install.sh) first if you like.
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/kalfasyan/desto/main/install.sh | sh
 ```
 
-Then run `desto` and open **[http://localhost:8809](http://localhost:8809)**. 🎉
-
-The [script](install.sh) is short and readable. It installs `tmux`, `at` and Redis with your package manager (apt, dnf, pacman or Homebrew, using `sudo`), starts Redis, installs [`uv`](https://docs.astral.sh/uv/) if needed, and runs `uv tool install desto`. Already run Redis somewhere else, e.g. in Docker? End the command with `| DESTO_SKIP_PACKAGES=1 sh` instead to only install desto.
+Uninstall: `uv tool uninstall desto`
 
 ### 🐳 Docker Compose
 
-Comes with Redis included. You only need [Docker](https://docs.docker.com/get-docker/).
+Everything runs in containers, Redis included. You only need [Docker](https://docs.docker.com/get-docker/).
 
 ```bash
 git clone https://github.com/kalfasyan/desto.git && cd desto
 docker compose up -d
 ```
 
-Open **[http://localhost:8809](http://localhost:8809)**. That's it. 🎉
+Use the terminal UI or CLI inside the container: `docker compose exec dashboard uv run desto-tui`
 
-desto lives inside the container, so commands like `desto-tui` run there too:
+Uninstall, from inside the `desto` folder (copy out any scripts you want to keep first):
 
 ```bash
-docker compose exec dashboard uv run desto-tui
+docker compose down -v --rmi all && cd .. && sudo rm -rf desto
 ```
 
-### 🐍 Manually with `uv` or `pip`
+### 🐍 With `uv` or `pip`
 
-You need Python 3.11+, [`tmux`](https://github.com/tmux/tmux), a running [Redis](https://redis.io/docs/latest/operate/oss_and_stack/install/) server, and optionally [`at`](https://en.wikipedia.org/wiki/At_(command)) for scheduling.
+First install Python 3.11+, `tmux`, `at` and Redis, and make sure Redis is running. On Debian/Ubuntu that's `sudo apt install tmux at redis-server`. Then:
 
 ```bash
-# Debian/Ubuntu (use dnf or pacman on Fedora or Arch)
-sudo apt install tmux at redis-server
-
-# Install desto as a tool (gives you `desto`, `desto-tui` and `desto-cli`)
 uv tool install desto      # or: pip install desto
-
-# Start the dashboard
-desto
-
-# ...or use it right in the terminal
-desto-tui
 ```
 
-desto creates `desto_scripts/` and `desto_logs/` in the current directory. Drop your `.sh` and `.py` files into `desto_scripts/` and they show up in the dashboard.
+Uninstall: `uv tool uninstall desto` (or `pip uninstall desto`)
 
-More options, including adding desto to an existing `uv` project, are in the [installation guide](https://desto.readthedocs.io/getting-started/installation/).
-
-<details>
-<summary><strong>🗑️ Uninstall</strong></summary>
-
-**One-line installer or `uv tool install`:**
+### ▶️ Run it
 
 ```bash
-desto-cli service uninstall   # only if you set up the systemd service
-uv tool uninstall desto
+desto        # web dashboard at http://localhost:8809
+desto-tui    # the same, in your terminal
 ```
 
-`tmux`, `at`, Redis and `uv` stay installed, since other tools may use them. Remove them with your package manager if you don't need them (for example `sudo apt remove redis-server at`). Your `desto_scripts/` and `desto_logs/` folders are left where you ran desto.
+desto creates `desto_scripts/` and `desto_logs/` in the current directory. Drop your `.sh` and `.py` files into `desto_scripts/` and they show up.
 
-**Docker Compose** (from inside the `desto` folder):
-
-```bash
-docker compose down -v --rmi all   # containers, network, volumes and images
-cd .. && sudo rm -rf desto         # the clone, including desto_scripts/ and desto_logs/
-```
-
-`sudo` is needed because the container writes its logs as root. Copy out any scripts you want to keep first.
-</details>
+Installing from source, other distros, and what each uninstall leaves behind are in the [installation guide](https://desto.readthedocs.io/getting-started/installation/).
 
 <details>
 <summary><strong>🔄 Start desto automatically on boot (systemd)</strong></summary>
@@ -134,7 +113,7 @@ desto-cli service install
 sudo desto-cli service install --system
 ```
 
-Docker Compose users don't need this: the `restart: always` policy already starts desto on boot.
+Docker Compose users don't need this: the containers' restart policy already starts desto on boot.
 </details>
 
 <details>
