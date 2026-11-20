@@ -54,7 +54,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
     def test_add_sessions_table_uses_redis_status_when_available(self):
         """Test that add_sessions_table checks Redis job status for keep-alive sessions."""
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
             tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
@@ -99,7 +99,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
     def test_add_sessions_table_falls_back_to_file_marker_without_redis(self):
         """Test that add_sessions_table falls back to file markers when Redis is not available."""
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_instance = Mock(spec=DestoRedisClient)
             mock_redis_instance.is_connected.return_value = False
             mock_redis_class.return_value = mock_redis_instance
@@ -108,7 +108,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
 
     def test_session_status_correctly_distinguishes_job_vs_session(self):
         """Test that session status correctly shows job completion vs session running state."""
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
             tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
@@ -215,7 +215,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         mock_redis_client.is_connected.return_value = True
         mock_redis_client.redis = Mock()  # Add the redis attribute
 
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
 
             tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
@@ -239,7 +239,7 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
         mock_redis_client.is_connected.return_value = False
         mock_redis_client.redis = Mock()  # Add the redis attribute
 
-        with patch("src.desto.app.sessions.DestoRedisClient") as mock_redis_class:
+        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = mock_redis_client
             with self.assertRaises(RuntimeError):
                 TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)

@@ -168,7 +168,7 @@ echo "Chain completion marker" >> {log_file}
         for part in expected_parts:
             self.assertIn(part, content, f"Missing expected content: {part}")
 
-    @patch("src.desto.app.sessions.subprocess.run")
+    @patch("desto.core.service.subprocess.run")
     def test_tmux_manager_uses_correct_command_structure(self, mock_subprocess):
         """Test that TmuxManager generates correct command structure."""
         if not TmuxManager:

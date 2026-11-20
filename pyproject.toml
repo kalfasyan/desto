@@ -12,6 +12,10 @@ dependencies = [
     "rich>=13.0.0",
     "redis>=4.0.0",
     "requests>=2.31.0",
+    "textual>=8.2",
+    "tree-sitter>=0.25",
+    "tree-sitter-bash>=0.23",
+    "tree-sitter-python>=0.23",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +43,7 @@ docs = [
 [project.scripts]
 desto = "desto.app.dashboard:main"
 desto-cli = "desto.cli.cli:cli_main"
+desto-tui = "desto.tui.app:main"
 
 [build-system]
 requires = ["hatchling"]

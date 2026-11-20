@@ -7,6 +7,8 @@ import psutil
 from loguru import logger
 from nicegui import ui
 
+from desto.core import scripts
+
 
 class SystemStatsPanel:
     def __init__(self, ui_settings):
@@ -222,7 +224,7 @@ class NewScriptTab:
         self.tmux_manager = tmux_manager
         self.ui_manager = ui_manager
         self.script_type = {"value": "bash"}
-        self.custom_code = {"value": "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"}
+        self.custom_code = {"value": scripts.TEMPLATES["bash"]}
         self.custom_template_name_input = None
         self.code_editor = None
 
@@ -262,38 +264,25 @@ class NewScriptTab:
     def on_script_type_change(self, e):
         script_type = e.value
         self.script_type["value"] = script_type
-        if script_type == "python":
-            self.custom_code["value"] = "#!/usr/bin/env python3\n\n# Your Python code here\nprint('Hello from desto!')\n"
-            self.code_editor.language = "python"
-        else:
-            self.custom_code["value"] = "#!/bin/bash\n\n# Your bash script here\necho 'Hello from desto!'\n"
-            self.code_editor.language = "bash"
+        self.custom_code["value"] = scripts.TEMPLATES[script_type]
+        self.code_editor.language = script_type
         self.code_editor.value = self.custom_code["value"]
 
     def save_custom_script(self):
         name = self.custom_template_name_input.value.strip()
-        if not name or len(name) > 15:
-            ui.notification("Please enter a name up to 15 characters.", type="info")
-            return
-        safe_name = name.strip().replace(" ", "_")[:15]
-        code = self.custom_code["value"]
-        script_type = self.script_type["value"]
-        extension = ".py" if script_type == "python" else ".sh"
-        default_shebang = "#!/usr/bin/env python3\n" if script_type == "python" else "#!/bin/bash\n"
-        if not code.startswith("#!"):
-            code = default_shebang + code
-        script_path = self.tmux_manager.get_script_file(f"{safe_name}{extension}")
         try:
-            with script_path.open("w") as f:
-                f.write(code)
-            os.chmod(script_path, 0o755)
+            script_path = scripts.create_script(self.tmux_manager.SCRIPTS_DIR, name, self.custom_code["value"], self.script_type["value"])
             ui.notification(f"Script '{name}' saved successfully.", type="positive")
+        except ValueError as e:
+            ui.notification(str(e), type="info")
+            return
         except Exception as e:
             ui.notification(f"Failed to save script: {e}", type="warning")
+            return
         if self.ui_manager:
             self.ui_manager.refresh_script_list()
             if hasattr(self.ui_manager, "script_path_select"):
-                self.ui_manager.script_path_select.value = f"{safe_name}{extension}"
+                self.ui_manager.script_path_select.value = script_path.name
 
 
 class LogSection:
@@ -347,10 +336,8 @@ class ScriptManagerTab:
         if not script_path.is_file():
             ui.notification(f"Script file not found: {actual_filename}", type="warning")
             return
-        exec_cmd = self.ui_manager.build_execution_command(script_path, arguments)
-        script_marker = f"echo '=== Running script: {script_path.name} ==='"
         try:
-            full_cmd = f"{script_marker} && ({exec_cmd})"
+            full_cmd = scripts.launch_command(script_path, arguments, self.ui_manager.python_executable)
             self.ui_manager.tmux_manager.start_tmux_session(session_name, full_cmd, logger)
             ui.notification(f"Launched session '{session_name}'", type="positive")
         except Exception as e:
@@ -365,20 +352,14 @@ class ScriptManagerTab:
         if not chain:
             ui.notification("Chain queue is empty.", type="warning")
             return
-        commands = []
+        missing = next((Path(script_path) for script_path, _ in chain if not Path(script_path).is_file()), None)
+        if missing:
+            ui.notification(f"Script not found: {missing.name}", type="warning")
+            return
         try:
-            total_scripts = len(chain)
-            for idx, (script_path, arguments) in enumerate(chain):
-                script_path_obj = Path(script_path)
-                if not script_path_obj.is_file():
-                    ui.notification(f"Script not found: {script_path_obj.name}", type="warning")
-                    return
-                marker = f"echo '=== Running script {idx + 1} of {total_scripts}: {script_path_obj.name} ==='"
-                exec_cmd = self.ui_manager.build_execution_command(script_path_obj, arguments)
-                commands.append(f"{marker} && ({exec_cmd})")
-            full_cmd = " && ".join(commands)
+            full_cmd = scripts.chain_command(chain, self.ui_manager.python_executable)
             self.ui_manager.tmux_manager.start_tmux_session(session_name, full_cmd, logger)
-            ui.notification(f"Launched chain '{session_name}' ({total_scripts} scripts)", type="positive")
+            ui.notification(f"Launched chain '{session_name}' ({len(chain)} scripts)", type="positive")
         except Exception as e:
             logger.error(f"Failed to launch chain: {e}")
             ui.notification(f"Error: {e}", type="negative")

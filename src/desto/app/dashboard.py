@@ -7,6 +7,7 @@ from desto.app.auth import get_auth_config, is_loopback, setup_auth
 from desto.app.config import config as ui_settings
 from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
+from desto.core.formatting import session_event_message
 
 # Dashboard timers, each running only as often as its data changes:
 #   - fast (1s): system stats, live durations, pending Redis events, system log panel
@@ -76,13 +77,9 @@ def process_pending_updates(um: UserInterfaceManager, state: DashboardState) -> 
     if not state.pending_updates:
         return
     while state.pending_updates:
-        update_data = state.pending_updates.popleft()
-        session_name = update_data.get("session_name")
-        status = update_data.get("status")
-        if status == "finished":
-            ui.notification(f"Session '{session_name}' finished!", type="positive")
-        elif status == "failed":
-            ui.notification(f"Session '{session_name}' failed!", type="negative")
+        event = session_event_message(state.pending_updates.popleft())
+        if event:
+            ui.notification(event[0], type=event[1])
     um.tmux_manager.update_sessions_status(force=False)
 
 

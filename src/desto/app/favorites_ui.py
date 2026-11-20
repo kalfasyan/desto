@@ -24,11 +24,7 @@ class FavoritesTab:
 
         self.favorites_container.clear()
 
-        search_query = self.search_input.value if self.search_input.value else ""
-        if search_query:
-            favorites = self.desto_manager.favorites_manager.search_favorites(search_query)
-        else:
-            favorites = self.desto_manager.favorites_manager.list_favorites(sort_by="use_count")
+        favorites = self.ui_manager.tmux_manager.list_favorites(self.search_input.value or "")
 
         if not favorites:
             with self.favorites_container:
@@ -59,12 +55,10 @@ class FavoritesTab:
 
     def _run_favorite(self, favorite_id: str, favorite_name: str, command: str):
         """Run a favorite command in a new session."""
-        base_name = f"fav-{favorite_name}"
-        session_name = self.ui_manager.tmux_manager.get_unique_session_name(base_name)
-        self.desto_manager.favorites_manager.increment_usage(favorite_id)
         try:
-            self.ui_manager.tmux_manager.start_tmux_session(session_name, command, logger)
-            ui.notification(f"Started session: {session_name}", type="positive")
+            session_name = self.ui_manager.tmux_manager.run_favorite(favorite_id, favorite_name, command)
+            if session_name:
+                ui.notification(f"Started session: {session_name}", type="positive")
             self.refresh_favorites_list()
         except Exception as e:
             logger.error(f"Failed to run favorite command: {e}")
@@ -195,15 +189,7 @@ class FavoritesTab:
             ui.notification('Please type "DELETE" to confirm', type="warning")
             return
 
-        deleted = self.desto_manager.favorites_manager.delete_all_favorites()
-        # Also clear from SQLite if available
-        if hasattr(self.desto_manager, "sqlite_store") and self.desto_manager.sqlite_store and self.desto_manager.sqlite_store.enabled:
-            try:
-                conn = self.desto_manager.sqlite_store._get_connection()
-                conn.execute("DELETE FROM favorites")
-                conn.commit()
-            except Exception:
-                pass
+        deleted = self.ui_manager.tmux_manager.clear_all_favorites()
 
         ui.notification(f"Deleted {deleted} favorite(s)", type="positive")
         dialog.close()

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from desto.app.session_format import (
+from desto.core.formatting import (
     decode_hash,
     extract_at_command,
     format_duration,
@@ -108,3 +108,58 @@ def test_extract_at_command():
 def test_format_scheduled_datetime():
     assert format_scheduled_datetime("Mon Jul 14 07:59:00 2025") == "2025-07-14T07:59:00"
     assert format_scheduled_datetime("garbage") == "garbage"
+
+
+# --- Table rows shared by the web dashboard and the terminal UI ---------------------------
+
+from desto.core.formatting import count_by_category, scheduled_job_rows, session_event_message, session_rows  # noqa: E402
+
+
+def _session(name, status, start, session_id=None):
+    return {"session_name": name, "status": status, "start_time": start, "session_id": session_id or name}
+
+
+def test_session_rows_skip_scheduled_sort_newest_first_and_carry_command():
+    sessions = {
+        "old": _session("old", "finished", "2026-01-01T10:00:00"),
+        "new": _session("new", "running", "2026-01-02T10:00:00"),
+        "later": _session("later", "scheduled", "2026-01-03T10:00:00"),
+    }
+    job_info = {"new": {"status": "running", "command": "bash new.sh"}}
+
+    rows = session_rows(sessions, tmux_active={"new"}, job_info=job_info)
+
+    assert [r.name for r in rows] == ["new", "old"]
+    assert rows[0].category == "running" and rows[0].tmux_active and rows[0].command == "bash new.sh"
+    assert rows[1].category == "finished" and not rows[1].tmux_active
+
+
+def test_count_by_category_counts_rows():
+    sessions = {"a": _session("a", "finished", "1"), "b": _session("b", "failed", "2"), "c": _session("c", "finished", "3")}
+    assert count_by_category(session_rows(sessions, set(), {})) == {"total": 3, "running": 0, "finished": 2, "failed": 1}
+
+
+def test_scheduled_job_rows_hide_internal_jobs_and_label_recurring():
+    jobs = [
+        {"id": "1", "datetime": "2026-01-01T10:00:00", "user": "ann", "metadata": None},
+        {"id": "2", "metadata": {"status": "finished_internal"}},
+        {"id": "3", "datetime": "x", "user": "x", "metadata": {"status": "scheduled", "recurring_id": "r1", "recurrence": "every day", "scheduled_time": "2026-01-02T08:00:00", "user": "bob"}},
+    ]
+
+    rows = scheduled_job_rows(jobs)
+
+    assert [r.job_id for r in rows] == ["1", "3"]
+    assert (rows[0].scheduled_time, rows[0].user, rows[0].status) == ("2026-01-01T10:00:00", "ann", "scheduled")
+    assert (rows[1].scheduled_time, rows[1].user, rows[1].status) == ("2026-01-02T08:00:00", "bob", "scheduled · every day")
+
+
+@pytest.mark.parametrize(
+    "update, expected",
+    [
+        ({"session_name": "s", "status": "finished"}, ("Session 's' finished!", "positive")),
+        ({"session_name": "s", "status": "failed"}, ("Session 's' failed!", "negative")),
+        ({"session_name": "s", "status": "running"}, None),
+    ],
+)
+def test_session_event_message(update, expected):
+    assert session_event_message(update) == expected

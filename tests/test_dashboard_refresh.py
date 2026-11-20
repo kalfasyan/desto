@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not 
 
 @pytest.fixture
 def tmux(tmp_path):
-    with patch("desto.app.sessions.DestoRedisClient") as mock_redis_class:
+    with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
         client = Mock()
         client.is_connected.return_value = True
         client.redis = MagicMock()

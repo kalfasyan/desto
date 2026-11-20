@@ -1,12 +1,13 @@
-"""Tests for the repeat option in the dashboard's schedule dialog."""
+"""Tests for the dashboard's schedule dialog: it turns the form into one schedule_launch call."""
 
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from desto.app.ui import UserInterfaceManager
+from desto.core.scheduled_jobs import ScheduleError
 
 
 @pytest.fixture
@@ -14,29 +15,12 @@ def ui_manager(tmp_path):
     (tmp_path / "backup.sh").write_text("echo hi\n")
     mock_tmux = MagicMock()
     mock_tmux.SCRIPTS_DIR = tmp_path
-    mock_tmux.LOG_DIR = tmp_path / "logs"
     manager = UserInterfaceManager(MagicMock(), {}, mock_tmux)
     manager.session_name_input = SimpleNamespace(value="backup")
     manager.arguments_input = SimpleNamespace(value="")
     manager.script_path_select = SimpleNamespace(value="backup.sh")
     manager.chain_queue_display = MagicMock()
     return manager
-
-
-@pytest.fixture
-def backends():
-    with (
-        patch("desto.app.schedule_ui.RecurringScheduleManager") as recurring,
-        patch("desto.app.schedule_ui.AtJobManager") as at_manager,
-        patch("desto.redis.client.DestoRedisClient") as redis_client,
-        patch("desto.redis.desto_manager.DestoManager") as desto_manager,
-        patch("desto.app.schedule_ui.ui"),
-        patch("shutil.which", return_value="/usr/bin/at"),
-    ):
-        redis_client.return_value.is_connected.return_value = True
-        recurring.return_value.create.return_value = "abc123"
-        at_manager.return_value.schedule.return_value = "42"
-        yield SimpleNamespace(recurring=recurring.return_value, at=at_manager.return_value, desto=desto_manager.return_value)
 
 
 FIRST_RUN = (datetime.now() + timedelta(days=1)).replace(second=0, microsecond=0)
@@ -55,57 +39,40 @@ def schedule(ui_manager, unit, count=1):
     return error_label, dialog
 
 
-def test_repeat_creates_recurring_schedule(ui_manager, backends, tmp_path):
+def test_repeat_passes_interval_to_service(ui_manager, tmp_path):
     error_label, dialog = schedule(ui_manager, "days", 2)
 
     assert error_label.text == ""
-    kwargs = backends.recurring.create.call_args.kwargs
-    assert kwargs["session_name"] == "backup"
-    assert kwargs["interval_minutes"] == 2 * 24 * 60
-    assert kwargs["first_run"] == FIRST_RUN
-    assert kwargs["log_dir"] == str(tmp_path / "logs")
-    assert str(tmp_path / "backup.sh") in kwargs["command"]
-    # Runs get their own sessions when they fire, so nothing is pre-created or queued directly
-    backends.desto.start_session_with_job.assert_not_called()
-    backends.at.schedule.assert_not_called()
+    name, command, script_paths, arguments, when, interval = ui_manager.tmux_manager.schedule_launch.call_args.args
+    assert (name, when, interval) == ("backup", FIRST_RUN, 2 * 24 * 60)
+    assert str(tmp_path / "backup.sh") in command
+    assert script_paths == [tmp_path / "backup.sh"]
     dialog.close.assert_called_once()
 
 
-def test_no_repeat_keeps_one_off_scheduling(ui_manager, backends):
-    error_label, dialog = schedule(ui_manager, "never")
+def test_no_repeat_schedules_once(ui_manager):
+    schedule(ui_manager, "never")
 
-    assert error_label.text == ""
-    backends.recurring.create.assert_not_called()
-    backends.desto.start_session_with_job.assert_called_once()
-    assert "desto.hooks.start_scheduled_session" in backends.at.schedule.call_args.kwargs["command"]
-    dialog.close.assert_called_once()
+    assert ui_manager.tmux_manager.schedule_launch.call_args.args[5] is None
 
 
-def test_repeat_count_must_be_positive(ui_manager, backends):
+def test_service_errors_are_shown_and_keep_dialog_open(ui_manager):
+    ui_manager.tmux_manager.schedule_launch.side_effect = ScheduleError("Repeat interval must be at least 1.")
+
     error_label, dialog = schedule(ui_manager, "hours", 0)
 
-    assert "at least 1" in error_label.text
-    backends.recurring.create.assert_not_called()
+    assert error_label.text == "Repeat interval must be at least 1."
     dialog.close.assert_not_called()
 
 
-def test_recurring_chain_runs_all_scripts_and_clears_queue(ui_manager, backends, tmp_path):
+def test_chain_schedules_all_scripts_and_clears_queue(ui_manager, tmp_path):
     (tmp_path / "report.py").write_text("print('hi')\n")
-    ui_manager.chain_queue = [(tmp_path / "backup.sh", ""), (tmp_path / "report.py", "")]
+    ui_manager.chain_queue = [(str(tmp_path / "backup.sh"), ""), (str(tmp_path / "report.py"), "")]
 
     schedule(ui_manager, "weeks")
 
-    kwargs = backends.recurring.create.call_args.kwargs
-    assert kwargs["interval_minutes"] == 7 * 24 * 60
-    assert " && " in kwargs["command"]
-    assert kwargs["script_paths"] == [str(tmp_path / "backup.sh"), str(tmp_path / "report.py")]
+    _, command, script_paths, _, _, interval = ui_manager.tmux_manager.schedule_launch.call_args.args
+    assert interval == 7 * 24 * 60
+    assert " && " in command
+    assert script_paths == [str(tmp_path / "backup.sh"), str(tmp_path / "report.py")]
     assert ui_manager.chain_queue == []
-
-
-def test_failed_first_run_reports_error(ui_manager, backends):
-    backends.recurring.create.return_value = None
-
-    error_label, dialog = schedule(ui_manager, "minutes", 30)
-
-    assert error_label.text == "Failed to schedule the first run with 'at'."
-    dialog.close.assert_not_called()

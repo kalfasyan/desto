@@ -23,8 +23,8 @@ def mock_logger():
     return logger
 
 
-@patch("desto.app.sessions.subprocess")
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.subprocess")
+@patch("desto.core.service.DestoRedisClient")
 def test_start_tmux_session_creates_tmux_session(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be available
     mock_redis_instance = Mock()
@@ -54,8 +54,8 @@ def test_start_tmux_session_creates_tmux_session(mock_redis_class, mock_subproce
     assert call_args[4] == "test"
 
 
-@patch("desto.app.sessions.subprocess")
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.subprocess")
+@patch("desto.core.service.DestoRedisClient")
 def test_kill_session_calls_tmux_kill(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be available
     mock_redis_instance = Mock()
@@ -83,8 +83,8 @@ def test_kill_session_calls_tmux_kill(mock_redis_class, mock_subprocess, mock_ui
     )
 
 
-@patch("desto.app.sessions.subprocess")
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.subprocess")
+@patch("desto.core.service.DestoRedisClient")
 def test_check_sessions_returns_dict(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be available
     mock_redis_instance = Mock()
@@ -109,7 +109,7 @@ def test_check_sessions_returns_dict(mock_redis_class, mock_subprocess, mock_ui,
     assert sessions["test"]["id"] == "1"
 
 
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.DestoRedisClient")
 def test_redis_required_for_initialization(mock_redis_class, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be unavailable
     mock_redis_instance = Mock()
@@ -125,8 +125,8 @@ def test_redis_required_for_initialization(mock_redis_class, mock_ui, mock_logge
         TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
 
 
-@patch("desto.app.sessions.subprocess")
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.subprocess")
+@patch("desto.core.service.DestoRedisClient")
 def test_is_tmux_session_active_true_false(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be available
     mock_redis_instance = Mock()
@@ -144,8 +144,8 @@ def test_is_tmux_session_active_true_false(mock_redis_class, mock_subprocess, mo
     assert tmux.is_tmux_session_active("test") is False
 
 
-@patch("desto.app.sessions.subprocess")
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.subprocess")
+@patch("desto.core.service.DestoRedisClient")
 def test_get_all_sessions_status_includes_tmux_and_redis(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
     # Mock Redis to be available
     mock_redis_instance = Mock()
@@ -165,7 +165,7 @@ def test_get_all_sessions_status_includes_tmux_and_redis(mock_redis_class, mock_
     assert "tmux_session" in all_sessions
 
 
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.DestoRedisClient")
 def test_session_heartbeat_and_finish(mock_redis_class, mock_ui, mock_logger, tmp_path):
     from desto.redis.session_manager import DestoSession, SessionManager, SessionStatus
 
@@ -198,7 +198,7 @@ def test_session_heartbeat_and_finish(mock_redis_class, mock_ui, mock_logger, tm
     assert manager.fail_session(session.session_id, "error") is True
 
 
-@patch("desto.app.sessions.DestoRedisClient")
+@patch("desto.core.service.DestoRedisClient")
 def test_clear_sessions_container_calls_ui_clear(mock_redis_class, mock_ui, mock_logger, tmp_path):
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = True

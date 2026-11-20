@@ -1,6 +1,6 @@
 import os
 
-from desto.app.log_tailer import LogTailer, read_last_lines
+from desto.core.log_tailer import LogTailer, read_last_lines
 
 
 def test_initial_lines_returns_tail_and_positions_at_eof(tmp_path):
