@@ -50,7 +50,17 @@ desto puts all of that in one page:
 
 ## ⚡ Quick start
 
-### 🐳 Docker Compose (recommended)
+### 🚀 One-line install (Linux and macOS)
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/kalfasyan/desto/main/install.sh | sh
+```
+
+Then run `desto` and open **[http://localhost:8809](http://localhost:8809)**. 🎉
+
+The [script](install.sh) is short and readable. It installs `tmux`, `at` and Redis with your package manager (apt, dnf, pacman or Homebrew, using `sudo`), starts Redis, installs [`uv`](https://docs.astral.sh/uv/) if needed, and runs `uv tool install desto`. Already run Redis somewhere else, e.g. in Docker? End the command with `| DESTO_SKIP_PACKAGES=1 sh` instead to only install desto.
+
+### 🐳 Docker Compose
 
 Comes with Redis included. You only need [Docker](https://docs.docker.com/get-docker/).
 
@@ -61,7 +71,13 @@ docker compose up -d
 
 Open **[http://localhost:8809](http://localhost:8809)**. That's it. 🎉
 
-### 🐍 With `uv` or `pip`
+desto lives inside the container, so commands like `desto-tui` run there too:
+
+```bash
+docker compose exec dashboard uv run desto-tui
+```
+
+### 🐍 Manually with `uv` or `pip`
 
 You need Python 3.11+, [`tmux`](https://github.com/tmux/tmux), a running [Redis](https://redis.io/docs/latest/operate/oss_and_stack/install/) server, and optionally [`at`](https://en.wikipedia.org/wiki/At_(command)) for scheduling.
 
@@ -82,6 +98,28 @@ desto-tui
 desto creates `desto_scripts/` and `desto_logs/` in the current directory. Drop your `.sh` and `.py` files into `desto_scripts/` and they show up in the dashboard.
 
 More options, including adding desto to an existing `uv` project, are in the [installation guide](https://desto.readthedocs.io/getting-started/installation/).
+
+<details>
+<summary><strong>🗑️ Uninstall</strong></summary>
+
+**One-line installer or `uv tool install`:**
+
+```bash
+desto-cli service uninstall   # only if you set up the systemd service
+uv tool uninstall desto
+```
+
+`tmux`, `at`, Redis and `uv` stay installed, since other tools may use them. Remove them with your package manager if you don't need them (for example `sudo apt remove redis-server at`). Your `desto_scripts/` and `desto_logs/` folders are left where you ran desto.
+
+**Docker Compose** (from inside the `desto` folder):
+
+```bash
+docker compose down -v --rmi all   # containers, network, volumes and images
+cd .. && sudo rm -rf desto         # the clone, including desto_scripts/ and desto_logs/
+```
+
+`sudo` is needed because the container writes its logs as root. Copy out any scripts you want to keep first.
+</details>
 
 <details>
 <summary><strong>🔄 Start desto automatically on boot (systemd)</strong></summary>
