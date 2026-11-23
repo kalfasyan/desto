@@ -20,7 +20,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/kalfasyan/desto"
-Demo = "https://desto.vercel.app"
+Demo = "https://desto-demo.vercel.app"
 Documentation = "https://desto.readthedocs.io/"
 Repository = "https://github.com/kalfasyan/desto"
 Issues = "https://github.com/kalfasyan/desto/issues"

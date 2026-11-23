@@ -22,11 +22,11 @@
 </p>
 
 <p align="center">
-  <a href="https://desto.vercel.app"><img src="https://img.shields.io/badge/%E2%96%B6%20Try%20the%20live%20demo-no%20install%20needed-3b82f6?style=for-the-badge" alt="Try the live demo, no install needed"/></a>
+  <a href="https://desto-demo.vercel.app"><img src="https://img.shields.io/badge/%E2%96%B6%20Try%20the%20live%20demo-no%20install%20needed-3b82f6?style=for-the-badge" alt="Try the live demo, no install needed"/></a>
 </p>
 
 <p align="center">
-  <a href="https://desto.vercel.app"><b>Live demo</b></a> ·
+  <a href="https://desto-demo.vercel.app"><b>Live demo</b></a> ·
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-features">Features</a> ·
   <a href="#-screenshots">Screenshots</a> ·
@@ -39,7 +39,7 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/kalfasyan/desto/main/docs/images/desto_demo.gif" alt="desto demo: launching scripts, watching one fail, reading a live log and switching to dark mode" width="800"/>
   <br/>
-  <sub>Want to click around yourself? <a href="https://desto.vercel.app">Open the interactive demo</a> in your browser. It runs on simulated data, so nothing is installed or executed.</sub>
+  <sub>Want to click around yourself? <a href="https://desto-demo.vercel.app">Open the interactive demo</a> in your browser. It runs on simulated data, so nothing is installed or executed.</sub>
 </p>
 
 ---
@@ -57,7 +57,7 @@ desto puts all of that in one page:
 
 ## ⚡ Quick start
 
-> **Just looking?** Try the [live demo](https://desto.vercel.app) first. It's a click-through copy of the dashboard with simulated sessions, so you can launch a script, watch one fail and switch to dark mode without installing anything.
+> **Just looking?** Try the [live demo](https://desto-demo.vercel.app) first. It's a click-through copy of the dashboard with simulated sessions, so you can launch a script, watch one fail and switch to dark mode without installing anything.
 
 Pick one way to install. Each comes with its matching uninstall.
 

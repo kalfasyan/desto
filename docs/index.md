@@ -30,7 +30,7 @@ The key features are:
   
 <strong>🎬 Demo</strong>
 
-👉 **[Try the interactive demo](https://desto.vercel.app)** in your browser. No install needed; all sessions are simulated.
+👉 **[Try the interactive demo](https://desto-demo.vercel.app)** in your browser. No install needed; all sessions are simulated.
 
 <img src="images/desto_demo.gif" alt="Desto Demo" title="Desto in Action" width="700" style="border:2px solid #ccc; border-radius:6px; margin-bottom:24px;"/>
 
