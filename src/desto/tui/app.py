@@ -9,6 +9,7 @@ from loguru import logger
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.widgets import Footer, Header, Log, TabbedContent, TabPane
 
 from desto.core.formatting import session_event_message
@@ -80,8 +81,13 @@ class DestoApp(App):
     # --- Periodic work --------------------------------------------------------------
 
     def tick(self) -> None:
-        self.query_one(StatsBar).show(self.monitor.read())
-        log_view = self.query_one("#desto-log", Log)
+        try:
+            stats_bar = self.query_one(StatsBar)
+            log_view = self.query_one("#desto-log", Log)
+        except NoMatches:
+            # The interval timer can fire while the app is shutting down and its widgets are gone.
+            return
+        stats_bar.show(self.monitor.read())
         while self.pending_log_lines:
             log_view.write_line(self.pending_log_lines.popleft())
         if self.pending_events:
