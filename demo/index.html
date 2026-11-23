@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>desto — interactive demo</title>
+<meta name="description" content="Interactive demo of desto, a self-hosted web dashboard for launching, monitoring and scheduling bash and Python scripts in tmux sessions." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90' font-weight='900' font-style='italic' fill='%233b82f6'>d</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --primary: #3b82f6;
+    --accent: #8b5cf6;
+    --positive: #10b981;
+    --negative: #ef4444;
+    --info: #06b6d4;
+    --warning: #f59e0b;
+
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+    --header-bg: #ffffff;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+  }
+  html[data-theme="dark"] {
+    --bg: #020617;
+    --surface: #0f172a;
+    --surface-2: #1e293b;
+    --border: #1e293b;
+    --text: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-faint: #64748b;
+    --header-bg: #0f172a;
+    --shadow: 0 1px 3px rgba(0,0,0,.4);
+    --shadow-lg: 0 10px 25px -5px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg);
+    color: var(--text);
+    transition: background .25s ease, color .25s ease;
+    min-height: 100vh;
+  }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* ---------- Demo banner ---------- */
+  .demo-banner {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    flex-wrap: wrap;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    color: #fff; font-size: 13px; font-weight: 500;
+    padding: 8px 16px; text-align: center;
+  }
+  .demo-banner b { font-weight: 700; }
+  .demo-banner a { color: #fff; text-decoration: underline; font-weight: 600; white-space: nowrap; }
+
+  /* ---------- Header ---------- */
+  header.topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    font-size: 26px; font-weight: 900; font-style: italic; letter-spacing: -1px;
+    text-transform: uppercase; color: var(--primary);
+  }
+  .iconbtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: none; background: transparent; color: var(--primary);
+    cursor: pointer; transition: background .15s;
+  }
+  .iconbtn:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+  .iconbtn svg { width: 22px; height: 22px; }
+  .topbar-actions { display: flex; align-items: center; gap: 6px; }
+
+  /* ---------- Layout ---------- */
+  .shell { display: flex; align-items: flex-start; }
+  aside.sidebar {
+    width: 280px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    min-height: calc(100vh - 56px);
+  }
+  aside.sidebar.hidden { display: none; }
+  main.content { flex: 1; min-width: 0; padding: 28px 32px 80px; }
+  .container { max-width: 1120px; margin: 0 auto; }
+
+  /* ---------- Sidebar stats ---------- */
+  .sidebar h2 { font-size: 20px; font-weight: 700; margin: 0 0 18px; }
+  .stat-block { margin-bottom: 22px; }
+  .stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .stat-label { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-muted); }
+  .stat-label svg { width: 18px; height: 18px; }
+  .stat-pct { font-weight: 700; }
+  .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .bar > span { display: block; height: 100%; border-radius: 999px; transition: width .6s ease; }
+  .substat { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+  .switch { position: relative; width: 34px; height: 18px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); cursor: pointer; transition: background .2s; flex-shrink: 0; }
+  .switch::after { content: ""; position: absolute; top: 1px; left: 1px; width: 14px; height: 14px; border-radius: 50%; background: var(--text-faint); transition: transform .2s, background .2s; }
+  .switch.on { background: var(--primary); }
+  .switch.on::after { transform: translateX(16px); background: #fff; }
+  .cores { margin-top: 12px; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); display: none; }
+  .cores.show { display: block; }
+  .cores-title { font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--text-muted); }
+  .cores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 8px; }
+  .core { text-align: center; }
+  .core small { font-size: 10px; color: var(--text-faint); text-transform: uppercase; }
+  .core .cv { font-size: 11px; font-weight: 700; display: block; margin: 2px 0; }
+  .core .bar { height: 4px; }
+  .tmux-box {
+    margin-top: 10px; padding: 16px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+  }
+  .tmux-box .tt { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--primary); margin-bottom: 8px; }
+  .tmux-box div { font-size: 14px; color: var(--text-muted); }
+
+  /* ---------- Dashboard head ---------- */
+  .dash-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 22px; }
+  .dash-head h1 { font-size: 26px; font-weight: 700; margin: 0; }
+  .dash-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+  .txtbtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: transparent; border: none; cursor: pointer;
+    font-size: 13px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+    padding: 8px 12px; border-radius: 8px; color: var(--primary);
+    font-family: inherit; transition: background .15s;
+  }
+  .txtbtn:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+  .txtbtn svg { width: 18px; height: 18px; }
+  .txtbtn.warn { color: var(--warning); }
+  .txtbtn.neg { color: var(--negative); }
+
+  /* ---------- Stat cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 20px; box-shadow: var(--shadow); transition: box-shadow .2s, transform .2s;
+  }
+  .card:hover { box-shadow: var(--shadow-lg); }
+  .card .num { font-size: 34px; font-weight: 800; line-height: 1; }
+  .card .cap { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+
+  /* ---------- Sessions table ---------- */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  thead th {
+    text-align: left; font-size: 13px; font-weight: 700; color: var(--text-muted);
+    padding: 16px 18px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody td { padding: 18px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: var(--surface-2); }
+  .sess-name { font-weight: 600; }
+  .time { color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+  .badge.fin { color: var(--positive); }
+  .badge.run { color: var(--primary); }
+  .badge.fail { color: var(--negative); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.pulse { background: var(--primary); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .tmux-cell svg { width: 20px; height: 20px; }
+  .row-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .mini { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 4px 2px; }
+  .mini.kill { color: var(--negative); }
+  .mini.log { color: var(--primary); }
+  .mini.clear { color: var(--warning); }
+  .mini:hover { text-decoration: underline; }
+
+  /* ---------- Tabs ---------- */
+  .tabs { display: flex; justify-content: center; gap: 8px; margin: 34px 0 0; border-bottom: 1px solid var(--border); }
+  .tab {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 6px;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    padding: 14px 22px; color: var(--text-muted); font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: color .15s;
+  }
+  .tab svg { width: 20px; height: 20px; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .tab-panel { display: none; padding-top: 26px; }
+  .tab-panel.active { display: block; }
+
+  /* ---------- Script execution form ---------- */
+  .exec-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 26px; box-shadow: var(--shadow); }
+  .exec-card h3 { margin: 0 0 20px; font-size: 18px; font-weight: 700; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--text-muted); }
+  .field input, .field select {
+    font-family: inherit; font-size: 15px; padding: 10px 12px;
+    border: none; border-bottom: 2px solid var(--border); background: transparent; color: var(--text);
+    transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus { outline: none; border-bottom-color: var(--primary); }
+  .preview-label { margin: 24px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+  pre.code {
+    margin: 0; padding: 18px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; line-height: 1.55;
+    overflow-x: auto; color: var(--text);
+  }
+  .code .cm { color: var(--text-faint); }
+  .code .kw { color: var(--accent); }
+  .code .st { color: var(--positive); }
+  .launch-row { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    padding: 11px 20px; border-radius: 10px; border: 1px solid transparent; transition: filter .15s, background .15s;
+  }
+  .btn svg { width: 18px; height: 18px; }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
+  .btn.ghost:hover { background: var(--surface-2); }
+
+  /* ---------- New script / favorites ---------- */
+  .ta {
+    width: 100%; min-height: 220px; resize: vertical; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; line-height: 1.55; padding: 16px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  }
+  .ta:focus { outline: none; border-color: var(--primary); }
+  .fav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; background: var(--surface); }
+  .fav .fav-name { font-weight: 700; }
+  .fav .fav-cmd { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .fav-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .fav-actions button { background: none; border: none; cursor: pointer; }
+  .fav-actions svg { width: 20px; height: 20px; }
+
+  /* ---------- Chain queue + log ---------- */
+  .section-head { display: flex; align-items: center; justify-content: space-between; margin: 34px 0 14px; flex-wrap: wrap; gap: 10px; }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+  .chain-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; min-height: 60px; }
+  .chain-empty { color: var(--text-faint); font-style: italic; font-size: 14px; }
+  .chain-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); margin-bottom: 8px; }
+  .chain-item:last-child { margin-bottom: 0; }
+  .chain-idx { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .chain-name { font-weight: 600; font-size: 14px; }
+  .chain-args { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+  .logbox {
+    margin-top: 14px; background: #0b1120; color: #cbd5e1; border: 1px solid #1e293b;
+    border-radius: 14px; padding: 18px; font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px; line-height: 1.7; height: 230px; overflow-y: auto;
+  }
+  .logbox .t { color: #64748b; }
+  .logbox .ok { color: #34d399; }
+  .logbox .warn { color: #fbbf24; }
+  .logbox .err { color: #f87171; }
+  .logbox .inf { color: #60a5fa; }
+
+  /* ---------- Toast ---------- */
+  .toasts { position: fixed; bottom: 24px; right: 24px; z-index: 60; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    display: flex; align-items: center; gap: 10px; min-width: 240px; max-width: 340px;
+    padding: 13px 16px; border-radius: 12px; color: #fff; font-size: 14px; font-weight: 500;
+    box-shadow: var(--shadow-lg); animation: slidein .25s ease;
+  }
+  .toast.pos { background: var(--positive); }
+  .toast.inf { background: var(--primary); }
+  .toast.neg { background: var(--negative); }
+  .toast.warn { background: var(--warning); }
+  @keyframes slidein { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  footer.foot { text-align: center; padding: 30px 20px 50px; color: var(--text-faint); font-size: 13px; }
+  footer.foot a { font-weight: 600; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px) {
+    .shell { flex-direction: column; }
+    aside.sidebar { width: 100%; min-height: 0; border-right: none; border-bottom: 1px solid var(--border); }
+    aside.sidebar.hidden { display: none; }
+    main.content { width: 100%; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    main.content { padding: 20px 16px 70px; }
+    header.topbar { padding: 12px 16px; }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .dash-head h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  <span>🎭 <b>Live demo.</b> A click-through recreation of desto — all data is simulated in your browser.</span>
+  <a href="https://github.com/kalfasyan/desto" target="_blank" rel="noopener">View on GitHub ↗</a>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <button class="iconbtn" id="menuBtn" title="Toggle sidebar" aria-label="Toggle sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <span class="logo">desto</span>
+  </div>
+  <div class="topbar-actions">
+    <button class="iconbtn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <button class="iconbtn" id="settingsBtn" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <h2>System Stats</h2>
+
+    <div class="stat-block">
+      <div class="stat-head">
+        <span class="stat-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
+          CPU
+        </span>
+        <span class="stat-pct" style="color:var(--primary)" id="cpuPct">21.6%</span>
+      </div>
+      <div class="bar"><span id="cpuBar" style="width:21.6%;background:var(--primary)"></span></div>
+      <div class="toggle-row">
+        <div class="switch" id="coresSwitch"></div> Show Details
+      </div>
+      <div class="cores" id="cores">
+        <div class="cores-title">CPU Details (8 threads on 4 cores)</div>
+        <div class="cores-grid" id="coresGrid"></div>
+      </div>
+    </div>
+
+    <div class="stat-block">
+      <div class="stat-head">
+        <span class="stat-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg>
+          Memory
+        </span>
+        <span class="stat-pct" style="color:var(--accent)" id="memPct">64.7%</span>
+      </div>
+      <div class="bar"><span id="memBar" style="width:64.7%;background:var(--accent)"></span></div>
+      <div class="substat"><span id="memUsed">6.77 GB Used</span><span id="memAvail">5.64 GB Available</span></div>
+    </div>
+
+    <div class="stat-block">
+      <div class="stat-head">
+        <span class="stat-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+          Disk
+        </span>
+        <span class="stat-pct" style="color:var(--info)" id="diskPct">13.9%</span>
+      </div>
+      <div class="bar"><span id="diskBar" style="width:13.9%;background:var(--info)"></span></div>
+      <div class="substat"><span>11.42 GB Used</span><span>70.9 GB Free</span></div>
+    </div>
+
+    <div class="tmux-box">
+      <div class="tt">Tmux Environment</div>
+      <div id="tmuxCpu">tmux CPU: 0.0%</div>
+      <div id="tmuxMem">tmux MEM: 0.0 MB</div>
+    </div>
+  </aside>
+
+  <main class="content">
+    <div class="container">
+      <div class="dash-head">
+        <h1>Sessions Dashboard</h1>
+        <div class="dash-actions">
+          <button class="txtbtn" id="refreshBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Refresh
+          </button>
+          <button class="txtbtn neg" id="clearHistBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear History
+          </button>
+          <button class="txtbtn warn" id="clearLogsBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Clear Logs
+          </button>
+        </div>
+      </div>
+
+      <div class="cards">
+        <div class="card"><div class="num" style="color:var(--primary)" id="cTotal">0</div><div class="cap">Total Sessions</div></div>
+        <div class="card"><div class="num" style="color:var(--positive)" id="cFin">0</div><div class="cap">Finished</div></div>
+        <div class="card"><div class="num" style="color:var(--negative)" id="cFail">0</div><div class="cap">Failed</div></div>
+        <div class="card"><div class="num" style="color:var(--warning)" id="cRun">0</div><div class="cap">Running</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Session Name</th><th>Status</th><th>Job Duration</th><th>Session Duration</th>
+                <th>Started</th><th>Finished</th><th>Tmux Active</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sessBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab active" data-tab="scripts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+          Scripts
+        </button>
+        <button class="tab" data-tab="new">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New Script
+        </button>
+        <button class="tab" data-tab="fav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          Favorites
+        </button>
+      </div>
+
+      <!-- Scripts tab -->
+      <div class="tab-panel active" id="panel-scripts">
+        <div class="exec-card">
+          <h3>Script Execution</h3>
+          <div class="form-grid">
+            <div class="field">
+              <label>Session Name</label>
+              <input id="sessionName" value="long-job" />
+            </div>
+            <div class="field">
+              <label>Target Script</label>
+              <select id="scriptSelect"></select>
+            </div>
+            <div class="field">
+              <label>Arguments</label>
+              <input id="argsInput" value="" placeholder="optional" />
+            </div>
+          </div>
+          <div class="preview-label">Script Preview</div>
+          <pre class="code" id="scriptPreview"></pre>
+          <div class="launch-row">
+            <button class="btn primary" id="launchBtn">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Launch
+            </button>
+            <button class="btn ghost" id="chainBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+              Add to Chain
+            </button>
+            <button class="btn ghost" id="scheduleBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              Schedule
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- New script tab -->
+      <div class="tab-panel" id="panel-new">
+        <div class="exec-card">
+          <h3>Create a New Script</h3>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="field"><label>Script Name</label><input value="backup.sh" /></div>
+            <div class="field"><label>Type</label><select><option>bash</option><option>python</option></select></div>
+          </div>
+          <div class="preview-label">Editor</div>
+          <textarea class="ta" spellcheck="false">#!/bin/bash
+# A new script, written right in the browser.
+echo "Backing up /data ..."
+tar czf /backups/data-$(date +%F).tgz /data
+echo "Done."</textarea>
+          <div class="launch-row">
+            <button class="btn primary" id="saveNewBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+              Save Script
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Favorites tab -->
+      <div class="tab-panel" id="panel-fav">
+        <div class="exec-card">
+          <h3>Favorite Commands</h3>
+          <div id="favList" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <!-- Chain queue -->
+      <div class="section-head">
+        <span class="section-title">Chain Queue</span>
+        <div style="display:flex;gap:4px;">
+          <button class="txtbtn warn" id="clearChainBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            Clear Chain
+          </button>
+          <button class="txtbtn neg" id="killAllBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Kill All Sessions
+          </button>
+        </div>
+      </div>
+      <div class="chain-box" id="chainBox"><span class="chain-empty">Chain queue is empty.</span></div>
+
+      <!-- Log section -->
+      <div class="section-head"><span class="section-title">System Log</span></div>
+      <div class="logbox" id="logBox"></div>
+
+      <footer class="foot">
+        desto is open source (MIT). &nbsp;·&nbsp;
+        <a href="https://github.com/kalfasyan/desto" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp;
+        <a href="https://desto.readthedocs.io/" target="_blank" rel="noopener">Docs</a> &nbsp;·&nbsp;
+        <a href="https://pypi.org/project/desto/" target="_blank" rel="noopener">PyPI</a>
+        <br/><br/>
+        <span style="opacity:.8">This page is a static, read-only demo. The real desto runs on your own machine and manages live tmux sessions.</span>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Theme ----------
+  var root = document.documentElement;
+  var stored = null;
+  try { stored = localStorage.getItem("desto-demo-theme"); } catch (e) {}
+  if (stored === "dark" || stored === "light") {
+    root.setAttribute("data-theme", stored);
+  } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    root.setAttribute("data-theme", "dark");
+  } else {
+    root.setAttribute("data-theme", "light");
+  }
+  var sunIcon = '<path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="5"/>';
+  var moonIcon = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  function syncThemeIcon() {
+    document.getElementById("themeIcon").innerHTML =
+      root.getAttribute("data-theme") === "dark" ? sunIcon : moonIcon;
+  }
+  syncThemeIcon();
+  document.getElementById("themeBtn").addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("desto-demo-theme", next); } catch (e) {}
+    syncThemeIcon();
+  });
+
+  // ---------- Sidebar toggle ----------
+  var sidebarEl = document.getElementById("sidebar");
+  if (window.innerWidth <= 960) sidebarEl.classList.add("hidden");
+  document.getElementById("menuBtn").addEventListener("click", function () {
+    sidebarEl.classList.toggle("hidden");
+  });
+
+  // ---------- Toast ----------
+  function toast(msg, kind) {
+    var el = document.createElement("div");
+    el.className = "toast " + (kind || "inf");
+    el.textContent = msg;
+    document.getElementById("toasts").appendChild(el);
+    setTimeout(function () {
+      el.style.transition = "opacity .3s, transform .3s";
+      el.style.opacity = "0";
+      el.style.transform = "translateX(20px)";
+      setTimeout(function () { el.remove(); }, 320);
+    }, 2600);
+  }
+
+  // ---------- Clock helpers ----------
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function fmt(d) {
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      " " + pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
+  }
+  function dur(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    if (sec < 60) return sec + "s";
+    var m = Math.floor(sec / 60), s = sec % 60;
+    if (m < 60) return m + "m " + s + "s";
+    var h = Math.floor(m / 60); m = m % 60;
+    return h + "h " + m + "m";
+  }
+
+  // ---------- Scripts ----------
+  var SCRIPTS = {
+    "long-running-demo.sh":
+      '#!/bin/bash\n' +
+      '# Simulate a long-running job with periodic output.\n' +
+      'for i in $(seq 1 30); do\n' +
+      '  echo "step $i / 30 — working..."\n' +
+      '  sleep 2\n' +
+      'done\n' +
+      'echo "All done."',
+    "count.sh":
+      '#!/bin/bash\n' +
+      '# Start a for loop that iterates from 1 to 100.\n' +
+      'for i in $(seq 1 100); do\n' +
+      '  echo "count: $i"\n' +
+      '  sleep 0.5\n' +
+      'done',
+    "fail.sh":
+      '#!/bin/bash\n' +
+      '# A job that does some work and then fails.\n' +
+      'echo "starting risky task..."\n' +
+      'sleep 3\n' +
+      'echo "something went wrong" >&2\n' +
+      'exit 1',
+    "data_processor.py":
+      '#!/usr/bin/env python3\n' +
+      '"""Process a batch of records."""\n' +
+      'import time\n' +
+      'for i in range(20):\n' +
+      '    print(f"processed batch {i}")\n' +
+      '    time.sleep(1)\n' +
+      'print("pipeline complete")',
+    "health_monitor.py":
+      '#!/usr/bin/env python3\n' +
+      '"""Ping services and report status."""\n' +
+      'import time\n' +
+      'services = ["api", "db", "cache"]\n' +
+      'for s in services:\n' +
+      '    print(f"{s}: OK")\n' +
+      '    time.sleep(1)'
+  };
+  var ICONS = { sh: "🐚", py: "🐍" };
+  function scriptIcon(name) { return name.endsWith(".py") ? ICONS.py : ICONS.sh; }
+
+  var sel = document.getElementById("scriptSelect");
+  Object.keys(SCRIPTS).forEach(function (name) {
+    var o = document.createElement("option");
+    o.value = name;
+    o.textContent = scriptIcon(name) + "  " + name;
+    sel.appendChild(o);
+  });
+  sel.value = "long-running-demo.sh";
+
+  function highlight(code) {
+    // escape then colorize comments and strings, cheaply.
+    var esc = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    var lines = esc.split("\n").map(function (ln) {
+      if (/^\s*#/.test(ln) || /^\s*"""/.test(ln)) return '<span class="cm">' + ln + "</span>";
+      // strings first (escaping turned " into &quot;), then keywords — avoids re-matching span attrs
+      ln = ln.replace(/&quot;[^&]*?&quot;/g, function (m) { return '\u0000' + m + '\u0001'; });
+      ln = ln.replace(/\b(for|do|done|in|echo|exit|import|def|range|print|seq|sleep)\b/g, '<span class="kw">$1</span>');
+      ln = ln.replace(/\u0000(.*?)\u0001/g, '<span class="st">$1</span>');
+      return ln;
+    });
+    return lines.join("\n");
+  }
+  function renderPreview() {
+    document.getElementById("scriptPreview").innerHTML = highlight(SCRIPTS[sel.value] || "");
+  }
+  sel.addEventListener("change", renderPreview);
+  renderPreview();
+
+  // ---------- Sessions state ----------
+  var now = Date.now();
+  var sessions = [
+    {
+      name: "chain", status: "finished", jobDur: 9, sessDur: 9,
+      started: new Date(now - 240000), finished: new Date(now - 231000), active: false
+    },
+    {
+      name: "count_session", status: "finished", jobDur: null, sessDur: 53,
+      started: new Date(now - 300000), finished: new Date(now - 247000), active: false
+    }
+  ];
+
+  var statusMeta = {
+    finished: { cls: "fin", label: "✅ Finished" },
+    running: { cls: "run", label: "Running" },
+    failed: { cls: "fail", label: "❌ Failed" }
+  };
+
+  function tmuxDot(active) {
+    if (active) {
+      return '<span class="dot pulse" title="tmux session active" style="width:14px;height:14px;"></span>';
+    }
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="var(--negative)" stroke-width="2.4"><circle cx="12" cy="12" r="9" fill="var(--negative)" stroke="none"/><path d="M9 9l6 6M15 9l-6 6" stroke="#fff"/></svg>';
+  }
+
+  function renderSessions() {
+    var body = document.getElementById("sessBody");
+    body.innerHTML = "";
+    sessions.forEach(function (s, i) {
+      var meta = statusMeta[s.status];
+      var tr = document.createElement("tr");
+      var finishedCell = s.status === "running" ? '<span class="time">Running</span>' :
+        '<span class="time">' + fmt(s.finished) + "</span>";
+      var statusLabel = s.status === "running"
+        ? '<span class="badge run"><span class="dot pulse"></span> Running</span>'
+        : '<span class="badge ' + meta.cls + '">' + meta.label + "</span>";
+      tr.innerHTML =
+        '<td class="sess-name">' + s.name + "</td>" +
+        "<td>" + statusLabel + "</td>" +
+        "<td>" + (s.jobDur == null ? "N/A" : dur(s.jobDur)) + "</td>" +
+        "<td>" + dur(s.sessDur) + "</td>" +
+        '<td><span class="time">' + fmt(s.started) + "</span></td>" +
+        "<td>" + finishedCell + "</td>" +
+        '<td class="tmux-cell">' + tmuxDot(s.active) + "</td>" +
+        '<td><div class="row-actions">' +
+          '<button class="mini kill" data-act="kill" data-i="' + i + '">Kill</button>' +
+          '<button class="mini log" data-act="log" data-i="' + i + '">View Log</button>' +
+          '<button class="mini clear" data-act="clear" data-i="' + i + '">Clear</button>' +
+        "</div></td>";
+      body.appendChild(tr);
+    });
+    updateCards();
+  }
+
+  function updateCards() {
+    var total = sessions.length, fin = 0, fail = 0, run = 0;
+    sessions.forEach(function (s) {
+      if (s.status === "finished") fin++;
+      else if (s.status === "failed") fail++;
+      else if (s.status === "running") run++;
+    });
+    document.getElementById("cTotal").textContent = total;
+    document.getElementById("cFin").textContent = fin;
+    document.getElementById("cFail").textContent = fail;
+    document.getElementById("cRun").textContent = run;
+  }
+
+  // delegated actions on the table
+  document.getElementById("sessBody").addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    var i = parseInt(btn.getAttribute("data-i"), 10);
+    var s = sessions[i];
+    if (!s) return;
+    var act = btn.getAttribute("data-act");
+    if (act === "kill") {
+      if (s.status === "running") { s.status = "failed"; s.finished = new Date(); s.active = false; }
+      log("warn", "Session '" + s.name + "' killed.");
+      toast("Killed " + s.name, "warn");
+      renderSessions();
+    } else if (act === "log") {
+      log("inf", "Viewing log for '" + s.name + "' (live tail would open in the real app).");
+      toast("Opened log: " + s.name, "inf");
+    } else if (act === "clear") {
+      sessions.splice(i, 1);
+      log("inf", "Cleared session '" + s.name + "'.");
+      renderSessions();
+    }
+  });
+
+  // ---------- Launch a simulated job ----------
+  var launching = false;
+  function launch() {
+    if (launching) return;
+    var name = (document.getElementById("sessionName").value || "job").trim();
+    var script = sel.value;
+    var isFail = script === "fail.sh";
+    launching = true;
+
+    var s = {
+      name: name, status: "running", jobDur: 0, sessDur: 0,
+      started: new Date(), finished: null, active: true
+    };
+    sessions.unshift(s);
+    renderSessions();
+    toast("Launched " + name, "pos");
+    log("ok", "Launched session '" + name + "' running " + script + ".");
+
+    var ticks = 0;
+    var total = isFail ? 4 : 8;
+    var timer = setInterval(function () {
+      ticks++;
+      s.jobDur = ticks; s.sessDur = ticks;
+      if (ticks <= total) {
+        if (isFail) log("t", "  [" + name + "] starting risky task...");
+        else log("t", "  [" + name + "] step " + ticks + " / " + total + " — working...");
+      }
+      renderSessions();
+      if (ticks >= total) {
+        clearInterval(timer);
+        s.active = false;
+        s.finished = new Date();
+        if (isFail) {
+          s.status = "failed";
+          log("err", "Session '" + name + "' exited with code 1.");
+          toast(name + " failed (exit 1)", "neg");
+        } else {
+          s.status = "finished";
+          log("ok", "Session '" + name + "' finished successfully.");
+          toast(name + " finished", "pos");
+        }
+        renderSessions();
+        launching = false;
+      }
+    }, 650);
+  }
+  document.getElementById("launchBtn").addEventListener("click", launch);
+
+  // ---------- Chain queue ----------
+  var chain = [];
+  function renderChain() {
+    var box = document.getElementById("chainBox");
+    if (!chain.length) { box.innerHTML = '<span class="chain-empty">Chain queue is empty.</span>'; return; }
+    box.innerHTML = chain.map(function (c, i) {
+      return '<div class="chain-item"><div class="chain-idx">' + (i + 1) + "</div>" +
+        '<div class="chain-name">' + c.name + "</div>" +
+        '<div class="chain-args">' + (c.args || "") + "</div></div>";
+    }).join("");
+  }
+  document.getElementById("chainBtn").addEventListener("click", function () {
+    chain.push({ name: sel.value, args: document.getElementById("argsInput").value });
+    renderChain();
+    toast("Added " + sel.value + " to chain", "pos");
+    log("inf", "Added '" + sel.value + "' to the chain queue.");
+  });
+  document.getElementById("clearChainBtn").addEventListener("click", function () {
+    if (!chain.length) { toast("Chain queue is already empty", "inf"); return; }
+    var n = chain.length; chain = []; renderChain();
+    toast("Cleared " + n + " item(s)", "pos");
+  });
+  document.getElementById("scheduleBtn").addEventListener("click", function () {
+    toast("Scheduling is available in the full app", "inf");
+    log("inf", "Schedule: pick a date/time or a cron-style repeat in the real desto.");
+  });
+  document.getElementById("killAllBtn").addEventListener("click", function () {
+    var any = false;
+    sessions.forEach(function (s) { if (s.status === "running") { s.status = "failed"; s.finished = new Date(); s.active = false; any = true; } });
+    renderSessions();
+    toast(any ? "Killed all running sessions" : "No running sessions", any ? "warn" : "inf");
+    if (any) log("warn", "Killed all running sessions.");
+  });
+  document.getElementById("saveNewBtn").addEventListener("click", function () {
+    toast("Script saved (demo)", "pos");
+    log("ok", "Saved new script 'backup.sh'.");
+  });
+
+  // ---------- Toolbar buttons ----------
+  document.getElementById("refreshBtn").addEventListener("click", function () {
+    renderSessions(); toast("Refreshed", "inf");
+  });
+  document.getElementById("clearHistBtn").addEventListener("click", function () {
+    sessions = sessions.filter(function (s) { return s.status === "running"; });
+    renderSessions(); toast("History cleared", "pos");
+    log("inf", "Cleared finished/failed session history.");
+  });
+  document.getElementById("clearLogsBtn").addEventListener("click", function () {
+    document.getElementById("logBox").innerHTML = "";
+    toast("Logs cleared", "pos");
+  });
+  document.getElementById("settingsBtn").addEventListener("click", function () {
+    toast("Settings: scripts dir, logs dir, notifications", "inf");
+  });
+
+  // ---------- Favorites ----------
+  var favs = [
+    { name: "nightly-backup", cmd: "bash backup.sh /data" },
+    { name: "train-model", cmd: "python train.py --epochs 50" },
+    { name: "scrape-feeds", cmd: "python scraper.py --since 24h" }
+  ];
+  function renderFavs() {
+    document.getElementById("favList").innerHTML = favs.map(function (f, i) {
+      return '<div class="fav"><div><div class="fav-name">' + f.name + "</div>" +
+        '<div class="fav-cmd">' + f.cmd + "</div></div>" +
+        '<div class="fav-actions">' +
+          '<button title="Run" data-fi="' + i + '"><svg viewBox="0 0 24 24" fill="var(--positive)"><path d="M8 5v14l11-7z"/></svg></button>' +
+          '<button title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>' +
+          '<button title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="var(--negative)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>' +
+        "</div></div>";
+    }).join("");
+  }
+  document.getElementById("favList").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-fi]");
+    if (!b) return;
+    var f = favs[parseInt(b.getAttribute("data-fi"), 10)];
+    toast("Ran favorite: " + f.name, "pos");
+    log("ok", "Ran favorite command '" + f.name + "'.");
+  });
+  renderFavs();
+
+  // ---------- Tabs ----------
+  var tabBtns = document.querySelectorAll(".tab");
+  tabBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      tabBtns.forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+      document.querySelectorAll(".tab-panel").forEach(function (p) { p.classList.remove("active"); });
+      document.getElementById("panel-" + btn.getAttribute("data-tab")).classList.add("active");
+    });
+  });
+
+  // ---------- CPU cores toggle ----------
+  var coreBars = [];
+  (function buildCores() {
+    var grid = document.getElementById("coresGrid");
+    for (var i = 0; i < 8; i++) {
+      var c = document.createElement("div");
+      c.className = "core";
+      c.innerHTML = "<small>T" + i + '</small><span class="cv">0%</span>' +
+        '<div class="bar"><span style="width:0%;background:var(--primary)"></span></div>';
+      grid.appendChild(c);
+      coreBars.push({ val: c.querySelector(".cv"), bar: c.querySelector(".bar > span") });
+    }
+  })();
+  document.getElementById("coresSwitch").addEventListener("click", function () {
+    this.classList.toggle("on");
+    document.getElementById("cores").classList.toggle("show", this.classList.contains("on"));
+  });
+
+  // ---------- Live stats ticker ----------
+  function jitter(base, spread, min, max) {
+    var v = base + (Math.random() - 0.5) * spread;
+    return Math.min(max, Math.max(min, v));
+  }
+  var cpu = 21.6, mem = 64.7, disk = 13.9;
+  function tickStats() {
+    cpu = jitter(cpu, 10, 4, 92);
+    mem = jitter(mem, 2.5, 40, 82);
+    disk = jitter(disk, 0.3, 13, 15);
+    document.getElementById("cpuPct").textContent = cpu.toFixed(1) + "%";
+    document.getElementById("cpuBar").style.width = cpu + "%";
+    document.getElementById("memPct").textContent = mem.toFixed(1) + "%";
+    document.getElementById("memBar").style.width = mem + "%";
+    document.getElementById("diskPct").textContent = disk.toFixed(1) + "%";
+    document.getElementById("diskBar").style.width = disk + "%";
+    var used = (mem / 100 * 12.4);
+    document.getElementById("memUsed").textContent = used.toFixed(2) + " GB Used";
+    document.getElementById("memAvail").textContent = (12.4 - used).toFixed(2) + " GB Available";
+    var anyRun = sessions.some(function (s) { return s.status === "running"; });
+    document.getElementById("tmuxCpu").textContent = "tmux CPU: " + (anyRun ? jitter(6, 6, 1, 18).toFixed(1) : "0.0") + "%";
+    document.getElementById("tmuxMem").textContent = "tmux MEM: " + (anyRun ? jitter(40, 20, 10, 90).toFixed(0) : "0.0") + (anyRun ? "" : " MB");
+    if (!anyRun) document.getElementById("tmuxMem").textContent = "tmux MEM: 0.0 MB";
+    else document.getElementById("tmuxMem").textContent = "tmux MEM: " + jitter(40, 20, 10, 90).toFixed(0) + " MB";
+    coreBars.forEach(function (c) {
+      var v = jitter(cpu, 40, 0, 100);
+      c.val.textContent = v.toFixed(0) + "%";
+      c.bar.style.width = v + "%";
+    });
+  }
+
+  // ---------- Log ----------
+  var logEl = document.getElementById("logBox");
+  function log(kind, msg) {
+    var line = document.createElement("div");
+    var cls = { t: "t", ok: "ok", warn: "warn", err: "err", inf: "inf" }[kind] || "";
+    line.innerHTML = '<span class="t">' + fmt(new Date()) + "</span>  " +
+      '<span class="' + cls + '">' + msg.replace(/</g, "&lt;") + "</span>";
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    // keep it from growing forever
+    while (logEl.childNodes.length > 200) logEl.removeChild(logEl.firstChild);
+  }
+
+  // ---------- Boot ----------
+  renderSessions();
+  renderChain();
+  tickStats();
+  setInterval(tickStats, 1600);
+  log("inf", "desto dashboard ready. Serving at http://localhost:8809");
+  log("inf", "Redis pub/sub connected — real-time updates enabled.");
+  log("inf", "This is an interactive demo; try launching a script above.");
+})();
+</script>
+</body>
+</html>
