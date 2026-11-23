@@ -14,6 +14,7 @@ from textual.widgets import Footer, Header, Log, TabbedContent, TabPane
 
 from desto.core.formatting import session_event_message
 from desto.core.service import DestoService
+from desto.core.session_metrics import start_background_sampler
 from desto.core.system_stats import SystemMonitor
 from desto.tui.favorites import FavoritesPane
 from desto.tui.messages import FavoritesChanged, SessionsChanged
@@ -170,6 +171,7 @@ def main() -> None:
     except RuntimeError as e:
         print(f"desto-tui: {e}\nStart Redis (for example `docker compose up -d redis`) and try again.", file=sys.stderr)
         sys.exit(1)
+    start_background_sampler()
     DestoApp(service, log_lines=pending_log_lines).run()
 
 

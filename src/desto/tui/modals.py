@@ -7,8 +7,9 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Log, Select, Static
+from textual.widgets import Button, Input, Label, Log, Select, Sparkline, Static
 
+from desto.core.formatting import format_bytes, format_seconds
 from desto.core.log_tailer import LogTailer
 from desto.core.scheduled_jobs import ScheduleError
 from desto.redis.recurring import REPEAT_UNITS
@@ -209,3 +210,39 @@ class LogScreen(ModalScreen[None]):
 
     def action_scroll_end(self) -> None:
         self.query_one(Log).scroll_end(animate=False)
+
+
+class UsageScreen(ModalScreen[None]):
+    """A session's CPU and memory over its run, with its totals."""
+
+    BINDINGS = [Binding("escape", "dismiss(None)", "Close"), Binding("u", "dismiss(None)", "Close", show=False)]
+
+    def __init__(self, session_name: str, summary: dict, points: list[dict]) -> None:
+        super().__init__()
+        self.session_name, self.summary, self.points = session_name, summary or {}, points
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog usage-dialog"):
+            yield Label(f"Resource usage: {self.session_name}", classes="dialog-title")
+            if not self.points:
+                yield Static("No usage recorded for this session yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.", classes="dialog-body")
+            else:
+                first, last = self.points[0]["t"], self.points[-1]["t"]
+                span = format_seconds(int(last - first))
+                yield Label(f"CPU % over the last {span} (peak {max(p.get('cpu_max', 0) for p in self.points):.0f}%)", classes="field-label")
+                yield Sparkline([p.get("cpu", 0) for p in self.points], id="usage-cpu")
+                yield Label(f"Memory over the last {span} (peak {format_bytes(max(p.get('rss_max', 0) for p in self.points))})", classes="field-label")
+                yield Sparkline([p.get("rss", 0) for p in self.points], id="usage-mem")
+            s = self.summary
+            if s:
+                totals = (
+                    f"Peak memory {format_bytes(s.get('peak_rss', 0))} · CPU time {format_seconds(int(float(s.get('cpu_seconds', 0))))} · "
+                    f"up to {s.get('max_procs', 0)} processes, {s.get('max_threads', 0)} threads · "
+                    f"read {format_bytes(s.get('read_bytes', 0))}, written {format_bytes(s.get('write_bytes', 0))}"
+                )
+                yield Static(totals, classes="dialog-body")
+            with Horizontal(classes="dialog-buttons"):
+                yield Button("Close", id="close", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(None)

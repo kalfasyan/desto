@@ -10,9 +10,9 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Label
 
-from desto.core.formatting import session_row_times
+from desto.core.formatting import metrics_key, session_row_times, usage_cells
 from desto.core.service import DestoService, Snapshot
-from desto.tui.modals import ConfirmScreen, LogScreen
+from desto.tui.modals import ConfirmScreen, LogScreen, UsageScreen
 
 # (filter, label, style) of the count buttons; None shows every session
 FILTERS = [(None, "Total", "bold"), ("running", "Running", "bold yellow"), ("finished", "Finished", "bold green"), ("failed", "Failed", "bold red")]
@@ -29,6 +29,7 @@ class SessionsPane(Vertical):
     BINDINGS = [
         Binding("l", "view_log", "Log"),
         Binding("a", "attach", "Attach"),
+        Binding("u", "usage", "Usage"),
         Binding("k", "kill", "Kill"),
         Binding("r", "rerun", "Re-run"),
         Binding("d", "clear_session", "Clear"),
@@ -54,7 +55,7 @@ class SessionsPane(Vertical):
         yield DataTable(id="scheduled-table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        self.query_one("#sessions-table", DataTable).add_columns("Session", "Status", "Job time", "Session time", "Started", "Finished", "tmux")
+        self.query_one("#sessions-table", DataTable).add_columns("Session", "Status", "CPU", "Memory", "Job time", "Session time", "Started", "Finished", "tmux")
         self.query_one("#scheduled-table", DataTable).add_columns("Job", "Scheduled for", "User", "Status")
         self.refresh_sessions()
 
@@ -77,12 +78,15 @@ class SessionsPane(Vertical):
         rows = []
         for row in snapshot.rows:
             times = session_row_times(row.session)
+            cpu, memory = usage_cells(snapshot.usage.get(metrics_key(row.name, row.session)))
             rows.append(
                 (
                     row.name,
                     (
                         Text(row.name, style="bold"),
                         Text(row.label, style=row.color),
+                        cpu,
+                        memory,
                         times["job_duration"],
                         times["session_duration"],
                         times["started"],
@@ -149,6 +153,17 @@ class SessionsPane(Vertical):
         with self.app.suspend():
             subprocess.run(attach_command(row.name))
         self.refresh_sessions()
+
+    def action_usage(self) -> None:
+        row = self.selected_row()
+        if row:
+            self._show_usage(row)
+
+    @work(thread=True, group="usage")
+    def _show_usage(self, row) -> None:
+        points = self.service.session_usage_history(row)
+        summary = self.service.session_usage([row]).get(metrics_key(row.name, row.session), {})
+        self.app.call_from_thread(self.app.push_screen, UsageScreen(row.name, summary, points))
 
     def action_kill(self) -> None:
         row = self.selected_row()

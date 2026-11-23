@@ -12,7 +12,7 @@ import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
@@ -21,6 +21,16 @@ from .models import DestoJob, DestoSession, FavoriteCommand, JobStatus, SessionS
 # Default database path
 _DEFAULT_DB_DIR = os.getenv("DESTO_DATA_DIR", os.path.join(os.getcwd(), "desto_data"))
 _DEFAULT_DB_PATH = os.path.join(_DEFAULT_DB_DIR, "desto.db")
+
+
+# Totals of a session's resource usage, written once when the session ends (see desto.core.session_metrics).
+METRIC_COLUMNS = {
+    "peak_rss_bytes": "INTEGER",
+    "cpu_seconds": "REAL",
+    "read_bytes": "INTEGER",
+    "write_bytes": "INTEGER",
+    "max_processes": "INTEGER",
+}
 
 
 class SQLiteStore:
@@ -119,6 +129,11 @@ class SQLiteStore:
             CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
             CREATE INDEX IF NOT EXISTS idx_favorites_name ON favorites(name);
         """)
+        # Resource usage totals, added after the first release: add them to existing databases too.
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(sessions)")}
+        for column, sql_type in METRIC_COLUMNS.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE sessions ADD COLUMN {column} {sql_type}")
         conn.commit()
 
     # ─── Session Operations ───────────────────────────────────────────────
@@ -333,6 +348,34 @@ class SQLiteStore:
             return False
 
     # ─── Job Operations ───────────────────────────────────────────────────
+
+    def save_session_metrics(self, session_id: str, **totals) -> bool:
+        """Store a session's resource usage totals (keys of METRIC_COLUMNS). Unknown sessions are skipped."""
+        if not self.enabled:
+            return False
+        values = {k: v for k, v in totals.items() if k in METRIC_COLUMNS}
+        if not values:
+            return False
+        try:
+            conn = self._get_connection()
+            assignments = ", ".join(f"{k}=?" for k in values)
+            cur = conn.execute(f"UPDATE sessions SET {assignments}, updated_at=datetime('now') WHERE session_id=?", (*values.values(), session_id))
+            conn.commit()
+            return cur.rowcount > 0
+        except Exception as e:
+            logger.error(f"SQLite: Failed to save metrics of session {session_id}: {e}")
+            return False
+
+    def get_session_metrics(self, session_id: str) -> Dict[str, Any]:
+        """The session's resource usage totals, {} if none were recorded."""
+        if not self.enabled:
+            return {}
+        try:
+            row = self._get_connection().execute(f"SELECT {', '.join(METRIC_COLUMNS)} FROM sessions WHERE session_id=?", (session_id,)).fetchone()
+        except Exception as e:
+            logger.error(f"SQLite: Failed to read metrics of session {session_id}: {e}")
+            return {}
+        return {k: row[k] for k in METRIC_COLUMNS if row is not None and row[k] is not None}
 
     def save_job(self, job: DestoJob) -> bool:
         """Save or update a job record.

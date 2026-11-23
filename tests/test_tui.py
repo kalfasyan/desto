@@ -14,7 +14,7 @@ from desto.core.scheduled_jobs import ScheduleError
 from desto.core.service import DestoService, Snapshot
 from desto.core.system_stats import SystemStats
 from desto.tui.app import DestoApp
-from desto.tui.modals import ConfirmScreen, FormScreen, LogScreen, ScheduleScreen
+from desto.tui.modals import ConfirmScreen, FormScreen, LogScreen, ScheduleScreen, UsageScreen
 from desto.tui.sessions import attach_command
 from desto.tui.stats import meter
 
@@ -70,6 +70,30 @@ async def settle(app, pilot):
 
 
 # --- Sessions tab ---------------------------------------------------------------------------
+
+
+def test_usage_columns_and_usage_screen(service):
+    live = session_row("live-job")
+    live.session["session_id"] = "sid-live"
+    service.snapshot.return_value = Snapshot(
+        rows=[live],
+        counts={"total": 1, "running": 1, "finished": 0, "failed": 0},
+        usage={"sid-live": {"active": "1", "cpu": "250", "rss": str(512 * 1024**2), "peak_rss": str(600 * 1024**2), "cpu_seconds": "90"}},
+    )
+    service.session_usage.return_value = service.snapshot.return_value.usage
+    service.session_usage_history.return_value = [{"t": 0, "cpu": 10, "cpu_max": 10, "rss": 100, "rss_max": 100}, {"t": 60, "cpu": 250, "cpu_max": 300, "rss": 200, "rss_max": 250}]
+
+    async def scenario(app, pilot):
+        table = app.query_one("#sessions-table", DataTable)
+        assert [str(c) for c in table.get_row_at(0)[2:4]] == ["250%", "512 MB"]
+        await pilot.press("u")
+        await settle(app, pilot)
+        assert isinstance(app.screen, UsageScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, UsageScreen)
+
+    run(service, scenario)
 
 
 def test_sessions_table_shows_snapshot_and_counts(service):

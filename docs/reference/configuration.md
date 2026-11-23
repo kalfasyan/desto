@@ -23,6 +23,15 @@ desto can be configured using environment variables. These override the default 
 
 See [SQLite Long-Term Persistence](../user-guide/sqlite-persistence.md) for details.
 
+### Session Usage Metrics
+
+| Variable | Default | Description |
+|---|---|---|
+| `DESTO_METRICS_ENABLED` | `true` | Record CPU, memory, threads, CPU time and disk IO of each session's processes. |
+| `DESTO_METRICS_INTERVAL` | `5` | Seconds between samples. |
+
+See [Session Usage](../user-guide/session-usage.md) for details.
+
 ### Application
 
 | Variable | Default | Description |

@@ -76,6 +76,11 @@ class UISettings:
         enabled: bool = False  # Disabled by default, opt-in for long-term persistence
         db_path: str = ""  # Defaults to desto_data/desto.db if empty
 
+    @dataclass
+    class MetricsSettings:
+        enabled: bool = True  # Sample CPU, memory and IO of every tmux session
+        interval: float = 5.0  # Seconds between samples
+
     header: Header = field(default_factory=Header)
     sidebar: Sidebar = field(default_factory=Sidebar)
     labels: Labels = field(default_factory=Labels)
@@ -86,6 +91,7 @@ class UISettings:
     main_content: MainContent = field(default_factory=MainContent)
     redis: RedisSettings = field(default_factory=RedisSettings)
     sqlite: SQLiteSettings = field(default_factory=SQLiteSettings)
+    metrics: MetricsSettings = field(default_factory=MetricsSettings)
 
     def __post_init__(self):
         """Override settings with environment variables if available."""
@@ -101,6 +107,10 @@ class UISettings:
         # SQLite configuration from environment variables
         self.sqlite.enabled = os.getenv("SQLITE_ENABLED", "false").lower() in ("true", "1", "yes", "on")
         self.sqlite.db_path = os.getenv("SQLITE_DB_PATH", self.sqlite.db_path)
+
+        # Session metrics sampling
+        self.metrics.enabled = os.getenv("DESTO_METRICS_ENABLED", "true").lower() in ("true", "1", "yes", "on")
+        self.metrics.interval = float(os.getenv("DESTO_METRICS_INTERVAL", self.metrics.interval))
 
 
 config = asdict(UISettings())

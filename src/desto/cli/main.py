@@ -119,6 +119,39 @@ def main(
 
 
 @app.command()
+def monitor(
+    interval: Optional[float] = typer.Option(None, "--interval", "-i", help="Seconds between samples (default: DESTO_METRICS_INTERVAL or 5)"),
+):
+    """Record CPU, memory and IO of every tmux session until stopped (Ctrl+C).
+
+    The dashboard and the terminal UI already do this while they run; use this command when
+    neither is open. Only one sampler writes at a time, so it is safe to run alongside them.
+    """
+    from desto.app.config import config as ui_settings
+    from desto.core.session_metrics import SessionMetricsSampler
+    from desto.redis.client import DestoRedisClient
+
+    client = DestoRedisClient(ui_settings.get("redis"))
+    if not client.is_connected():
+        console.print("[red]Redis is not available; session metrics are stored in Redis.[/red]")
+        raise typer.Exit(1)
+    sqlite_store = None
+    if ui_settings.get("sqlite", {}).get("enabled", False):
+        from desto.redis.sqlite_store import SQLiteStore
+
+        sqlite_store = SQLiteStore(db_path=ui_settings["sqlite"].get("db_path") or None, enabled=True)
+    every = interval or ui_settings.get("metrics", {}).get("interval", 5.0)
+    retention = int(ui_settings.get("redis", {}).get("session_history_days", 7)) * 86400
+    sampler = SessionMetricsSampler(client.redis, sqlite_store, interval=every, retention_seconds=retention)
+    console.print(f"[green]Recording session metrics every {sampler.interval:g}s. Press Ctrl+C to stop.[/green]")
+    try:
+        sampler.run()
+    except KeyboardInterrupt:
+        sampler.release_lease()
+        console.print("Stopped.")
+
+
+@app.command()
 def version():
     """Show version information."""
     from . import __version__

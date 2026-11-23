@@ -142,6 +142,7 @@ docker compose down              # stop and remove the containers
 | 🚀 **Run** | Launch bash (`.sh`) and Python (`.py`) scripts as `tmux` sessions. Pass arguments, re-run finished jobs, or kill running ones. |
 | ✍️ **Write** | Create, edit, save and delete scripts in a built-in editor with syntax highlighting and bash/Python templates. Or paste what your favorite LLM wrote. 😉 |
 | 👀 **Monitor** | A live sessions table with status, exit code, job and session duration, plus CPU, memory and disk usage of the host. |
+| 📈 **Usage** | CPU, memory, threads, CPU time and disk IO of every session's processes, sampled every 5 seconds. Click a session's usage to chart it over its whole run; ended sessions keep their peak memory and CPU time. |
 | 📜 **Logs** | Live-updating log viewer for every session, with download. Logs are kept on disk after the session ends. |
 | 🔗 **Chain** | Queue several scripts to run one after another in a single session. |
 | ⏰ **Schedule** | Launch a script or chain at a set date and time, once or every N minutes, hours, days or weeks. Cancel scheduled jobs with one click. [Learn more →](https://desto.readthedocs.io/user-guide/scheduling/) |
@@ -225,6 +226,8 @@ The most common settings, all set through environment variables:
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Redis server to connect to. |
 | `SQLITE_ENABLED` | `false` | Keep session history in SQLite as well, so it outlives Redis's 7-day expiry. |
 | `DESTO_PUSHBULLET_API_KEY` | *(unset)* | Pushbullet key for finish/fail notifications. |
+| `DESTO_METRICS_ENABLED` | `true` | Record CPU, memory and IO of each session. |
+| `DESTO_METRICS_INTERVAL` | `5` | Seconds between usage samples. |
 
 See the [configuration reference](https://desto.readthedocs.io/reference/configuration/) for the full list.
 
@@ -256,6 +259,8 @@ desto-cli sessions list                                  # list sessions
 desto-cli sessions start "my-task" "python my_script.py" # start a command in a new session
 desto-cli sessions logs "my-task"                        # view its logs
 desto-cli sessions kill "my-task"                        # stop it
+desto-cli sessions usage                                 # CPU, memory and IO per session
+desto-cli monitor                                        # record usage when no dashboard or TUI runs
 
 desto-cli scripts list                                   # list your scripts
 desto-cli scripts create "my_script" --type python       # create a new script

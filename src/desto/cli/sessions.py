@@ -231,3 +231,45 @@ def session_status(
             console.print(f"  Log file: {log_file} ({log_size} bytes)")
         else:
             console.print("  Log file: [dim]Not found[/dim]")
+
+
+@sessions_app.command("usage")
+def session_usage(
+    session_name: Optional[str] = typer.Argument(None, help="Only show this session"),
+):
+    """Show CPU, memory and IO recorded for each session (see `desto-cli monitor`)."""
+    from datetime import datetime
+
+    from desto.app.config import config as ui_settings
+    from desto.core.formatting import format_bytes, format_seconds
+    from desto.core.session_metrics import KEY_PREFIX, read_summaries
+    from desto.redis.client import DestoRedisClient
+
+    client = DestoRedisClient(ui_settings.get("redis"))
+    if not client.is_connected():
+        console.print("[red]Redis is not available.[/red]")
+        raise typer.Exit(1)
+    keys = [k[len(KEY_PREFIX) : -len(":summary")] for k in client.redis.scan_iter(match=f"{KEY_PREFIX}*:summary", count=500)]
+    summaries = [s for s in read_summaries(client.redis, keys).values() if not session_name or s.get("session_name") == session_name]
+    if not summaries:
+        console.print("[yellow]No usage recorded yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.[/yellow]")
+        return
+
+    table = Table(title="Session resource usage")
+    for column in ("Session", "State", "CPU now", "Memory now", "Peak memory", "CPU time", "Peak procs", "Read", "Written", "Last sample"):
+        table.add_column(column)
+    for s in sorted(summaries, key=lambda s: float(s.get("last_ts", 0)), reverse=True):
+        active = s.get("active") == "1"
+        table.add_row(
+            s.get("session_name", "?"),
+            "[green]running[/green]" if active else "[dim]ended[/dim]",
+            f"{float(s.get('cpu', 0)):.0f}%" if active else "",
+            format_bytes(s.get("rss", 0)) if active else "",
+            format_bytes(s.get("peak_rss", 0)),
+            format_seconds(int(float(s.get("cpu_seconds", 0)))),
+            s.get("max_procs", "0"),
+            format_bytes(s.get("read_bytes", 0)),
+            format_bytes(s.get("write_bytes", 0)),
+            datetime.fromtimestamp(float(s.get("last_ts", 0))).strftime("%Y-%m-%d %H:%M:%S"),
+        )
+    console.print(table)

@@ -22,8 +22,9 @@ from typing import Callable, Optional
 from loguru import logger
 
 from desto.app.config import config as ui_settings
-from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, scheduled_job_rows, session_rows, summarize_jobs
+from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, metrics_key, scheduled_job_rows, session_rows, summarize_jobs
 from desto.core.scheduled_jobs import ScheduledJobsMixin
+from desto.core.session_metrics import read_history, read_summaries
 from desto.redis.client import DestoRedisClient
 from desto.redis.desto_manager import DestoManager
 from desto.redis.job_manager import JobManager
@@ -51,6 +52,7 @@ class Snapshot:
     rows: list[SessionRow] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=lambda: {"total": 0, "running": 0, "finished": 0, "failed": 0})
     scheduled: list[ScheduledJobRow] = field(default_factory=list)
+    usage: dict[str, dict] = field(default_factory=dict)  # metrics key -> usage summary, see session_usage()
 
 
 class DestoService(ScheduledJobsMixin):
@@ -206,11 +208,32 @@ class DestoService(ScheduledJobsMixin):
         tmux_active = set(self.check_sessions().keys())
         job_info = self._job_info_by_session()
         all_rows = session_rows(sessions_status, tmux_active, job_info)
+        rows = [row for row in all_rows if not status_filter or row.category == status_filter]
         return Snapshot(
-            rows=[row for row in all_rows if not status_filter or row.category == status_filter],
+            rows=rows,
             counts=count_by_category(all_rows),
             scheduled=scheduled_job_rows(self._get_scheduled_jobs_with_metadata()),
+            usage=self.session_usage(rows),
         )
+
+    def session_usage(self, rows) -> dict:
+        """{metrics key: usage summary} for the given SessionRows, read in one Redis round trip."""
+        try:
+            return read_summaries(self.redis_client.redis, [metrics_key(row.name, row.session) for row in rows])
+        except Exception as e:
+            logger.debug(f"Could not read session usage: {e}")
+            return {}
+
+    def session_usage_history(self, row) -> list[dict]:
+        """A session's usage points, oldest first (see desto.core.session_metrics.read_history)."""
+        key = metrics_key(row.name, row.session)
+        if not key:
+            return []
+        try:
+            return read_history(self.redis_client.redis, key)
+        except Exception as e:
+            logger.debug(f"Could not read usage history of {row.name}: {e}")
+            return []
 
     def _count_by_category(self, sessions_status, tmux_active=None, job_info=None):
         if tmux_active is None:
