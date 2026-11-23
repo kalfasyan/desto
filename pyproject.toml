@@ -18,6 +18,13 @@ dependencies = [
     "tree-sitter-python>=0.23",
 ]
 
+[project.urls]
+Homepage = "https://github.com/kalfasyan/desto"
+Demo = "https://desto.vercel.app"
+Documentation = "https://desto.readthedocs.io/"
+Repository = "https://github.com/kalfasyan/desto"
+Issues = "https://github.com/kalfasyan/desto/issues"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",
