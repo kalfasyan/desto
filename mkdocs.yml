@@ -53,6 +53,13 @@ plugins:
   - include-markdown
   - htmlproofer:
       raise_error: true
+      # Don't fail the build when a site is briefly down or rate-limiting
+      # the link checker. Dead links (404 and similar) still fail it.
+      raise_error_excludes:
+        429: ['*']
+        502: ['*']
+        503: ['*']
+        504: ['*']
       ignore_urls:
         - localhost
         - pyproject.toml
