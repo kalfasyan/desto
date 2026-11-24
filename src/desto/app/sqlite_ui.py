@@ -5,6 +5,8 @@ from datetime import datetime
 from loguru import logger
 from nicegui import ui
 
+from desto.core.formatting import format_bytes, format_seconds
+
 # Status → (color, icon) mapping for badges
 _STATUS_STYLE = {
     "finished": ("positive", "check_circle"),
@@ -252,6 +254,19 @@ class SQLiteHistoryTab:
                         duration = session.end_time - session.start_time
                         ui.label("Duration").classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
                         ui.label(_fmt_duration(duration)).classes("text-sm text-slate-800 dark:text-slate-200 font-mono")
+
+                    # Resource usage totals, recorded when the session ended
+                    metrics = self.sqlite_store.get_session_metrics(session_id) if hasattr(self.sqlite_store, "get_session_metrics") else {}
+                    for label, column, fmt in (
+                        ("Peak Memory", "peak_rss_bytes", format_bytes),
+                        ("CPU Time", "cpu_seconds", lambda v: format_seconds(int(v))),
+                        ("Peak Processes", "max_processes", str),
+                        ("Disk Read", "read_bytes", format_bytes),
+                        ("Disk Written", "write_bytes", format_bytes),
+                    ):
+                        if column in metrics:
+                            ui.label(label).classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
+                            ui.label(fmt(metrics[column])).classes("text-sm text-slate-800 dark:text-slate-200 font-mono")
 
                 # Jobs table
                 jobs = self.sqlite_store.get_jobs_for_session(session_id)

@@ -9,13 +9,17 @@ from nicegui import ui
 from desto.core.formatting import (
     classify_session,
     decode_hash,
+    format_bytes,
     format_seconds,
+    metrics_key,
     parse_iso,
     scheduled_job_rows,
     seconds_since,
     session_row_times,
     session_rows,
+    usage_cells,
 )
+from desto.core.session_metrics import read_history, read_summaries
 
 
 class SessionsDashboardMixin:
@@ -42,6 +46,7 @@ class SessionsDashboardMixin:
         tmux_active = set(self.check_sessions().keys())
         job_info = self._job_info_by_session()
         scheduled_jobs = self._get_scheduled_jobs_with_metadata()
+        self.tick_usage()
 
         signature = json.dumps([sessions_status, sorted(tmux_active), job_info, scheduled_jobs, self.status_filter], sort_keys=True, default=str)
         if not force and signature == self._last_render_signature:
@@ -64,6 +69,20 @@ class SessionsDashboardMixin:
                 label.text = format_seconds(seconds_since(start_dt))
             except Exception:
                 pass
+
+    def tick_usage(self):
+        """Update the CPU / memory labels of the shown sessions in place (no table rebuild)."""
+        labels = getattr(self, "_usage_labels", {})
+        if not labels:
+            return
+        try:
+            summaries = read_summaries(self.redis_client.redis, list(labels))
+        except Exception:
+            return
+        for key, label in labels.items():
+            text = _usage_text(summaries.get(key))
+            if label.text != text:
+                label.text = text
 
     def _is_atd_running_cached(self, at_job_manager_cls, ttl: float = 60.0) -> bool:
         """The atd check spawns processes, so only run it once a minute."""
@@ -139,6 +158,7 @@ class SessionsDashboardMixin:
         if job_info is None:
             job_info = self._job_info_by_session()
         self._live_duration_labels = []
+        self._usage_labels = {}
 
         self._render_sessions_header(ui)
 
@@ -146,8 +166,12 @@ class SessionsDashboardMixin:
         if not rows and self.status_filter:
             ui.label(f"No {self.status_filter} sessions. Click the card again to show all.").style("padding: 12px;").classes("text-slate-500")
 
+        try:
+            usage = read_summaries(self.redis_client.redis, [metrics_key(row.name, row.session) for row in rows])
+        except Exception:
+            usage = {}
         for row in rows:
-            self._render_session_row(ui, row.name, row.session, row.tmux_active, row.label, row.color, row.command)
+            self._render_session_row(ui, row.name, row.session, row.tmux_active, row.label, row.color, row.command, usage=usage)
 
         if scheduled_jobs is None:
             scheduled_jobs = self._get_scheduled_jobs_with_metadata()
@@ -159,30 +183,37 @@ class SessionsDashboardMixin:
         with ui.row().style("width: 100%; min-width: 1100px; padding: 12px; border-radius: 4px; margin-bottom: 10px; font-weight: bold;").classes("bg-slate-100 dark:!bg-slate-800 text-slate-900 dark:text-slate-100"):
             ui.label("Session Name").style("flex: 2; min-width: 150px;")
             ui.label("Status").style("flex: 1; min-width: 100px;")
-            ui.label("Job Duration").style("flex: 1; min-width: 120px;")
-            ui.label("Session Duration").style("flex: 1; min-width: 130px;")
-            ui.label("Started").style("flex: 2; min-width: 140px;")
-            ui.label("Finished").style("flex: 2; min-width: 140px;")
-            ui.label("Tmux Active").style("flex: 1; min-width: 100px;")
+            ui.label("CPU · Memory").style("flex: 1; min-width: 110px;").tooltip("Running: current CPU and memory. Ended: CPU time used and peak memory.")
+            ui.label("Job Duration").style("flex: 1; min-width: 100px;")
+            ui.label("Session Duration").style("flex: 1; min-width: 120px;")
+            ui.label("Started").style("flex: 2; min-width: 125px;")
+            ui.label("Finished").style("flex: 2; min-width: 125px;")
+            ui.label("Tmux Active").style("flex: 1; min-width: 80px;")
             ui.label("Actions").style("flex: 1; min-width: 120px;")
 
-    def _render_session_row(self, ui, session_name, session, tmux_active_row, status, status_color, command):
+    def _render_session_row(self, ui, session_name, session, tmux_active_row, status, status_color, command, usage=None):
         times = session_row_times(session)
+        key = metrics_key(session_name, session)
         with ui.row().style("width: 100%; min-width: 1100px; padding: 10px 12px; border-bottom: 1px solid #ddd; align-items: center;").classes("dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"):
             ui.label(session.get("session_name", session_name)).style("flex: 2; min-width: 150px; font-weight: 500;")
             ui.label(status).style(f"flex: 1; min-width: 100px; color: {status_color}; font-weight: 500;")
-            ui.label(times["job_duration"]).style("flex: 1; min-width: 120px;").classes("text-slate-700 dark:text-slate-400")
-            duration_label = ui.label(times["session_duration"]).style("flex: 1; min-width: 130px;").classes("text-slate-700 dark:text-slate-400")
+            usage_label = ui.label(_usage_text((usage or {}).get(key))).style("flex: 1; min-width: 110px; font-size: 0.9em; cursor: pointer;").classes("text-slate-700 dark:text-slate-400")
+            if key:
+                self._usage_labels[key] = usage_label
+                usage_label.on("click", lambda k=key, n=session_name: self.show_usage_dialog(ui, n, k))
+                usage_label.tooltip("Show CPU and memory over time")
+            ui.label(times["job_duration"]).style("flex: 1; min-width: 100px;").classes("text-slate-700 dark:text-slate-400")
+            duration_label = ui.label(times["session_duration"]).style("flex: 1; min-width: 120px;").classes("text-slate-700 dark:text-slate-400")
             if times["start_time"] and not times["end_time"] and tmux_active_row:
                 try:
                     self._live_duration_labels.append((duration_label, parse_iso(times["start_time"])))
                 except Exception:
                     pass
-            ui.label(times["started"]).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
-            ui.label(times["finished"]).style("flex: 2; min-width: 140px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
+            ui.label(times["started"]).style("flex: 2; min-width: 125px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
+            ui.label(times["finished"]).style("flex: 2; min-width: 125px; font-size: 0.9em;").classes("text-slate-600 dark:text-slate-500")
             icon = "check_circle" if tmux_active_row else "cancel"
             color = "#4CAF50" if tmux_active_row else "#F44336"
-            ui.icon(icon).style(f"flex: 1; min-width: 100px; color: {color}; font-size: 1.5em; text-align: center;")
+            ui.icon(icon).style(f"flex: 1; min-width: 80px; color: {color}; font-size: 1.5em; text-align: center;")
             with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                 # Kill while running; once the tmux session is gone, the slot becomes Re-run.
                 if tmux_active_row:
@@ -208,6 +239,43 @@ class SessionsDashboardMixin:
                     "Clear",
                     on_click=lambda s=session_name: self.confirm_clear_session(s, ui),
                 ).props("color=orange flat")
+
+    def show_usage_dialog(self, ui, session_name, key):
+        """CPU and memory of a session over its run, with its totals."""
+        try:
+            points = read_history(self.redis_client.redis, key)
+            summary = read_summaries(self.redis_client.redis, [key]).get(key, {})
+        except Exception:
+            points, summary = [], {}
+        if self.pause_updates:
+            self.pause_updates()
+
+        def close_dialog():
+            dialog.close()
+            if self.resume_updates:
+                self.resume_updates()
+
+        with ui.dialog() as dialog, ui.card().style("min-width: 720px; max-width: 95vw;").classes("dark:!bg-slate-900"):
+            ui.label(f"Resource usage: {session_name}").style("font-weight: bold; font-size: 1.1em;")
+            if not points:
+                ui.label("No usage recorded for this session yet. It is recorded while the dashboard, the terminal UI or `desto-cli monitor` runs.")
+            else:
+                ui.echart(_usage_chart_options(points)).style("width: 680px; height: 320px;")
+            if summary:
+                with ui.row().style("gap: 24px; flex-wrap: wrap;"):
+                    for title, value in (
+                        ("Peak memory", format_bytes(summary.get("peak_rss", 0))),
+                        ("CPU time", format_seconds(int(float(summary.get("cpu_seconds", 0))))),
+                        ("Peak processes", summary.get("max_procs", "0")),
+                        ("Peak threads", summary.get("max_threads", "0")),
+                        ("Read", format_bytes(summary.get("read_bytes", 0))),
+                        ("Written", format_bytes(summary.get("write_bytes", 0))),
+                    ):
+                        with ui.column().style("gap: 0;"):
+                            ui.label(title).style("font-size: 0.8em;").classes("text-slate-500")
+                            ui.label(str(value)).style("font-weight: 600;")
+            ui.button("Close", on_click=close_dialog)
+        dialog.open()
 
     # --- Scheduled jobs table (atq + Redis metadata) ---------------------------------
 
@@ -268,3 +336,25 @@ class SessionsDashboardMixin:
                 ui.label("No metadata found.")
             ui.button("Close", on_click=close_dialog)
         dialog.open()
+
+
+def _usage_text(summary):
+    cpu, memory = usage_cells(summary)
+    return f"{cpu} · {memory}" if cpu or memory else "–"
+
+
+def _usage_chart_options(points):
+    """ECharts options: CPU % (left axis) and memory in MB (right axis) over time."""
+    cpu = [[int(p["t"] * 1000), p.get("cpu", 0)] for p in points]
+    memory = [[int(p["t"] * 1000), round(p.get("rss", 0) / 1024**2, 1)] for p in points]
+    return {
+        "tooltip": {"trigger": "axis"},
+        "legend": {"data": ["CPU %", "Memory MB"], "bottom": 0},
+        "grid": {"left": 50, "right": 60, "top": 40, "bottom": 60},
+        "xAxis": {"type": "time"},
+        "yAxis": [{"type": "value", "name": "CPU %", "min": 0}, {"type": "value", "name": "MB", "min": 0}],
+        "series": [
+            {"name": "CPU %", "type": "line", "showSymbol": False, "data": cpu},
+            {"name": "Memory MB", "type": "line", "showSymbol": False, "yAxisIndex": 1, "data": memory},
+        ],
+    }

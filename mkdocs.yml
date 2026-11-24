@@ -14,6 +14,7 @@ nav:
       - Favorites: user-guide/favorites.md
       - Scheduling: user-guide/scheduling.md
       - SQLite Persistence: user-guide/sqlite-persistence.md
+      - Session Usage: user-guide/session-usage.md
   - Reference:
       - Configuration: reference/configuration.md
   - Community:

@@ -313,3 +313,51 @@ def session_event_message(update):
     if status == "failed":
         return f"Session '{session_name}' failed!", "negative"
     return None
+
+
+# --- Session resource usage -------------------------------------------------------------
+
+
+def external_metrics_key(session_name, created):
+    """Metrics key of a tmux session that desto has no record of (desto sessions use their session id)."""
+    return f"tmux-{session_name}-{created}"
+
+
+def metrics_key(session_name, session):
+    """The key the metrics sampler stores a sessions table row's usage under, or "" if it has none."""
+    if session.get("session_id"):
+        return session["session_id"]
+    if session.get("created"):
+        return external_metrics_key(session_name, session["created"])
+    return ""
+
+
+def format_bytes(num_bytes):
+    """Format a byte count as '512 KB', '314 MB' or '1.2 GB'."""
+    try:
+        value = float(num_bytes)
+    except (TypeError, ValueError):
+        return "N/A"
+    for unit in ("B", "KB", "MB", "GB"):
+        if value < 1024 or unit == "GB":
+            if unit in ("B", "KB", "MB"):
+                return f"{value:.0f} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    return f"{value:.1f} TB"
+
+
+def usage_cells(summary):
+    """(cpu text, memory text) for a sessions table row.
+
+    Running sessions show their current CPU and memory ("97%", "314 MB"); ended sessions show the
+    CPU time they used and their peak memory ("1m 5s cpu", "peak 314 MB"). No summary gives ("", "").
+    """
+    if not summary:
+        return "", ""
+    try:
+        if summary.get("active") == "1":
+            return f"{float(summary.get('cpu', 0)):.0f}%", format_bytes(summary.get("rss", 0))
+        return f"{format_seconds(int(round(float(summary.get('cpu_seconds', 0)))))} cpu", f"peak {format_bytes(summary.get('peak_rss', 0))}"
+    except (TypeError, ValueError):
+        return "", ""

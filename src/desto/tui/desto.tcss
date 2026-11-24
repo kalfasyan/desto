@@ -192,3 +192,13 @@ ModalScreen {
     margin: 1 0 0 0;
     border: round $panel;
 }
+
+.usage-dialog {
+    width: 90;
+}
+
+.usage-dialog Sparkline {
+    height: 4;
+    margin: 0 0 1 0;
+}
+

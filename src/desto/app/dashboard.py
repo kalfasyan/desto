@@ -10,6 +10,7 @@ from desto.app.config import config as ui_settings
 from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
 from desto.core.formatting import session_event_message
+from desto.core.session_metrics import start_background_sampler
 
 # Dashboard timers, each running only as often as its data changes:
 #   - fast (1s): system stats, live durations, pending Redis events, system log panel
@@ -204,6 +205,7 @@ def main():
             "Set DESTO_PASSWORD to require a login, or set DESTO_HOST=127.0.0.1 to keep the dashboard local."
         )
     logger.info(f"Serving the desto dashboard at http://{cfg.host}:{cfg.port}")
+    start_background_sampler()
 
     # The dashboard is built in a root function rather than at module level: NiceGUI 3 does not
     # allow global-scope UI next to ui.page routes, and the login page is one of those.
