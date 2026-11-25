@@ -11,20 +11,24 @@ from desto.redis.recurring import REPEAT_UNITS
 REPEAT_OPTIONS = {"never": "Does not repeat", "minutes": "minute(s)", "hours": "hour(s)", "days": "day(s)", "weeks": "week(s)"}
 
 
-class ScheduleLaunchMixin:
-    """Scheduling for UserInterfaceManager.
+class ScheduleDialog:
+    """The "schedule launch" dialog of the launch section.
 
-    Expects the host class to provide tmux_manager, chain_queue, the launch inputs
-    (session_name_input, arguments_input, script_path_select), python_executable,
-    extract_script_filename and refresh_chain_queue_display.
+    Schedules through the service and reads what to run from the ui_manager's launch form
+    (session name, arguments, selected script) and chain queue.
     """
+
+    def __init__(self, service, ui_manager):
+        self.service = service
+        self.ui_manager = ui_manager
 
     def _selected_script_path(self):
         """Path of the script currently picked in the launch section's select."""
-        select_value = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
-        return self.tmux_manager.SCRIPTS_DIR / self.extract_script_filename(select_value)
+        um = self.ui_manager
+        select_value = um.script_path_select.value if um.script_path_select is not None and hasattr(um.script_path_select, "value") else None
+        return self.service.SCRIPTS_DIR / um.extract_script_filename(select_value)
 
-    def schedule_launch(self):
+    def open(self):
         """Open a dialog to schedule the script launch at a specific date and time."""
         with ui.dialog() as schedule_dialog, ui.card():
             ui.label("Schedule Script Launch").style("font-size: 1.2em; font-weight: bold;")
@@ -48,14 +52,15 @@ class ScheduleLaunchMixin:
                 ui.button("Cancel", on_click=schedule_dialog.close)
                 ui.button(
                     "Schedule",
-                    on_click=lambda: self.confirm_schedule(date_input, time_input, error_label, schedule_dialog, repeat_select, repeat_count_input),
+                    on_click=lambda: self.confirm(date_input, time_input, error_label, schedule_dialog, repeat_select, repeat_count_input),
                 )
         schedule_dialog.open()
 
-    def confirm_schedule(self, date_input, time_input, error_label, schedule_dialog, repeat_select=None, repeat_count_input=None):
+    def confirm(self, date_input, time_input, error_label, schedule_dialog, repeat_select=None, repeat_count_input=None):
         """Schedule the selected script (or the chain queue) at the picked date and time."""
-        session_name = self.session_name_input.value.strip() if self.session_name_input is not None and hasattr(self.session_name_input, "value") else ""
-        arguments = self.arguments_input.value if self.arguments_input is not None and hasattr(self.arguments_input, "value") else "."
+        um = self.ui_manager
+        session_name = um.session_name_input.value.strip() if um.session_name_input is not None and hasattr(um.session_name_input, "value") else ""
+        arguments = um.arguments_input.value if um.arguments_input is not None and hasattr(um.arguments_input, "value") else "."
         if not date_input.value or not time_input.value or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
             return
@@ -70,20 +75,20 @@ class ScheduleLaunchMixin:
             repeat_count = int(repeat_count_input.value or 0) if repeat_count_input is not None else 1
             interval_minutes = repeat_count * REPEAT_UNITS[repeat_select.value]
 
-        if self.chain_queue:
-            command = scripts.chain_command(self.chain_queue, self.python_executable)
-            script_paths = [script for script, _ in self.chain_queue]
+        if um.chain_queue:
+            command = scripts.chain_command(um.chain_queue, um.python_executable)
+            script_paths = [script for script, _ in um.chain_queue]
         else:
             script_path = self._selected_script_path()
-            command = scripts.launch_command(script_path, arguments, self.python_executable)
+            command = scripts.launch_command(script_path, arguments, um.python_executable)
             script_paths = [script_path]
 
         try:
-            self.tmux_manager.schedule_launch(session_name, command, script_paths, arguments, when, interval_minutes)
+            self.service.schedule_launch(session_name, command, script_paths, arguments, when, interval_minutes)
         except ScheduleError as e:
             error_label.text = str(e)
             return
-        if self.chain_queue:
-            self.chain_queue.clear()
-            self.refresh_chain_queue_display()
+        if um.chain_queue:
+            um.chain_queue.clear()
+            um.refresh_chain_queue_display()
         schedule_dialog.close()
