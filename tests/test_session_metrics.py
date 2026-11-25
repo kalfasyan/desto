@@ -100,10 +100,24 @@ class FakePipeline:
 class FakeProc:
     """A psutil.Process stand-in with fixed figures."""
 
-    def __init__(self, pid, cpu=0.0, rss=0, threads=1, user=0.0, system=0.0, children_user=0.0, children_system=0.0, read=0, write=0):
+    def __init__(
+        self,
+        pid,
+        cpu=0.0,
+        rss=0,
+        threads=1,
+        user=0.0,
+        system=0.0,
+        children_user=0.0,
+        children_system=0.0,
+        read=0,
+        write=0,
+    ):
         self.pid = pid
         self._cpu, self._rss, self._threads = cpu, rss, threads
-        self._times = SimpleNamespace(user=user, system=system, children_user=children_user, children_system=children_system)
+        self._times = SimpleNamespace(
+            user=user, system=system, children_user=children_user, children_system=children_system
+        )
         self._io = SimpleNamespace(read_bytes=read, write_bytes=write)
 
     def oneshot(self):
@@ -166,7 +180,10 @@ def make_sampler(redis, clock, sqlite_store=None):
 
 
 def add_desto_session(redis, session_id, name, status="running", start="2026-11-23T10:00:00"):
-    redis.hset(f"desto:session:{session_id}", {"session_id": session_id, "session_name": name, "status": status, "start_time": start})
+    redis.hset(
+        f"desto:session:{session_id}",
+        {"session_id": session_id, "session_name": name, "status": status, "start_time": start},
+    )
 
 
 # --- Process tree --------------------------------------------------------------------------
@@ -181,7 +198,9 @@ def test_tree_pids_walks_descendants_once():
 
 def test_measure_sums_the_tree_and_counts_reaped_children_cpu():
     procs = {
-        1: FakeProc(1, cpu=10, rss=100, threads=1, user=1, system=1, children_user=3, children_system=1, read=5, write=7),
+        1: FakeProc(
+            1, cpu=10, rss=100, threads=1, user=1, system=1, children_user=3, children_system=1, read=5, write=7
+        ),
         2: FakeProc(2, cpu=90, rss=900, threads=4, user=10, system=2, read=1, write=3),
     }
     s = sm.measure([1, 2, 3], procs, now=5.0)  # pid 3 has already gone
@@ -307,7 +326,13 @@ def test_ended_session_is_marked_and_archived_to_sqlite(world, tmp_path):
     assert summary["ended_ts"]
     # The partial one-minute bucket is flushed when the session ends
     assert len(redis.lrange(sm.tier_key("sid-1", "1m"), 0, -1)) == 1
-    assert store.get_session_metrics("sid-1") == {"peak_rss_bytes": 4096, "cpu_seconds": 3.0, "read_bytes": 10, "write_bytes": 20, "max_processes": 1}
+    assert store.get_session_metrics("sid-1") == {
+        "peak_rss_bytes": 4096,
+        "cpu_seconds": 3.0,
+        "read_bytes": 10,
+        "write_bytes": 20,
+        "max_processes": 1,
+    }
     # Saving the session again (status change) keeps the totals
     store.save_session(DestoSession(session_id="sid-1", session_name="train", status=SessionStatus.FINISHED))
     assert store.get_session_metrics("sid-1")["peak_rss_bytes"] == 4096
@@ -355,10 +380,15 @@ def test_read_history_merges_tiers_coarse_to_fine():
 def test_usage_cells_for_running_and_ended_sessions():
     assert usage_cells(None) == ("", "")
     assert usage_cells({"active": "1", "cpu": "97.4", "rss": str(314 * 1024**2)}) == ("97%", "314 MB")
-    assert usage_cells({"active": "0", "cpu_seconds": "65.2", "peak_rss": str(3 * 1024**3)}) == ("1m 5s cpu", "peak 3.0 GB")
+    assert usage_cells({"active": "0", "cpu_seconds": "65.2", "peak_rss": str(3 * 1024**3)}) == (
+        "1m 5s cpu",
+        "peak 3.0 GB",
+    )
 
 
-@pytest.mark.parametrize("value, expected", [(512, "512 B"), (2048, "2 KB"), (5 * 1024**2, "5 MB"), (1.5 * 1024**3, "1.5 GB"), ("x", "N/A")])
+@pytest.mark.parametrize(
+    "value, expected", [(512, "512 B"), (2048, "2 KB"), (5 * 1024**2, "5 MB"), (1.5 * 1024**3, "1.5 GB"), ("x", "N/A")]
+)
 def test_format_bytes(value, expected):
     assert format_bytes(value) == expected
 

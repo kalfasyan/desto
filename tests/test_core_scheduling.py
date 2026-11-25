@@ -71,7 +71,14 @@ def test_one_off_queues_at_job_and_records_scheduled_session(service, backends, 
     ],
 )
 def test_invalid_input_raises(service, backends, kwargs, message):
-    args = {"session_name": "backup", "command": "true", "script_paths": ["x.sh"], "arguments": "", "when": FIRST_RUN, **kwargs}
+    args = {
+        "session_name": "backup",
+        "command": "true",
+        "script_paths": ["x.sh"],
+        "arguments": "",
+        "when": FIRST_RUN,
+        **kwargs,
+    }
     with pytest.raises(ScheduleError, match=message):
         service.schedule_launch(**args)
     backends.at.schedule.assert_not_called()

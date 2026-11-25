@@ -47,7 +47,9 @@ class TestJobCompletionTracking(unittest.TestCase):
 
         # Create TmuxManager (without Redis for testing)
         if TmuxManager:
-            self.tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            self.tmux_manager = TmuxManager(
+                self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir
+            )
 
     def tearDown(self):
         self.temp_dir.cleanup()
@@ -79,7 +81,14 @@ echo "Job completion: exit code $SCRIPT_EXIT_CODE" >> {log_file}
         self.assertTrue(log_file.exists(), "Log file was not created")
 
         content = log_file.read_text()
-        expected_parts = ["SCRIPT STARTING", "Test script", "Done", "SCRIPT FINISHED", "exit code: 0", "Job completion: exit code 0"]
+        expected_parts = [
+            "SCRIPT STARTING",
+            "Test script",
+            "Done",
+            "SCRIPT FINISHED",
+            "exit code: 0",
+            "Job completion: exit code 0",
+        ]
 
         for part in expected_parts:
             self.assertIn(part, content, f"Missing expected content: {part}")

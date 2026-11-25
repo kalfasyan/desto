@@ -10,7 +10,9 @@ from datetime import datetime
 
 def decode_hash(data):
     """Decode a Redis hash whose keys/values may be bytes into a str dict."""
-    return {k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in data.items()}
+    return {
+        k.decode() if isinstance(k, bytes) else k: v.decode() if isinstance(v, bytes) else v for k, v in data.items()
+    }
 
 
 def parse_iso(value):
@@ -30,7 +32,9 @@ def format_seconds(elapsed_seconds):
         return "N/A"
     hours, remainder = divmod(elapsed_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    return f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+    return (
+        f"{hours}h {minutes}m {seconds}s" if hours > 0 else (f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s")
+    )
 
 
 def format_duration(duration_str):
@@ -264,7 +268,9 @@ def session_rows(sessions_status, tmux_active, job_info):
         if category == "scheduled":
             continue
         command = (job_info or {}).get(session.get("session_id", ""), {}).get("command", "")
-        rows.append((session_sort_key(session), SessionRow(session_name, session, is_active, category, label, color, command)))
+        rows.append(
+            (session_sort_key(session), SessionRow(session_name, session, is_active, category, label, color, command))
+        )
     rows.sort(key=lambda r: r[0], reverse=True)
     return [row for _, row in rows]
 
@@ -365,6 +371,9 @@ def usage_cells(summary):
     try:
         if summary.get("active") == "1":
             return f"{float(summary.get('cpu', 0)):.0f}%", format_bytes(summary.get("rss", 0))
-        return f"{format_seconds(int(round(float(summary.get('cpu_seconds', 0)))))} cpu", f"peak {format_bytes(summary.get('peak_rss', 0))}"
+        return (
+            f"{format_seconds(int(round(float(summary.get('cpu_seconds', 0)))))} cpu",
+            f"peak {format_bytes(summary.get('peak_rss', 0))}",
+        )
     except (TypeError, ValueError):
         return "", ""

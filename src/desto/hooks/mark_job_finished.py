@@ -45,7 +45,12 @@ def main(argv=None) -> int:
                 if session_data:
                     # Handle bytes from Redis
                     if isinstance(list(session_data.values())[0], bytes):
-                        session_data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in session_data.items()}
+                        session_data = {
+                            k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8")
+                            if isinstance(v, bytes)
+                            else v
+                            for k, v in session_data.items()
+                        }
                     job_finished_time = session_data.get("job_finished_time")
             except Exception:
                 job_finished_time = None

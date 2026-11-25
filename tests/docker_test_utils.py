@@ -19,7 +19,11 @@ def check_for_existing_containers():
         conflicting_containers = []
 
         for port in ports_to_check:
-            result = subprocess.run(["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"],
+                capture_output=True,
+                text=True,
+            )
             if result.stdout.strip():
                 containers = result.stdout.strip().split("\n")
                 for container in containers:
@@ -58,7 +62,9 @@ def safe_docker_cleanup(project_root=None, remove_volumes=True):
         logger.debug("Stopping desto-specific containers...")
 
         # Get list of desto containers
-        result = subprocess.run(["docker", "ps", "-a", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True
+        )
 
         if result.stdout.strip():
             desto_containers = result.stdout.strip().split("\n")
@@ -91,7 +97,9 @@ def wait_for_compose_down(timeout=30):
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            result = subprocess.run(["docker", "ps", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True)
+            result = subprocess.run(
+                ["docker", "ps", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True
+            )
             if not result.stdout.strip():
                 logger.debug("All desto containers stopped")
                 return True
@@ -219,7 +227,11 @@ def ensure_docker_compose_available():
 def get_desto_container_status():
     """Get the status of desto-related containers."""
     try:
-        result = subprocess.run(["docker", "ps", "-a", "--filter", "name=desto-", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--filter", "name=desto-", "--format", "table {{.Names}}\t{{.Status}}\t{{.Ports}}"],
+            capture_output=True,
+            text=True,
+        )
         if result.returncode == 0:
             return result.stdout
     except Exception as e:
@@ -230,7 +242,9 @@ def get_desto_container_status():
 def is_port_available(port):
     """Check if a port is available (not in use by any container)."""
     try:
-        result = subprocess.run(["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["docker", "ps", "--filter", f"publish={port}", "--format", "{{.Names}}"], capture_output=True, text=True
+        )
         return not bool(result.stdout.strip())
     except Exception:
         return True  # Assume available if we can't check
@@ -283,7 +297,11 @@ def cleanup_desto_sessions_via_container():
     """Clean up sessions through the desto container if it's running."""
     try:
         # Check if desto-dashboard container is running
-        result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"],
+            capture_output=True,
+            text=True,
+        )
 
         if "desto-dashboard" in result.stdout:
             # Try to clean up sessions through the container
@@ -292,7 +310,11 @@ def cleanup_desto_sessions_via_container():
             for session_name in test_session_names:
                 try:
                     # Use docker exec to kill sessions inside the container
-                    subprocess.run(["docker", "exec", "desto-dashboard", "tmux", "kill-session", "-t", session_name], capture_output=True, text=True)
+                    subprocess.run(
+                        ["docker", "exec", "desto-dashboard", "tmux", "kill-session", "-t", session_name],
+                        capture_output=True,
+                        text=True,
+                    )
                     logger.debug(f"Attempted to clean up container session: {session_name}")
                 except Exception as e:
                     logger.debug(f"Could not clean up container session {session_name}: {e}")

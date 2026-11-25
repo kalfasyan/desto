@@ -28,7 +28,9 @@ class CLISessionManager:
         self.scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         self.logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
 
-        self.scripts_dir = Path(self.scripts_dir_env) if self.scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        self.scripts_dir = (
+            Path(self.scripts_dir_env) if self.scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        )
         self.log_dir = Path(self.logs_dir_env) if self.logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
 
         self._service = None
@@ -103,7 +105,9 @@ class CLISessionManager:
                     "group": None,  # Not tracked in Redis
                     "group_size": 1,  # Not tracked in Redis
                     "finished": session.status.value == "finished",
-                    "runtime": int(((session.end_time or datetime.now()) - session.start_time).total_seconds()) if session.start_time else None,
+                    "runtime": int(((session.end_time or datetime.now()) - session.start_time).total_seconds())
+                    if session.start_time
+                    else None,
                     "status": session.status.value,
                 }
             return active_sessions

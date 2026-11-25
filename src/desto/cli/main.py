@@ -47,7 +47,9 @@ def main(
 
 @app.command()
 def monitor(
-    interval: Optional[float] = typer.Option(None, "--interval", "-i", help="Seconds between samples (default: DESTO_METRICS_INTERVAL or 5)"),
+    interval: Optional[float] = typer.Option(
+        None, "--interval", "-i", help="Seconds between samples (default: DESTO_METRICS_INTERVAL or 5)"
+    ),
 ):
     """Record CPU, memory and IO of every tmux session until stopped (Ctrl+C).
 

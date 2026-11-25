@@ -112,7 +112,12 @@ def test_format_scheduled_datetime():
 
 # --- Table rows shared by the web dashboard and the terminal UI ---------------------------
 
-from desto.core.formatting import count_by_category, scheduled_job_rows, session_event_message, session_rows  # noqa: E402
+from desto.core.formatting import (  # noqa: E402
+    count_by_category,
+    scheduled_job_rows,
+    session_event_message,
+    session_rows,
+)
 
 
 def _session(name, status, start, session_id=None):
@@ -135,22 +140,46 @@ def test_session_rows_skip_scheduled_sort_newest_first_and_carry_command():
 
 
 def test_count_by_category_counts_rows():
-    sessions = {"a": _session("a", "finished", "1"), "b": _session("b", "failed", "2"), "c": _session("c", "finished", "3")}
-    assert count_by_category(session_rows(sessions, set(), {})) == {"total": 3, "running": 0, "finished": 2, "failed": 1}
+    sessions = {
+        "a": _session("a", "finished", "1"),
+        "b": _session("b", "failed", "2"),
+        "c": _session("c", "finished", "3"),
+    }
+    assert count_by_category(session_rows(sessions, set(), {})) == {
+        "total": 3,
+        "running": 0,
+        "finished": 2,
+        "failed": 1,
+    }
 
 
 def test_scheduled_job_rows_hide_internal_jobs_and_label_recurring():
     jobs = [
         {"id": "1", "datetime": "2026-01-01T10:00:00", "user": "ann", "metadata": None},
         {"id": "2", "metadata": {"status": "finished_internal"}},
-        {"id": "3", "datetime": "x", "user": "x", "metadata": {"status": "scheduled", "recurring_id": "r1", "recurrence": "every day", "scheduled_time": "2026-01-02T08:00:00", "user": "bob"}},
+        {
+            "id": "3",
+            "datetime": "x",
+            "user": "x",
+            "metadata": {
+                "status": "scheduled",
+                "recurring_id": "r1",
+                "recurrence": "every day",
+                "scheduled_time": "2026-01-02T08:00:00",
+                "user": "bob",
+            },
+        },
     ]
 
     rows = scheduled_job_rows(jobs)
 
     assert [r.job_id for r in rows] == ["1", "3"]
     assert (rows[0].scheduled_time, rows[0].user, rows[0].status) == ("2026-01-01T10:00:00", "ann", "scheduled")
-    assert (rows[1].scheduled_time, rows[1].user, rows[1].status) == ("2026-01-02T08:00:00", "bob", "scheduled · every day")
+    assert (rows[1].scheduled_time, rows[1].user, rows[1].status) == (
+        "2026-01-02T08:00:00",
+        "bob",
+        "scheduled · every day",
+    )
 
 
 @pytest.mark.parametrize(

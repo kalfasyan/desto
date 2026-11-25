@@ -93,7 +93,9 @@ class TestScriptCommands:
         # Check if executable
         assert os.access(script_path, os.X_OK)
 
-        mock_console.print.assert_called_with("[green]✅ Created 🐚 test_script.sh in " + str(temp_scripts_dir) + "[/green]")
+        mock_console.print.assert_called_with(
+            "[green]✅ Created 🐚 test_script.sh in " + str(temp_scripts_dir) + "[/green]"
+        )
 
     def test_create_python_script(self, mock_session_manager, temp_scripts_dir):
         """Test creating a python script."""
@@ -150,7 +152,10 @@ class TestScriptCommands:
         script_path = temp_scripts_dir / "delete_me.sh"
         script_path.write_text("#!/bin/bash\necho test")
 
-        with patch("desto.cli.scripts.console") as mock_console, patch("desto.cli.scripts.Confirm.ask", return_value=True):
+        with (
+            patch("desto.cli.scripts.console") as mock_console,
+            patch("desto.cli.scripts.Confirm.ask", return_value=True),
+        ):
             delete_script("delete_me", force=False)
 
         assert not script_path.exists()
@@ -162,7 +167,10 @@ class TestScriptCommands:
         script_path = temp_scripts_dir / "keep_me.sh"
         script_path.write_text("#!/bin/bash\necho test")
 
-        with patch("desto.cli.scripts.console") as mock_console, patch("desto.cli.scripts.Confirm.ask", return_value=False):
+        with (
+            patch("desto.cli.scripts.console") as mock_console,
+            patch("desto.cli.scripts.Confirm.ask", return_value=False),
+        ):
             delete_script("keep_me", force=False)
 
         assert script_path.exists()

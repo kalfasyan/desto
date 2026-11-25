@@ -70,7 +70,9 @@ class SystemMonitor:
         if not candidates:
             self._tmux_proc = None
             return None
-        proc = next((p for p in candidates if p.info["ppid"] == 1), None) or min(candidates, key=lambda p: p.info["ppid"])
+        proc = next((p for p in candidates if p.info["ppid"] == 1), None) or min(
+            candidates, key=lambda p: p.info["ppid"]
+        )
         proc.cpu_percent(interval=None)  # prime the counter
         self._tmux_proc = proc
         return proc

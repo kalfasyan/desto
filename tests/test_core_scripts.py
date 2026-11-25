@@ -14,7 +14,9 @@ def test_script_type_and_icon(name, kind):
     assert scripts.script_icon(kind) == scripts.SCRIPT_ICONS[kind]
 
 
-@pytest.mark.parametrize("name, valid", [("build-1", True), ("a_b", True), ("", False), ("has space", False), ("x" * 16, False)])
+@pytest.mark.parametrize(
+    "name, valid", [("build-1", True), ("a_b", True), ("", False), ("has space", False), ("x" * 16, False)]
+)
 def test_is_valid_name(name, valid):
     assert scripts.is_valid_name(name) is valid
 
@@ -37,7 +39,9 @@ def test_launch_command_adds_banner():
 
 
 def test_chain_command_runs_in_order_and_numbers_steps():
-    assert scripts.chain_command([("/s/a.sh", "1"), ("/s/b.py", "")], "python3") == ("echo '=== Running script 1 of 2: a.sh ===' && (bash '/s/a.sh' 1) && echo '=== Running script 2 of 2: b.py ===' && (python3 '/s/b.py' )")
+    assert scripts.chain_command([("/s/a.sh", "1"), ("/s/b.py", "")], "python3") == (
+        "echo '=== Running script 1 of 2: a.sh ===' && (bash '/s/a.sh' 1) && echo '=== Running script 2 of 2: b.py ===' && (python3 '/s/b.py' )"
+    )
 
 
 def test_create_script_writes_executable_file_with_shebang(tmp_path):

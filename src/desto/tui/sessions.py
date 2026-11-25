@@ -15,7 +15,12 @@ from desto.core.service import DestoService, Snapshot
 from desto.tui.modals import ConfirmScreen, LogScreen, UsageScreen
 
 # (filter, label, style) of the count buttons; None shows every session
-FILTERS = [(None, "Total", "bold"), ("running", "Running", "bold yellow"), ("finished", "Finished", "bold green"), ("failed", "Failed", "bold red")]
+FILTERS = [
+    (None, "Total", "bold"),
+    ("running", "Running", "bold yellow"),
+    ("finished", "Finished", "bold green"),
+    ("failed", "Failed", "bold red"),
+]
 
 
 def attach_command(session_name: str) -> list[str]:
@@ -55,7 +60,9 @@ class SessionsPane(Vertical):
         yield DataTable(id="scheduled-table", cursor_type="row", zebra_stripes=True)
 
     def on_mount(self) -> None:
-        self.query_one("#sessions-table", DataTable).add_columns("Session", "Status", "CPU", "Memory", "Job time", "Session time", "Started", "Finished", "tmux")
+        self.query_one("#sessions-table", DataTable).add_columns(
+            "Session", "Status", "CPU", "Memory", "Job time", "Session time", "Started", "Finished", "tmux"
+        )
         self.query_one("#scheduled-table", DataTable).add_columns("Job", "Scheduled for", "User", "Status")
         self.refresh_sessions()
 
@@ -98,7 +105,10 @@ class SessionsPane(Vertical):
         self._fill(table, rows)
 
         scheduled = self.query_one("#scheduled-table", DataTable)
-        self._fill(scheduled, [(job.job_id, (job.job_id, job.scheduled_time, job.user, job.status)) for job in snapshot.scheduled])
+        self._fill(
+            scheduled,
+            [(job.job_id, (job.job_id, job.scheduled_time, job.user, job.status)) for job in snapshot.scheduled],
+        )
         scheduled.display = bool(snapshot.scheduled)
         self.query_one(".section-title").display = bool(snapshot.scheduled)
 
@@ -141,7 +151,9 @@ class SessionsPane(Vertical):
     def action_view_log(self) -> None:
         row = self.selected_row()
         if row:
-            self.app.push_screen(LogScreen(row.name, self.service.get_log_file(row.name), self.service.is_tmux_session_active))
+            self.app.push_screen(
+                LogScreen(row.name, self.service.get_log_file(row.name), self.service.is_tmux_session_active)
+            )
 
     def action_attach(self) -> None:
         row = self.selected_row()
@@ -172,7 +184,10 @@ class SessionsPane(Vertical):
         if not row.tmux_active:
             self.notify("Cannot kill: no active tmux session for this entry.", severity="warning")
             return
-        self._confirm(ConfirmScreen("Kill session", f"Kill the session '{row.name}'?", "Kill"), lambda: self.service.kill_session(row.name))
+        self._confirm(
+            ConfirmScreen("Kill session", f"Kill the session '{row.name}'?", "Kill"),
+            lambda: self.service.kill_session(row.name),
+        )
 
     def action_rerun(self) -> None:
         row = self.selected_row()
@@ -188,7 +203,9 @@ class SessionsPane(Vertical):
         row = self.selected_row()
         if row:
             message = f"Clear the session '{row.name}'? This deletes its log file and removes it from the table."
-            self._confirm(ConfirmScreen("Clear session", message, "Clear"), lambda: self.service.clear_session(row.name))
+            self._confirm(
+                ConfirmScreen("Clear session", message, "Clear"), lambda: self.service.clear_session(row.name)
+            )
 
     def action_cancel_job(self) -> None:
         job_id = _selected_key(self.query_one("#scheduled-table", DataTable))
@@ -199,7 +216,10 @@ class SessionsPane(Vertical):
         recurrence = self.service.get_recurring_info(job_id)
         if recurrence:
             message += f"\nIt is part of a recurring schedule ({recurrence[1]}); cancelling it stops all future runs."
-        self._confirm(ConfirmScreen("Cancel scheduled job", message, "Cancel job"), lambda: self.service.cancel_scheduled_job(job_id))
+        self._confirm(
+            ConfirmScreen("Cancel scheduled job", message, "Cancel job"),
+            lambda: self.service.cancel_scheduled_job(job_id),
+        )
 
     def action_kill_all(self) -> None:
         running = [row.name for row in self.snapshot.rows if row.tmux_active]
@@ -209,7 +229,9 @@ class SessionsPane(Vertical):
             return
         parts = []
         if running:
-            parts.append(f"{len(running)} running session(s): {', '.join(running[:5])}{' …' if len(running) > 5 else ''}")
+            parts.append(
+                f"{len(running)} running session(s): {', '.join(running[:5])}{' …' if len(running) > 5 else ''}"
+            )
         if jobs:
             parts.append(f"{jobs} scheduled job(s)")
         message = "This kills:\n• " + "\n• ".join(parts) + ("\n\nThis interrupts running processes!" if running else "")

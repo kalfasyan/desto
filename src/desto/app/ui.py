@@ -31,7 +31,13 @@ class UserInterfaceManager:
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
-        self.sqlite_history_tab = SQLiteHistoryTab(self, desto_manager) if desto_manager and getattr(desto_manager, "sqlite_store", None) and getattr(desto_manager.sqlite_store, "enabled", False) else None
+        self.sqlite_history_tab = (
+            SQLiteHistoryTab(self, desto_manager)
+            if desto_manager
+            and getattr(desto_manager, "sqlite_store", None)
+            and getattr(desto_manager.sqlite_store, "enabled", False)
+            else None
+        )
         self.script_path_select = None  # Reference to the script select component
         self.session_name_input = None  # Reference to session name input
         self.arguments_input = None  # Reference to arguments input
@@ -100,16 +106,30 @@ class UserInterfaceManager:
                 ui.query("body").classes(add="dark")
             else:
                 ui.query("body").classes(remove="dark")
-            if hasattr(self, "new_script_tab") and hasattr(self.new_script_tab, "code_editor") and self.new_script_tab.code_editor:
+            if (
+                hasattr(self, "new_script_tab")
+                and hasattr(self.new_script_tab, "code_editor")
+                and self.new_script_tab.code_editor
+            ):
                 self.new_script_tab.code_editor.theme = "vscodeDark" if v else "vscodeLight"
-            if hasattr(self, "script_manager_tab") and hasattr(self.script_manager_tab, "script_preview_editor") and self.script_manager_tab.script_preview_editor:
+            if (
+                hasattr(self, "script_manager_tab")
+                and hasattr(self.script_manager_tab, "script_preview_editor")
+                and self.script_manager_tab.script_preview_editor
+            ):
                 self.script_manager_tab.script_preview_editor.theme = "vscodeDark" if v else "vscodeLight"
 
         self._dark_mode.on_value_change(lambda e: update_dark_mode_ui(e.value))
         update_dark_mode_ui(self._dark_mode.value)
 
         # Header
-        with ui.header(elevated=False).props("flat").classes("bg-white dark:!bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 px-6 py-4 items-center justify-between"):
+        with (
+            ui.header(elevated=False)
+            .props("flat")
+            .classes(
+                "bg-white dark:!bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 px-6 py-4 items-center justify-between"
+            )
+        ):
             with ui.row().classes("items-center gap-4"):
                 ui.button(on_click=lambda: left_drawer.toggle(), icon="menu").props("flat round color=primary")
                 ui.label("desto").classes("text-2xl font-black tracking-tighter text-primary italic uppercase")
@@ -121,10 +141,14 @@ class UserInterfaceManager:
                     ui.button(icon="logout", on_click=logout).props("flat round color=primary").tooltip("Log out")
 
         # Drawers
-        with ui.left_drawer(value=True).classes("bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6") as left_drawer:
+        with ui.left_drawer(value=True).classes(
+            "bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6"
+        ) as left_drawer:
             self.stats_panel.build()
 
-        with ui.right_drawer(value=False).classes("bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-6") as right_drawer:
+        with ui.right_drawer(value=False).classes(
+            "bg-slate-50 dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-6"
+        ) as right_drawer:
             self.settings_panel = SettingsPanel(self.tmux_manager, self, right_drawer)
             self.settings_panel.build()
 
@@ -157,10 +181,18 @@ class UserInterfaceManager:
                 with ui.row().classes("w-full justify-between items-end"):
                     ui.label("Chain Queue").classes("text-sm font-bold uppercase tracking-wider text-slate-500")
                     with ui.row().classes("gap-2"):
-                        ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props("flat color=warning dense")
-                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.dialogs.confirm_kill_all_sessions).props("flat color=negative dense")
+                        ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props(
+                            "flat color=warning dense"
+                        )
+                        ui.button(
+                            "Kill All Sessions",
+                            icon="delete_forever",
+                            on_click=self.tmux_manager.dialogs.confirm_kill_all_sessions,
+                        ).props("flat color=negative dense")
 
-                self.chain_queue_display = ui.column().classes("modern-card w-full p-4 dark:!bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
+                self.chain_queue_display = ui.column().classes(
+                    "modern-card w-full p-4 dark:!bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800"
+                )
                 self.refresh_chain_queue_display()
 
             self.log_section.build()
@@ -240,7 +272,11 @@ class UserInterfaceManager:
 
     def confirm_delete_script(self):
         """Show a confirmation dialog and delete the selected script if confirmed."""
-        selected_script = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
+        selected_script = (
+            self.script_path_select.value
+            if self.script_path_select is not None and hasattr(self.script_path_select, "value")
+            else None
+        )
         if not selected_script or selected_script == "No scripts found":
             msg = "No script selected to delete."
             logger.warning(msg)
@@ -277,7 +313,11 @@ class UserInterfaceManager:
 
     def save_current_script(self, script_edited):
         """Save the current script in the editor to its file."""
-        selected_script = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
+        selected_script = (
+            self.script_path_select.value
+            if self.script_path_select is not None and hasattr(self.script_path_select, "value")
+            else None
+        )
         if not selected_script or selected_script == "No scripts found":
             ui.notification("No script selected to save.", type="warning")
             return
@@ -328,8 +368,16 @@ class UserInterfaceManager:
         name_dialog.open()
 
     def chain_current_script(self):
-        script_name = self.script_path_select.value if self.script_path_select is not None and hasattr(self.script_path_select, "value") else None
-        arguments = self.arguments_input.value if self.arguments_input is not None and hasattr(self.arguments_input, "value") else ""
+        script_name = (
+            self.script_path_select.value
+            if self.script_path_select is not None and hasattr(self.script_path_select, "value")
+            else None
+        )
+        arguments = (
+            self.arguments_input.value
+            if self.arguments_input is not None and hasattr(self.arguments_input, "value")
+            else ""
+        )
         if not script_name or script_name == "No scripts found":
             ui.notification("No script selected to chain.", type="warning")
             return
@@ -351,7 +399,9 @@ class UserInterfaceManager:
             else:
                 for idx, (script, args) in enumerate(self.chain_queue, 1):
                     with ui.row().classes("w-full items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800"):
-                        ui.label(str(idx)).classes("bg-primary text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center font-bold")
+                        ui.label(str(idx)).classes(
+                            "bg-primary text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center font-bold"
+                        )
                         ui.label(Path(script).name).classes("font-semibold text-sm")
                         ui.label(args).classes("text-xs text-slate-500 truncate flex-grow")
 

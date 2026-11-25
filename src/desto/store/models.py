@@ -102,7 +102,10 @@ class DestoSession:
         """Create from dictionary (Redis data)."""
         # Handle bytes from Redis
         if data and isinstance(list(data.values())[0], bytes):
-            data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in data.items()}
+            data = {
+                k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                for k, v in data.items()
+            }
         return cls(
             session_id=data.get("session_id", ""),
             session_name=data.get("session_name", ""),
@@ -144,7 +147,10 @@ class FavoriteCommand:
         """Create from dictionary (Redis data)."""
         # Handle bytes from Redis
         if data and isinstance(list(data.values())[0], bytes):
-            data = {k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v for k, v in data.items()}
+            data = {
+                k.decode("utf-8") if isinstance(k, bytes) else k: v.decode("utf-8") if isinstance(v, bytes) else v
+                for k, v in data.items()
+            }
         return cls(
             favorite_id=data.get("favorite_id", ""),
             name=data.get("name", ""),

@@ -18,7 +18,12 @@ def main(argv=None) -> int:
         print("Usage: python -m desto.hooks.run_recurring <schedule_id> <occurrence>", file=sys.stderr)
         return 1
 
-    from desto.core.recurring import OCCURRENCE_FORMAT, RecurringScheduleManager, next_occurrence, occurrence_session_name
+    from desto.core.recurring import (
+        OCCURRENCE_FORMAT,
+        RecurringScheduleManager,
+        next_occurrence,
+        occurrence_session_name,
+    )
     from desto.store.client import DestoRedisClient
 
     schedule_id = argv[0]
@@ -55,8 +60,14 @@ def main(argv=None) -> int:
 
     session_name = occurrence_session_name(schedule["session_name"], occurrence)
     env = {**os.environ, "DESTO_LOGS_DIR": schedule["log_dir"]}
-    result = subprocess.run([sys.executable, "-m", "desto.hooks.start_scheduled_session", session_name, schedule["command"]], env=env)
-    manager.record_run(schedule_id, "started" if result.returncode == 0 else f"failed to start (exit code {result.returncode})", session_name)
+    result = subprocess.run(
+        [sys.executable, "-m", "desto.hooks.start_scheduled_session", session_name, schedule["command"]], env=env
+    )
+    manager.record_run(
+        schedule_id,
+        "started" if result.returncode == 0 else f"failed to start (exit code {result.returncode})",
+        session_name,
+    )
     return result.returncode
 
 

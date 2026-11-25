@@ -159,7 +159,9 @@ class FavoriteCommandsManager:
         logger.info(f"Deleted all favorites ({deleted} total)")
         return deleted
 
-    def update_favorite(self, favorite_id: str, name: Optional[str] = None, command: Optional[str] = None) -> Optional[FavoriteCommand]:
+    def update_favorite(
+        self, favorite_id: str, name: Optional[str] = None, command: Optional[str] = None
+    ) -> Optional[FavoriteCommand]:
         """Update a favorite command's name or command.
 
         Args:
@@ -239,6 +241,8 @@ class FavoriteCommandsManager:
         all_favorites = self.list_favorites()
         query_lower = query.lower()
 
-        matching = [fav for fav in all_favorites if query_lower in fav.name.lower() or query_lower in fav.command.lower()]
+        matching = [
+            fav for fav in all_favorites if query_lower in fav.name.lower() or query_lower in fav.command.lower()
+        ]
 
         return matching

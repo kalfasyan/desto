@@ -68,7 +68,16 @@ class Sample:
     write_bytes: int = 0
 
     def point(self) -> dict:
-        return {"t": round(self.ts, 1), "cpu": round(self.cpu, 1), "rss": self.rss, "procs": self.procs, "threads": self.threads, "cpu_s": round(self.cpu_seconds, 2), "rd": self.read_bytes, "wr": self.write_bytes}
+        return {
+            "t": round(self.ts, 1),
+            "cpu": round(self.cpu, 1),
+            "rss": self.rss,
+            "procs": self.procs,
+            "threads": self.threads,
+            "cpu_s": round(self.cpu_seconds, 2),
+            "rd": self.read_bytes,
+            "wr": self.write_bytes,
+        }
 
 
 @dataclass
@@ -222,7 +231,14 @@ class SessionMetricsSampler:
         retention_seconds: how long metrics keys live after their last update.
     """
 
-    def __init__(self, redis, sqlite_store=None, interval: float = 5.0, retention_seconds: int = 7 * 86400, clock: Callable[[], float] = time.time):
+    def __init__(
+        self,
+        redis,
+        sqlite_store=None,
+        interval: float = 5.0,
+        retention_seconds: int = 7 * 86400,
+        clock: Callable[[], float] = time.time,
+    ):
         self.redis = redis
         self.sqlite_store = sqlite_store
         self.interval = max(1.0, float(interval))
@@ -311,7 +327,12 @@ class SessionMetricsSampler:
             key = data.get("key") or skey[len(KEY_PREFIX) : -len(":summary")]
             if data.get("active") != "1" or key in live:
                 continue
-            t = _Tracked(key=key, name=data.get("session_name", ""), session_id=data.get("session_id", ""), first_ts=float(data.get("first_ts") or 0))
+            t = _Tracked(
+                key=key,
+                name=data.get("session_name", ""),
+                session_id=data.get("session_id", ""),
+                first_ts=float(data.get("first_ts") or 0),
+            )
             for f in _MONOTONIC:
                 try:
                     t.peaks[f] = float(data[f])
@@ -346,7 +367,14 @@ class SessionMetricsSampler:
         pipe = self.redis.pipeline(transaction=False)
         for key, t in current.items():
             s = samples[key]
-            values = {"peak_rss": s.rss, "max_procs": s.procs, "max_threads": s.threads, "cpu_seconds": s.cpu_seconds, "read_bytes": s.read_bytes, "write_bytes": s.write_bytes}
+            values = {
+                "peak_rss": s.rss,
+                "max_procs": s.procs,
+                "max_threads": s.threads,
+                "cpu_seconds": s.cpu_seconds,
+                "read_bytes": s.read_bytes,
+                "write_bytes": s.write_bytes,
+            }
             for f, v in values.items():
                 t.peaks[f] = max(t.peaks.get(f, 0), v)
 
@@ -400,7 +428,10 @@ class SessionMetricsSampler:
                     lkey = tier_key(t.key, tier)
                     pipe.rpush(lkey, json.dumps(bucket.point(), separators=(",", ":")))
                     pipe.ltrim(lkey, -keep, -1)
-            pipe.hset(summary_key(t.key), mapping={"active": "0", "cpu": 0, "procs": 0, "threads": 0, "rss": 0, "ended_ts": round(now, 1)})
+            pipe.hset(
+                summary_key(t.key),
+                mapping={"active": "0", "cpu": 0, "procs": 0, "threads": 0, "rss": 0, "ended_ts": round(now, 1)},
+            )
         pipe.execute()
 
         if self.sqlite_store is not None and getattr(self.sqlite_store, "enabled", False):
@@ -494,7 +525,9 @@ def start_background_sampler(settings: Optional[dict] = None) -> Optional[Sessio
 
             sqlite_store = SQLiteStore(db_path=sqlite_cfg.get("db_path") or None, enabled=True)
         retention = int(settings.get("redis", {}).get("session_history_days", 7)) * 86400
-        _background = SessionMetricsSampler(client.redis, sqlite_store, interval=metrics_cfg.get("interval", 5.0), retention_seconds=retention).start()
+        _background = SessionMetricsSampler(
+            client.redis, sqlite_store, interval=metrics_cfg.get("interval", 5.0), retention_seconds=retention
+        ).start()
         return _background
 
 

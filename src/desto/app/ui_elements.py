@@ -45,7 +45,9 @@ class SystemStatsPanel:
 
                 # CPU Details toggle
                 self.show_cpu_cores = ui.switch("Show Details", value=False).props("dense size=sm")
-                self.cpu_cores_container = ui.column().classes("w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 transition-all overflow-hidden")
+                self.cpu_cores_container = ui.column().classes(
+                    "w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4 transition-all overflow-hidden"
+                )
 
                 def toggle_cpu_cores_visibility(e):
                     new_value = self.show_cpu_cores.value
@@ -63,7 +65,9 @@ class SystemStatsPanel:
                         ui.icon("analytics", color="accent", size="1.2rem")
                         ui.label("Memory").classes("font-semibold text-slate-700 dark:text-slate-300")
                     self.memory_percent = ui.label("0%").classes("font-bold text-accent")
-                self.memory_bar = ui.linear_progress(value=0, size="8px", show_value=False).props("rounded color=accent")
+                self.memory_bar = ui.linear_progress(value=0, size="8px", show_value=False).props(
+                    "rounded color=accent"
+                )
 
                 with ui.row().classes("w-full justify-between text-xs text-slate-500 dark:text-slate-400 mt-1"):
                     self.memory_used = ui.label("0 GB Used")
@@ -83,7 +87,9 @@ class SystemStatsPanel:
                     self.disk_free = ui.label("0 GB Free")
 
             # Tmux Section
-            with ui.column().classes("w-full mt-4 p-4 bg-primary/10 dark:bg-primary/5 rounded-lg border border-primary/20"):
+            with ui.column().classes(
+                "w-full mt-4 p-4 bg-primary/10 dark:bg-primary/5 rounded-lg border border-primary/20"
+            ):
                 ui.label("Tmux Environment").classes("text-xs font-bold uppercase tracking-wider text-primary mb-2")
                 self.tmux_cpu = ui.label("tmux CPU: N/A").classes("text-sm text-slate-700 dark:text-slate-300")
                 self.tmux_mem = ui.label("tmux MEM: N/A").classes("text-sm text-slate-700 dark:text-slate-300")
@@ -98,7 +104,9 @@ class SystemStatsPanel:
         logger.debug(f"CPU cores: {logical_cores} logical, {physical_cores} physical, max_cols: {max_cols}")
 
         with self.cpu_cores_container:
-            ui.label(f"CPU Details ({logical_cores} threads on {physical_cores} cores)").classes("text-sm font-bold mb-4")
+            ui.label(f"CPU Details ({logical_cores} threads on {physical_cores} cores)").classes(
+                "text-sm font-bold mb-4"
+            )
 
             # Create a grid for CPU cores for better alignment
             with ui.grid(columns=max_cols).classes("w-full gap-x-2 gap-y-4 mb-2"):
@@ -106,7 +114,11 @@ class SystemStatsPanel:
                     with ui.column().classes("items-center gap-0 w-full"):
                         ui.label(f"T{j}").classes("text-[10px] text-slate-400 uppercase")
                         core_percent = ui.label("0%").classes("text-xs font-bold text-slate-700 dark:text-slate-300")
-                        core_bar = ui.linear_progress(value=0, size="4px", show_value=False).props("rounded color=primary").classes("w-full")
+                        core_bar = (
+                            ui.linear_progress(value=0, size="4px", show_value=False)
+                            .props("rounded color=primary")
+                            .classes("w-full")
+                        )
 
                     self.cpu_core_labels.append(core_percent)
                     self.cpu_core_bars.append(core_bar)
@@ -150,7 +162,9 @@ class SettingsPanel:
             ).classes("w-full")
 
             # Pushbullet API key input
-            existing_key = getattr(self.tmux_manager, "pushbullet_api_key", os.environ.get("DESTO_PUSHBULLET_API_KEY", ""))
+            existing_key = getattr(
+                self.tmux_manager, "pushbullet_api_key", os.environ.get("DESTO_PUSHBULLET_API_KEY", "")
+            )
             self.pushbullet_input = ui.input(
                 label="Pushbullet API Key",
                 value=existing_key,
@@ -159,7 +173,9 @@ class SettingsPanel:
                 autocomplete=[],
             ).classes("w-full")
 
-            ui.button("Save Configuration", icon="save", on_click=self.save_settings).props("unelevated color=primary").classes("w-full mt-2")
+            ui.button("Save Configuration", icon="save", on_click=self.save_settings).props(
+                "unelevated color=primary"
+            ).classes("w-full mt-2")
 
             # Send test push button
             def _send_test_push():
@@ -187,10 +203,14 @@ class SettingsPanel:
                     logger.exception("Failed to send test push")
                     ui.notification(f"Error: {e}", type="negative")
 
-            ui.button("Send Test Notification", icon="send", on_click=_send_test_push).props("outline color=secondary").classes("w-full")
+            ui.button("Send Test Notification", icon="send", on_click=_send_test_push).props(
+                "outline color=secondary"
+            ).classes("w-full")
 
         with ui.row().classes("w-full justify-center mt-8"):
-            ui.button("Close Panel", icon="close", on_click=lambda: self.right_drawer.toggle()).props("flat color=slate-500")
+            ui.button("Close Panel", icon="close", on_click=lambda: self.right_drawer.toggle()).props(
+                "flat color=slate-500"
+            )
 
     def save_settings(self):
         scripts_dir = Path(self.scripts_dir_input.value).expanduser()
@@ -254,7 +274,9 @@ class NewScriptTab:
             ).classes("w-full h-64 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 mb-6")
 
             with ui.row().classes("w-full justify-between items-center"):
-                ui.select(self.code_editor.supported_themes, label="Editor Theme").classes("w-40").bind_value(self.code_editor, "theme")
+                ui.select(self.code_editor.supported_themes, label="Editor Theme").classes("w-40").bind_value(
+                    self.code_editor, "theme"
+                )
                 ui.button(
                     "Save Script",
                     icon="save",
@@ -271,7 +293,9 @@ class NewScriptTab:
     def save_custom_script(self):
         name = self.custom_template_name_input.value.strip()
         try:
-            script_path = scripts.create_script(self.tmux_manager.SCRIPTS_DIR, name, self.custom_code["value"], self.script_type["value"])
+            script_path = scripts.create_script(
+                self.tmux_manager.SCRIPTS_DIR, name, self.custom_code["value"], self.script_type["value"]
+            )
             ui.notification(f"Script '{name}' saved successfully.", type="positive")
         except ValueError as e:
             ui.notification(str(e), type="info")
@@ -296,9 +320,17 @@ class LogSection:
                 ui.label("System Logs").classes("text-lg font-bold text-slate-900 dark:text-white")
                 show_logs = ui.switch("Show Logs", value=True).props("dense")
 
-            log_card = ui.card().classes("modern-card w-full p-0 bg-slate-100 dark:bg-slate-900 rounded-xl shadow-lg overflow-hidden transition-all")
+            log_card = ui.card().classes(
+                "modern-card w-full p-0 bg-slate-100 dark:bg-slate-900 rounded-xl shadow-lg overflow-hidden transition-all"
+            )
             with log_card:
-                self.log_display = ui.textarea("").classes("w-full h-64 font-mono text-xs p-4 bg-transparent text-slate-700 dark:text-emerald-400 border-none").props("readonly borderless fill-viewport")
+                self.log_display = (
+                    ui.textarea("")
+                    .classes(
+                        "w-full h-64 font-mono text-xs p-4 bg-transparent text-slate-700 dark:text-emerald-400 border-none"
+                    )
+                    .props("readonly borderless fill-viewport")
+                )
 
             def toggle_log_card_visibility(value):
                 log_card.set_visibility(value)
@@ -369,7 +401,9 @@ class ScriptManagerTab:
             ui.label("Script Execution").classes("text-lg font-bold text-slate-900 dark:text-white mb-4")
 
             with ui.grid(columns=3).classes("w-full gap-4 mb-6"):
-                self.session_name_input = ui.input(label="Session Name", placeholder="e.g. build-task").classes("w-full")
+                self.session_name_input = ui.input(label="Session Name", placeholder="e.g. build-task").classes(
+                    "w-full"
+                )
                 script_files = self.ui_manager.get_script_files()
                 self.script_path_select = ui.select(
                     options=script_files if script_files else ["No scripts found"],
@@ -413,11 +447,19 @@ class ScriptManagerTab:
 
             self.ui_manager.script_preview_editor = self.script_preview_editor
 
-            with ui.row().classes("w-full justify-between items-center mt-4 pt-6 border-t border-slate-100 dark:border-slate-800"):
+            with ui.row().classes(
+                "w-full justify-between items-center mt-4 pt-6 border-t border-slate-100 dark:border-slate-800"
+            ):
                 with ui.row().classes("gap-2"):
-                    ui.button("Save", icon="save", on_click=lambda: self.ui_manager.save_current_script(self.script_edited)).props("unelevated color=primary")
-                    ui.button("Save As", icon="save_as", on_click=self.ui_manager.save_as_new_dialog).props("outline color=primary")
-                    ui.button("Delete", icon="delete", on_click=self.ui_manager.confirm_delete_script).props("flat color=negative")
+                    ui.button(
+                        "Save", icon="save", on_click=lambda: self.ui_manager.save_current_script(self.script_edited)
+                    ).props("unelevated color=primary")
+                    ui.button("Save As", icon="save_as", on_click=self.ui_manager.save_as_new_dialog).props(
+                        "outline color=primary"
+                    )
+                    ui.button("Delete", icon="delete", on_click=self.ui_manager.confirm_delete_script).props(
+                        "flat color=negative"
+                    )
 
                 with ui.row().classes("gap-2"):
 
@@ -435,9 +477,15 @@ class ScriptManagerTab:
                             selected_script = self.script_path_select.value
                             await self._launch_single_script(session_name, selected_script, arguments)
 
-                    ui.button("Launch Now", icon="rocket_launch", on_click=launch_with_save_check).props("unelevated color=positive").classes("px-6")
-                    ui.button(icon="history", on_click=self.ui_manager.schedule_dialog.open).props("outline color=secondary round")
-                    ui.button(icon="add_link", on_click=self.ui_manager.chain_current_script).props("outline color=secondary round")
+                    ui.button("Launch Now", icon="rocket_launch", on_click=launch_with_save_check).props(
+                        "unelevated color=positive"
+                    ).classes("px-6")
+                    ui.button(icon="history", on_click=self.ui_manager.schedule_dialog.open).props(
+                        "outline color=secondary round"
+                    )
+                    ui.button(icon="add_link", on_click=self.ui_manager.chain_current_script).props(
+                        "outline color=secondary round"
+                    )
 
                     if self.ui_manager.favorites_tab:
 
@@ -453,7 +501,9 @@ class ScriptManagerTab:
                                     def __init__(self, val):
                                         self.value = val
 
-                                self.ui_manager.favorites_tab._save_as_favorite(self.session_name_input, CommandWrapper(command))
+                                self.ui_manager.favorites_tab._save_as_favorite(
+                                    self.session_name_input, CommandWrapper(command)
+                                )
                             else:
                                 ui.notification("Select a valid script first", type="warning")
 

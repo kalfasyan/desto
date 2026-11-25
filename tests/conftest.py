@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from .docker_test_utils import ensure_docker_available, ensure_docker_compose_available, safe_docker_cleanup, wait_for_http
+from .docker_test_utils import (
+    ensure_docker_available,
+    ensure_docker_compose_available,
+    safe_docker_cleanup,
+    wait_for_http,
+)
 
 
 @pytest.fixture(scope="session")

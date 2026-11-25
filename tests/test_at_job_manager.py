@@ -75,7 +75,13 @@ def test_schedule_links_at_job_id_to_session(monkeypatch):
     atm = AtJobManager(redis_client=client)
 
     # Act: schedule a job for the session name that exists in fake redis
-    job_id = atm.schedule(command="echo hello", time_spec="12:00 2025-09-02", session_name="my-session", script_path=["/tmp/script.sh"], arguments="")
+    job_id = atm.schedule(
+        command="echo hello",
+        time_spec="12:00 2025-09-02",
+        session_name="my-session",
+        script_path=["/tmp/script.sh"],
+        arguments="",
+    )
 
     # Assert: job_id returned and atjob stored in redis
     assert job_id == "123"
@@ -96,7 +102,13 @@ def test_schedule_with_no_matching_session_still_stores_atjob(monkeypatch):
     from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
-    job_id = atm.schedule(command="echo hi", time_spec="12:00 2025-09-02", session_name="nonexistent-session", script_path=["/tmp/s"], arguments="")
+    job_id = atm.schedule(
+        command="echo hi",
+        time_spec="12:00 2025-09-02",
+        session_name="nonexistent-session",
+        script_path=["/tmp/s"],
+        arguments="",
+    )
 
     assert job_id == "123"
     # atjob stored
@@ -141,7 +153,9 @@ def test_direct_lookup_used_when_get_session_key_available(monkeypatch):
     from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
-    job_id = atm.schedule(command="echo hi", time_spec="12:00 2025-09-02", session_name="my-session", script_path=["/tmp/s"], arguments="")
+    job_id = atm.schedule(
+        command="echo hi", time_spec="12:00 2025-09-02", session_name="my-session", script_path=["/tmp/s"], arguments=""
+    )
 
     assert job_id == "123"
     # Verify the direct key was updated

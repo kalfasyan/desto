@@ -89,7 +89,9 @@ def redis_session(name):
 def wait_for_end(name, log_file):
     """Wait until tmux has exited and the completion hook has recorded a final status."""
     assert wait_until(lambda: not tmux_alive(name)), "tmux session did not exit"
-    assert wait_until(lambda: redis_session(name) is not None and redis_session(name).status.value in ("finished", "failed")), "no final status in Redis"
+    assert wait_until(
+        lambda: redis_session(name) is not None and redis_session(name).status.value in ("finished", "failed")
+    ), "no final status in Redis"
     assert log_file.exists()
     return log_file.read_text(), redis_session(name)
 
@@ -117,7 +119,13 @@ def launch_cli(name, command, dirs):
 
 def launch_hook(name, command, dirs):
     log_dir, _ = dirs
-    result = subprocess.run([sys.executable, "-m", "desto.hooks.start_scheduled_session", name, command], capture_output=True, text=True, env=os.environ.copy(), timeout=30)
+    result = subprocess.run(
+        [sys.executable, "-m", "desto.hooks.start_scheduled_session", name, command],
+        capture_output=True,
+        text=True,
+        env=os.environ.copy(),
+        timeout=30,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     return log_dir / f"{name}.log"
 
@@ -214,7 +222,9 @@ def test_service_chain_runs_every_step(dirs, session_name):
     for i in (1, 2):
         (scripts_dir / f"step{i}.sh").write_text(f"#!/bin/bash\necho step-{i}-ran\n")
     service = DestoService(log_dir=log_dir, scripts_dir=scripts_dir)
-    command = scripts.chain_command([(scripts_dir / "step1.sh", ""), (scripts_dir / "step2.sh", "")], service.python_executable)
+    command = scripts.chain_command(
+        [(scripts_dir / "step1.sh", ""), (scripts_dir / "step2.sh", "")], service.python_executable
+    )
     assert service.start_tmux_session(session_name, command)
     text, session = wait_for_end(session_name, service.get_log_file(session_name))
     assert "step-1-ran" in text and "step-2-ran" in text

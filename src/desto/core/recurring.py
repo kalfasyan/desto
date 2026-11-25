@@ -95,7 +95,9 @@ class RecurringScheduleManager:
         if not self.arm(schedule, datetime.strptime(schedule["anchor"], OCCURRENCE_FORMAT)):
             self.redis.delete(self._key(schedule_id))
             return None
-        logger.info(f"Created recurring schedule {schedule_id} for '{session_name}' ({describe_interval(interval_minutes)})")
+        logger.info(
+            f"Created recurring schedule {schedule_id} for '{session_name}' ({describe_interval(interval_minutes)})"
+        )
         return schedule_id
 
     def get(self, schedule_id: str) -> Optional[Dict[str, str]]:
@@ -114,17 +116,24 @@ class RecurringScheduleManager:
         """Queue one run with ``at``. Returns the at job id, or None on failure."""
         schedule_id = schedule["id"]
         occurrence_str = occurrence.strftime(OCCURRENCE_FORMAT)
-        command = f"{shlex.quote(sys.executable)} -m desto.hooks.run_recurring {shlex.quote(schedule_id)} {occurrence_str}"
+        command = (
+            f"{shlex.quote(sys.executable)} -m desto.hooks.run_recurring {shlex.quote(schedule_id)} {occurrence_str}"
+        )
         at_job_id = self.at_job_manager.schedule(
             command=command,
             time_spec=occurrence.strftime("%H:%M %Y-%m-%d"),
             session_name=occurrence_session_name(schedule["session_name"], occurrence),
             script_path=shlex.split(schedule.get("script_path", "")),
             arguments=schedule.get("arguments", ""),
-            extra_metadata={"recurring_id": schedule_id, "recurrence": describe_interval(int(schedule["interval_minutes"]))},
+            extra_metadata={
+                "recurring_id": schedule_id,
+                "recurrence": describe_interval(int(schedule["interval_minutes"])),
+            },
         )
         if at_job_id:
-            self.redis.hset(self._key(schedule_id), mapping={"next_run": occurrence_str, "pending_at_job_id": at_job_id})
+            self.redis.hset(
+                self._key(schedule_id), mapping={"next_run": occurrence_str, "pending_at_job_id": at_job_id}
+            )
         else:
             logger.error(f"Failed to queue next run of recurring schedule {schedule_id} at {occurrence_str}")
         return at_job_id

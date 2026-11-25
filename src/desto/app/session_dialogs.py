@@ -40,10 +40,14 @@ class SessionDialogs:
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             self.service.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
-            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style(
+                "font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
             recurrence = self.service.get_recurring_info(at_job_id)
             if recurrence:
-                ui.label(f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs.").classes("text-slate-600 dark:text-slate-400")
+                ui.label(
+                    f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs."
+                ).classes("text-slate-600 dark:text-slate-400")
 
             def _cancel():
                 cancel()
@@ -68,9 +72,13 @@ class SessionDialogs:
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
             self.service.telemetry_event("confirm_clear_history.open", {})
-            ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            ui.label("⚠️ Clear Session History").style(
+                "font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
             ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
-            ui.label("This action cannot be undone.").style("margin-bottom: 20px;").classes("text-slate-600 dark:text-slate-400")
+            ui.label("This action cannot be undone.").style("margin-bottom: 20px;").classes(
+                "text-slate-600 dark:text-slate-400"
+            )
 
             def _close_and_telemetry_cancel():
                 close_dialog()
@@ -83,7 +91,9 @@ class SessionDialogs:
 
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
                 ui.button("Cancel", on_click=_close_and_telemetry_cancel).props("color=grey")
-                ui.button("Clear History", color="red", on_click=_clear_and_telemetry_confirm).props("icon=delete_forever")
+                ui.button("Clear History", color="red", on_click=_clear_and_telemetry_confirm).props(
+                    "icon=delete_forever"
+                )
         dialog.open()
 
     def confirm_clear_logs(self):
@@ -103,15 +113,21 @@ class SessionDialogs:
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
             self.service.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
-            ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
+            ui.label("🗂️ Clear Log Files").style(
+                "font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;"
+            )
             ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
-            ui.label(str(log_dir)).style("font-family: monospace; padding: 5px; border-radius: 3px; margin-bottom: 15px;").classes("bg-slate-100 dark:!bg-slate-800")
+            ui.label(str(log_dir)).style(
+                "font-family: monospace; padding: 5px; border-radius: 3px; margin-bottom: 15px;"
+            ).classes("bg-slate-100 dark:!bg-slate-800")
             ui.label("Files to be deleted:").style("font-weight: bold; margin-bottom: 5px;")
             shown = log_files if len(log_files) <= 5 else log_files[:3]
             for log_file in shown:
                 ui.label(f"• {log_file.name}").style("margin-left: 10px; font-family: monospace; font-size: 0.9em;")
             if len(log_files) > 5:
-                ui.label(f"• ... and {len(log_files) - 3} more files").style("margin-left: 10px; font-size: 0.9em;").classes("text-slate-600")
+                ui.label(f"• ... and {len(log_files) - 3} more files").style(
+                    "margin-left: 10px; font-size: 0.9em;"
+                ).classes("text-slate-600")
 
             def _close_logs_cancel():
                 close_dialog()
@@ -170,8 +186,12 @@ class SessionDialogs:
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
             self.service.telemetry_event("confirm_clear_session.open", {"session": session_name})
-            ui.label(f"Are you sure you want to clear session '{session_name}'?").style("font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
-            ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
+            ui.label(f"Are you sure you want to clear session '{session_name}'?").style(
+                "font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;"
+            )
+            ui.label("This will delete its log file and remove it from the sessions table.").style(
+                "margin-bottom: 15px;"
+            )
 
             def _cancel_clear_session():
                 cancel()
@@ -217,12 +237,16 @@ class SessionDialogs:
             self.service.resume()
 
         with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
-            self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
+            self.ui.label("⚠️ Clear All Jobs").style(
+                "font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;"
+            )
 
             warning_parts = []
             if session_count > 0:
                 if running_count > 0 and finished_count > 0:
-                    warning_parts.append(f"{session_count} sessions ({running_count} running, {finished_count} finished)")
+                    warning_parts.append(
+                        f"{session_count} sessions ({running_count} running, {finished_count} finished)"
+                    )
                 elif running_count > 0:
                     warning_parts.append(f"{running_count} RUNNING sessions")
                 else:
@@ -240,7 +264,9 @@ class SessionDialogs:
                 for session in running_sessions[:5]:
                     self.ui.label(f"• {session}").style("margin-left: 10px; color: #d32f2f;")
                 if len(running_sessions) > 5:
-                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style("margin-left: 10px; color: #666;")
+                    self.ui.label(f"• ... and {len(running_sessions) - 5} more").style(
+                        "margin-left: 10px; color: #666;"
+                    )
 
             if job_count > 0:
                 self.ui.label("Scheduled jobs:").style("font-weight: bold; margin-bottom: 5px; margin-top: 10px;")
@@ -348,7 +374,11 @@ class SessionDialogs:
                 ui.label(f"Log for session '{session_name}'").style("font-weight: bold;").classes("flex-grow")
                 status_badge = ui.badge("LIVE" if is_active else "ENDED", color="positive" if is_active else "grey")
 
-            log_view = ui.log(max_lines=2000).style("width: 100%; height: 65vh;").classes("font-mono text-xs dark:text-slate-300")
+            log_view = (
+                ui.log(max_lines=2000)
+                .style("width: 100%; height: 65vh;")
+                .classes("font-mono text-xs dark:text-slate-300")
+            )
             if initial_lines:
                 logger.debug(f"Successfully read {len(initial_lines)} lines from log file for session: {session_name}")
                 for line in initial_lines:

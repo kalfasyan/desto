@@ -80,7 +80,9 @@ def chain_command(chain, python_executable: str = "python3", continue_on_error: 
     return (" ; " if continue_on_error else " && ").join(parts)
 
 
-def completion_hook(session_name: str, exit_code_ref: str = "$SCRIPT_EXIT_CODE", python_executable: str | None = None) -> str:
+def completion_hook(
+    session_name: str, exit_code_ref: str = "$SCRIPT_EXIT_CODE", python_executable: str | None = None
+) -> str:
     """Shell snippet that records the session's exit code in Redis and sends the finish notification."""
     python = python_executable or sys.executable
     return f"{shlex.quote(python)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"

@@ -8,7 +8,13 @@ from desto.core import scripts
 from desto.core.recurring import REPEAT_UNITS
 from desto.core.scheduled_jobs import ScheduleError
 
-REPEAT_OPTIONS = {"never": "Does not repeat", "minutes": "minute(s)", "hours": "hour(s)", "days": "day(s)", "weeks": "week(s)"}
+REPEAT_OPTIONS = {
+    "never": "Does not repeat",
+    "minutes": "minute(s)",
+    "hours": "hour(s)",
+    "days": "day(s)",
+    "weeks": "week(s)",
+}
 
 
 class ScheduleDialog:
@@ -25,7 +31,11 @@ class ScheduleDialog:
     def _selected_script_path(self):
         """Path of the script currently picked in the launch section's select."""
         um = self.ui_manager
-        select_value = um.script_path_select.value if um.script_path_select is not None and hasattr(um.script_path_select, "value") else None
+        select_value = (
+            um.script_path_select.value
+            if um.script_path_select is not None and hasattr(um.script_path_select, "value")
+            else None
+        )
         return self.service.SCRIPTS_DIR / um.extract_script_filename(select_value)
 
     def open(self):
@@ -41,8 +51,12 @@ class ScheduleDialog:
             # Optional repetition: the date/time above is the first run
             with ui.row().style("gap: 8px; align-items: center; margin-bottom: 8px;"):
                 ui.label("Repeat:")
-                repeat_count_input = ui.number(value=1, min=1, step=1, format="%d").props("dense outlined").style("width: 80px;")
-                repeat_select = ui.select(REPEAT_OPTIONS, value="never").props("dense outlined").style("min-width: 160px;")
+                repeat_count_input = (
+                    ui.number(value=1, min=1, step=1, format="%d").props("dense outlined").style("width: 80px;")
+                )
+                repeat_select = (
+                    ui.select(REPEAT_OPTIONS, value="never").props("dense outlined").style("min-width: 160px;")
+                )
                 repeat_count_input.bind_visibility_from(repeat_select, "value", backward=lambda v: v != "never")
 
             error_label = ui.label("").style("color: red;")
@@ -52,15 +66,25 @@ class ScheduleDialog:
                 ui.button("Cancel", on_click=schedule_dialog.close)
                 ui.button(
                     "Schedule",
-                    on_click=lambda: self.confirm(date_input, time_input, error_label, schedule_dialog, repeat_select, repeat_count_input),
+                    on_click=lambda: self.confirm(
+                        date_input, time_input, error_label, schedule_dialog, repeat_select, repeat_count_input
+                    ),
                 )
         schedule_dialog.open()
 
-    def confirm(self, date_input, time_input, error_label, schedule_dialog, repeat_select=None, repeat_count_input=None):
+    def confirm(
+        self, date_input, time_input, error_label, schedule_dialog, repeat_select=None, repeat_count_input=None
+    ):
         """Schedule the selected script (or the chain queue) at the picked date and time."""
         um = self.ui_manager
-        session_name = um.session_name_input.value.strip() if um.session_name_input is not None and hasattr(um.session_name_input, "value") else ""
-        arguments = um.arguments_input.value if um.arguments_input is not None and hasattr(um.arguments_input, "value") else "."
+        session_name = (
+            um.session_name_input.value.strip()
+            if um.session_name_input is not None and hasattr(um.session_name_input, "value")
+            else ""
+        )
+        arguments = (
+            um.arguments_input.value if um.arguments_input is not None and hasattr(um.arguments_input, "value") else "."
+        )
         if not date_input.value or not time_input.value or not session_name:
             error_label.text = "Please select date, time, and enter a session name in the Launch Script section."
             return

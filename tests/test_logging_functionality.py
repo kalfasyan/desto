@@ -69,7 +69,9 @@ class TestTmuxManagerLogging:
             mock_redis_instance.is_connected.return_value = False
             mock_redis_class.return_value = mock_redis_instance
 
-            tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
+            tmux_manager = TmuxManager(
+                mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
+            )
 
             return tmux_manager
 
@@ -84,10 +86,14 @@ class TestTmuxManagerLogging:
         # Wait for command to complete (poll the log)
         from .docker_test_utils import wait_for_file_contains
 
-        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Hello World", timeout=5), "Log did not contain expected output"
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Hello World", timeout=5), (
+            "Log did not contain expected output"
+        )
 
         # Wait for session to fully complete by waiting for the finish marker
-        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "=== SCRIPT FINISHED at", timeout=5), "Finish marker not found"
+        assert wait_for_file_contains(
+            temp_dirs["log_dir"] / f"{session_name}.log", "=== SCRIPT FINISHED at", timeout=5
+        ), "Finish marker not found"
 
         # Check log file exists
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
@@ -117,7 +123,9 @@ class TestTmuxManagerLogging:
         assert wait_for_file_contains(log_file, "First session", timeout=5), "First session output not found"
 
         # Wait for session to fully complete
-        assert wait_for_file_contains(log_file, "=== SCRIPT FINISHED at", timeout=5), "First session finish marker not found"
+        assert wait_for_file_contains(log_file, "=== SCRIPT FINISHED at", timeout=5), (
+            "First session finish marker not found"
+        )
 
         first_content = log_file.read_text()
 
@@ -170,7 +178,9 @@ class TestTmuxManagerLogging:
 
         from .docker_test_utils import wait_for_file_contains
 
-        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Test completed", timeout=5), "Command output not found in log"
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Test completed", timeout=5), (
+            "Command output not found in log"
+        )
 
         # Check that job status can be retrieved from Redis (through the status tracker)
         # This replaces the old file marker check
@@ -195,13 +205,17 @@ class TestTmuxManagerLogging:
 
         from .docker_test_utils import wait_for_file_contains
 
-        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "First run", timeout=5), "First run output not found"
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "First run", timeout=5), (
+            "First run output not found"
+        )
 
         # Second session with same name - should append to existing log
         assert wait_for_tmux_session_to_exit(session_name), "First tmux session did not exit"
         command2 = "echo 'Second run'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
-        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Second run", timeout=5), "Second run output not found"
+        assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Second run", timeout=5), (
+            "Second run output not found"
+        )
 
         # Check that log contains both runs
         log_file = temp_dirs["log_dir"] / f"{session_name}.log"
@@ -226,6 +240,8 @@ class TestTmuxManagerLogging:
             # Kill any test sessions that might be running
             test_sessions = ["test_session", "path_test"]
             for session in test_sessions:
-                subprocess.run(["tmux", "kill-session", "-t", session], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(
+                    ["tmux", "kill-session", "-t", session], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
         except Exception:
             pass  # Ignore errors if sessions don't exist or tmux is not available

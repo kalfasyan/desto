@@ -7,14 +7,30 @@ from types import SimpleNamespace
 
 import pytest
 
-from desto.core.recurring import CLAIM_PREFIX, RECURRING_PREFIX, RecurringScheduleManager, describe_interval, next_occurrence, occurrence_session_name
+from desto.core.recurring import (
+    CLAIM_PREFIX,
+    RECURRING_PREFIX,
+    RecurringScheduleManager,
+    describe_interval,
+    next_occurrence,
+    occurrence_session_name,
+)
 from desto.hooks import run_recurring
 from desto.store.client import DestoRedisClient
 
 
 @pytest.mark.parametrize(
     "minutes, expected",
-    [(1, "every minute"), (15, "every 15 minutes"), (60, "every hour"), (180, "every 3 hours"), (1440, "every day"), (2880, "every 2 days"), (10080, "every week"), (90, "every 90 minutes")],
+    [
+        (1, "every minute"),
+        (15, "every 15 minutes"),
+        (60, "every hour"),
+        (180, "every 3 hours"),
+        (1440, "every day"),
+        (2880, "every 2 days"),
+        (10080, "every week"),
+        (90, "every 90 minutes"),
+    ],
 )
 def test_describe_interval(minutes, expected):
     assert describe_interval(minutes) == expected
@@ -82,7 +98,14 @@ FIRST_RUN = datetime(2030, 5, 1, 6, 30)
 
 
 def create(manager, **overrides):
-    kwargs = dict(session_name=f"rec-{uuid.uuid4().hex[:6]}", command="bash /s/backup.sh", interval_minutes=1440, first_run=FIRST_RUN, log_dir="/logs", script_paths=["/s/backup.sh"])
+    kwargs = dict(
+        session_name=f"rec-{uuid.uuid4().hex[:6]}",
+        command="bash /s/backup.sh",
+        interval_minutes=1440,
+        first_run=FIRST_RUN,
+        log_dir="/logs",
+        script_paths=["/s/backup.sh"],
+    )
     kwargs.update(overrides)
     return manager.create(**kwargs)
 

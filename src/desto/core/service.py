@@ -21,7 +21,16 @@ from loguru import logger
 
 from desto.config import config as ui_settings
 from desto.core import scripts
-from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, metrics_key, scheduled_job_rows, session_rows, summarize_jobs
+from desto.core.formatting import (
+    ScheduledJobRow,
+    SessionRow,
+    count_by_category,
+    decode_hash,
+    metrics_key,
+    scheduled_job_rows,
+    session_rows,
+    summarize_jobs,
+)
 from desto.core.scheduled_jobs import ScheduledJobsMixin
 from desto.core.session_metrics import read_history, read_summaries
 from desto.store.client import DestoRedisClient
@@ -58,7 +67,9 @@ class DestoService(ScheduledJobsMixin):
     def __init__(self, log_dir=None, scripts_dir=None, notifier: Optional[Notifier] = None, instance_logger=None):
         scripts_dir_env = os.environ.get("DESTO_SCRIPTS_DIR")
         logs_dir_env = os.environ.get("DESTO_LOGS_DIR")
-        self.SCRIPTS_DIR = Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        self.SCRIPTS_DIR = (
+            Path(scripts_dir_env) if scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
+        )
         self.LOG_DIR = Path(logs_dir_env) if logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
         self.logger = instance_logger or logger
         self.notifier = notifier or _log_notifier
@@ -250,7 +261,11 @@ class DestoService(ScheduledJobsMixin):
 
     def _redis_session_names(self) -> set:
         try:
-            return {s.session_name for s in self.desto_manager.session_manager.list_all_sessions() if getattr(s, "session_name", None)}
+            return {
+                s.session_name
+                for s in self.desto_manager.session_manager.list_all_sessions()
+                if getattr(s, "session_name", None)
+            }
         except Exception:
             return set()
 
@@ -270,7 +285,9 @@ class DestoService(ScheduledJobsMixin):
         """
         for session in self.desto_manager.session_manager.list_all_sessions():
             status = getattr(session, "status", None)
-            if getattr(session, "session_name", None) == session_name and (status == SessionStatus.SCHEDULED or str(status).lower() == "scheduled"):
+            if getattr(session, "session_name", None) == session_name and (
+                status == SessionStatus.SCHEDULED or str(status).lower() == "scheduled"
+            ):
                 msg = f"Session '{session_name}' is already scheduled. Cannot start a new session with the same name until it runs or is cancelled."
                 logger.error(msg)
                 self.notify(msg, "negative")
@@ -294,7 +311,16 @@ class DestoService(ScheduledJobsMixin):
 
         try:
             subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", self._logged_command(session_name, command, log_file)],
+                [
+                    "tmux",
+                    "new-session",
+                    "-d",
+                    "-s",
+                    session_name,
+                    "bash",
+                    "-c",
+                    self._logged_command(session_name, command, log_file),
+                ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -382,7 +408,9 @@ class DestoService(ScheduledJobsMixin):
     def kill_session(self, session_name) -> bool:
         """Kill a tmux session by name."""
         self.logger.info(f"Attempting to kill session: '{session_name}'")
-        result = subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(
+            ["tmux", "kill-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         if result.returncode == 0:
             # The completion hook never runs for a killed session, so record the end here
             try:
@@ -451,9 +479,17 @@ class DestoService(ScheduledJobsMixin):
         session_success, session_total, job_success, job_total, error_messages = self.kill_all_sessions_and_jobs()
         results = []
         if session_total > 0:
-            results.append(f"Successfully cleared all {session_total} sessions" if session_success == session_total else f"Cleared {session_success}/{session_total} sessions")
+            results.append(
+                f"Successfully cleared all {session_total} sessions"
+                if session_success == session_total
+                else f"Cleared {session_success}/{session_total} sessions"
+            )
         if job_total > 0:
-            results.append(f"Successfully cancelled all {job_total} scheduled jobs" if job_success == job_total else f"Cancelled {job_success}/{job_total} scheduled jobs")
+            results.append(
+                f"Successfully cancelled all {job_total} scheduled jobs"
+                if job_success == job_total
+                else f"Cancelled {job_success}/{job_total} scheduled jobs"
+            )
         if not results:
             results.append("No items to clear")
         msg = ". ".join(results) + "."

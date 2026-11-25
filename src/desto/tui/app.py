@@ -45,7 +45,9 @@ class DestoApp(App):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, service: DestoService, monitor: SystemMonitor | None = None, log_lines: deque | None = None) -> None:
+    def __init__(
+        self, service: DestoService, monitor: SystemMonitor | None = None, log_lines: deque | None = None
+    ) -> None:
         super().__init__()
         self.service = service
         self.monitor = monitor or SystemMonitor()
@@ -165,7 +167,9 @@ def main() -> None:
     pending_log_lines: deque[str] = deque(maxlen=1000)
     # Log lines would scribble over the terminal UI, so they go to the in-app log panel instead
     logger.remove()
-    logger.add(lambda msg: pending_log_lines.append(msg.strip()), format="{time:HH:mm:ss} {level: <7} {message}", level="INFO")
+    logger.add(
+        lambda msg: pending_log_lines.append(msg.strip()), format="{time:HH:mm:ss} {level: <7} {message}", level="INFO"
+    )
     try:
         service = DestoService()
     except RuntimeError as e:

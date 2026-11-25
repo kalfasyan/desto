@@ -44,7 +44,9 @@ def service(tmp_path):
         counts={"total": 2, "running": 1, "finished": 1, "failed": 0},
         scheduled=[ScheduledJobRow("7", "2026-01-02T08:00:00", "ann", "scheduled", None)],
     )
-    svc.list_favorites.return_value = [SimpleNamespace(favorite_id="f1", name="deploy", command="make deploy", use_count=3, last_used_at=None)]
+    svc.list_favorites.return_value = [
+        SimpleNamespace(favorite_id="f1", name="deploy", command="make deploy", use_count=3, last_used_at=None)
+    ]
     svc.start_tmux_session.return_value = True
     return svc
 
@@ -78,10 +80,21 @@ def test_usage_columns_and_usage_screen(service):
     service.snapshot.return_value = Snapshot(
         rows=[live],
         counts={"total": 1, "running": 1, "finished": 0, "failed": 0},
-        usage={"sid-live": {"active": "1", "cpu": "250", "rss": str(512 * 1024**2), "peak_rss": str(600 * 1024**2), "cpu_seconds": "90"}},
+        usage={
+            "sid-live": {
+                "active": "1",
+                "cpu": "250",
+                "rss": str(512 * 1024**2),
+                "peak_rss": str(600 * 1024**2),
+                "cpu_seconds": "90",
+            }
+        },
     )
     service.session_usage.return_value = service.snapshot.return_value.usage
-    service.session_usage_history.return_value = [{"t": 0, "cpu": 10, "cpu_max": 10, "rss": 100, "rss_max": 100}, {"t": 60, "cpu": 250, "cpu_max": 300, "rss": 200, "rss_max": 250}]
+    service.session_usage_history.return_value = [
+        {"t": 0, "cpu": 10, "cpu_max": 10, "rss": 100, "rss_max": 100},
+        {"t": 60, "cpu": 250, "cpu_max": 300, "rss": 200, "rss_max": 250},
+    ]
 
     async def scenario(app, pilot):
         table = app.query_one("#sessions-table", DataTable)
@@ -177,7 +190,11 @@ def test_cancel_scheduled_job(service):
 
 def test_kill_all_and_clear_actions_call_service(service):
     async def scenario(app, pilot):
-        for key, method in (("K", service.kill_all_and_notify), ("H", service.clear_session_history), ("L", service.clear_log_files)):
+        for key, method in (
+            ("K", service.kill_all_and_notify),
+            ("H", service.clear_session_history),
+            ("L", service.clear_log_files),
+        ):
             await pilot.press(key, "y")
             method.assert_called_once()
 
@@ -198,7 +215,11 @@ def test_attach_command(monkeypatch, in_tmux, verb):
 
 def test_tab_keys_switch_tabs_and_focus(service):
     async def scenario(app, pilot):
-        for key, tab, widget in (("2", "scripts", "#script-list"), ("3", "favorites", "#favorites-table"), ("1", "sessions", "#sessions-table")):
+        for key, tab, widget in (
+            ("2", "scripts", "#script-list"),
+            ("3", "favorites", "#favorites-table"),
+            ("1", "sessions", "#sessions-table"),
+        ):
             await pilot.press(key)
             await pilot.pause()
             assert app.query_one(TabbedContent).active == tab
