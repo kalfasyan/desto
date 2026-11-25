@@ -52,13 +52,16 @@ dev-install:  ## Install package in development mode with dev dependencies
 	uv sync --extra dev
 
 docs-build:  ## Install docs dependencies and build the MkDocs documentation site
-	uv sync --extra docs
-	uv run --extra docs mkdocs build -f mkdocs.yml
+	uv sync --group docs
+	uv run --group docs mkdocs build -f mkdocs.yml
+
+docs-requirements:  ## Regenerate docs/requirements-docs.txt (used by Read the Docs) from the docs group in uv.lock
+	uv export --frozen --only-group docs --no-hashes --format requirements-txt -o docs/requirements-docs.txt
 
 docs-serve:  ## Install docs dependencies and serve the MkDocs site locally at http://127.0.0.1:8000
-	uv sync --extra docs
+	uv sync --group docs
 	# Use uv run so the correct project venv and deps are used
-	uv run --extra docs mkdocs serve -f mkdocs.yml
+	uv run --group docs mkdocs serve -f mkdocs.yml
 
 publish:  ## Publish to PyPI (manual - normally done by GitHub Actions)
 	@echo "⚠️  Note: Publishing is normally automated via GitHub Actions"
