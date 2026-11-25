@@ -4,10 +4,25 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-
-import requests
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
+
+
+def _http_request(url: str, headers: dict, data: Optional[dict] = None, timeout: float = 5) -> tuple[int, str, dict]:
+    """Send a GET (or a JSON POST when ``data`` is given) and return (status, body, headers).
+
+    Non-2xx responses are returned like any other response instead of raising.
+    Network errors still raise.
+    """
+    body = json.dumps(data).encode("utf-8") if data is not None else None
+    req = Request(url, data=body, headers=headers, method="POST" if body is not None else "GET")
+    try:
+        with urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read().decode("utf-8", errors="replace"), dict(resp.headers)
+    except HTTPError as e:
+        return e.code, e.read().decode("utf-8", errors="replace"), dict(e.headers or {})
 
 
 class PushbulletNotifier:
@@ -52,24 +67,19 @@ class PushbulletNotifier:
             payload["device_iden"] = device_iden
 
         try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=5)
-            status = resp.status_code
-            text = resp.text
+            status, text, resp_headers = _http_request(url, headers=headers, data=payload)
             # Log detailed response for debugging (headers + body)
-            try:
-                logger.debug("Pushbullet response headers: %s", dict(resp.headers))
-            except Exception:
-                logger.debug("Pushbullet response headers: <unavailable>")
+            logger.debug("Pushbullet response headers: %s", resp_headers)
 
             # Log body at debug level for full inspection; keep info/warn for status
             logger.debug("Pushbullet response body: %s", text)
 
             if status == 200:
                 logger.info("Pushbullet notification sent (200)")
-                return {"ok": True, "status_code": status, "body": text, "headers": dict(resp.headers)}
+                return {"ok": True, "status_code": status, "body": text, "headers": resp_headers}
             else:
                 logger.warning(f"Pushbullet failed ({status}): {text}")
-                return {"ok": False, "status_code": status, "body": text, "headers": dict(resp.headers)}
+                return {"ok": False, "status_code": status, "body": text, "headers": resp_headers}
         except Exception as e:
             logger.exception(f"Pushbullet notification error: {e}")
             return {"ok": False, "status_code": None, "body": str(e)}
@@ -84,12 +94,12 @@ class PushbulletNotifier:
         try:
             url = "https://api.pushbullet.com/v2/devices"
             headers = {"Access-Token": self.api_key}
-            resp = requests.get(url, headers=headers, timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
+            status, text, _ = _http_request(url, headers=headers)
+            if status == 200:
+                data = json.loads(text)
                 return data.get("devices", [])
             else:
-                logger.debug(f"Failed to list Pushbullet devices ({resp.status_code}): {resp.text}")
+                logger.debug(f"Failed to list Pushbullet devices ({status}): {text}")
                 return []
         except Exception as e:
             logger.debug(f"Exception listing Pushbullet devices: {e}")
