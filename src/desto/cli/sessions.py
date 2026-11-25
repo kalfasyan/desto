@@ -241,7 +241,7 @@ def session_usage(
     """Show CPU, memory and IO recorded for each session (see `desto-cli monitor`)."""
     from datetime import datetime
 
-    from desto.app.config import config as ui_settings
+    from desto.config import config as ui_settings
     from desto.core.formatting import format_bytes, format_seconds
     from desto.core.session_metrics import KEY_PREFIX, read_summaries
     from desto.redis.client import DestoRedisClient

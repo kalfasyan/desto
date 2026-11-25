@@ -54,7 +54,7 @@ SQLITE_ENABLED=true desto
 | `SQLITE_ENABLED` | `false` | Enable or disable the SQLite store. Accepts `true`, `1`, `yes`, or `on`. |
 | `SQLITE_DB_PATH` | `desto_data/desto.db` | Path to the SQLite database file. Parent directories are created automatically. |
 
-These can also be configured in the `SQLiteSettings` dataclass in `src/desto/app/config.py`.
+These can also be configured in the `SQLiteSettings` dataclass in `src/desto/config.py`.
 
 ## What Gets Stored
 

@@ -1,6 +1,6 @@
 ## Environment Variables
 
-desto can be configured using environment variables. These override the default values in the `UISettings` dataclass (`src/desto/app/config.py`).
+desto can be configured using environment variables. These override the default values in the `UISettings` dataclass (`src/desto/config.py`).
 
 ### Redis
 

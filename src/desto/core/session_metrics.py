@@ -476,7 +476,7 @@ def start_background_sampler(settings: Optional[dict] = None) -> Optional[Sessio
     with _background_lock:
         if _background is not None:
             return _background
-        from desto.app.config import config as default_settings
+        from desto.config import config as default_settings
         from desto.redis.client import DestoRedisClient
 
         settings = settings or default_settings
