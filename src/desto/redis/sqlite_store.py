@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
-from .models import DestoJob, DestoSession, FavoriteCommand, JobStatus, SessionStatus
+from .models import DestoJob, DestoSession, JobStatus, SessionStatus
 
 # Default database path
 _DEFAULT_DB_DIR = os.getenv("DESTO_DATA_DIR", os.path.join(os.getcwd(), "desto_data"))
@@ -473,85 +473,6 @@ class SQLiteStore:
 
     # ─── Favorites Operations ─────────────────────────────────────────────
 
-    def save_favorite(self, favorite: FavoriteCommand) -> bool:
-        """Save or update a favorite command.
-
-        Args:
-            favorite: FavoriteCommand object to persist.
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        if not self.enabled:
-            return False
-
-        try:
-            conn = self._get_connection()
-            conn.execute(
-                """
-                INSERT INTO favorites (favorite_id, name, command, created_at,
-                                       last_used_at, use_count, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                ON CONFLICT(favorite_id) DO UPDATE SET
-                    name=excluded.name,
-                    command=excluded.command,
-                    last_used_at=excluded.last_used_at,
-                    use_count=excluded.use_count,
-                    updated_at=datetime('now')
-                """,
-                (
-                    favorite.favorite_id,
-                    favorite.name,
-                    favorite.command,
-                    favorite.created_at.isoformat() if favorite.created_at else None,
-                    favorite.last_used_at.isoformat() if favorite.last_used_at else None,
-                    favorite.use_count,
-                ),
-            )
-            conn.commit()
-            return True
-        except Exception as e:
-            logger.error(f"SQLite: Failed to save favorite {favorite.favorite_id}: {e}")
-            return False
-
-    def get_all_favorites(self) -> List[FavoriteCommand]:
-        """Get all favorite commands.
-
-        Returns:
-            List of FavoriteCommand objects.
-        """
-        if not self.enabled:
-            return []
-
-        try:
-            conn = self._get_connection()
-            cursor = conn.execute("SELECT * FROM favorites ORDER BY use_count DESC, name ASC")
-            return [self._row_to_favorite(row) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"SQLite: Failed to get favorites: {e}")
-            return []
-
-    def delete_favorite(self, favorite_id: str) -> bool:
-        """Delete a favorite command.
-
-        Args:
-            favorite_id: The favorite UUID to delete.
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        if not self.enabled:
-            return False
-
-        try:
-            conn = self._get_connection()
-            conn.execute("DELETE FROM favorites WHERE favorite_id = ?", (favorite_id,))
-            conn.commit()
-            return True
-        except Exception as e:
-            logger.error(f"SQLite: Failed to delete favorite {favorite_id}: {e}")
-            return False
-
     # ─── Utility Methods ──────────────────────────────────────────────────
 
     def clear_sessions_and_jobs(self) -> bool:
@@ -575,48 +496,6 @@ class SQLiteStore:
         except Exception as e:
             logger.error(f"SQLite: Failed to clear sessions/jobs: {e}")
             return False
-
-    def clear_all(self) -> bool:
-        """Clear all data from the store. Use with caution.
-
-        Returns:
-            True if successful, False otherwise.
-        """
-        if not self.enabled:
-            return False
-
-        try:
-            conn = self._get_connection()
-            conn.executescript("""
-                DELETE FROM jobs;
-                DELETE FROM sessions;
-                DELETE FROM favorites;
-            """)
-            conn.commit()
-            logger.warning("SQLite: All data cleared")
-            return True
-        except Exception as e:
-            logger.error(f"SQLite: Failed to clear data: {e}")
-            return False
-
-    def get_stats(self) -> Dict[str, int]:
-        """Get storage statistics.
-
-        Returns:
-            Dictionary with counts for sessions, jobs, and favorites.
-        """
-        if not self.enabled:
-            return {"sessions": 0, "jobs": 0, "favorites": 0}
-
-        try:
-            conn = self._get_connection()
-            sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-            jobs = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
-            favorites = conn.execute("SELECT COUNT(*) FROM favorites").fetchone()[0]
-            return {"sessions": sessions, "jobs": jobs, "favorites": favorites}
-        except Exception as e:
-            logger.error(f"SQLite: Failed to get stats: {e}")
-            return {"sessions": 0, "jobs": 0, "favorites": 0}
 
     def close(self):
         """Close the database connection for the current thread."""
@@ -655,16 +534,4 @@ class SQLiteStore:
             end_time=datetime.fromisoformat(row["end_time"]) if row["end_time"] else None,
             exit_code=row["exit_code"],
             error_message=row["error_message"] or None,
-        )
-
-    @staticmethod
-    def _row_to_favorite(row: sqlite3.Row) -> FavoriteCommand:
-        """Convert a database row to a FavoriteCommand object."""
-        return FavoriteCommand(
-            favorite_id=row["favorite_id"],
-            name=row["name"],
-            command=row["command"],
-            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
-            last_used_at=datetime.fromisoformat(row["last_used_at"]) if row["last_used_at"] else None,
-            use_count=row["use_count"],
         )
