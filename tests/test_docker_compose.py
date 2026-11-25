@@ -22,7 +22,10 @@ from .docker_test_utils import (
 pytestmark = [
     pytest.mark.slow,
     pytest.mark.docker,
-    pytest.mark.skipif(not ensure_docker_available() or not ensure_docker_compose_available(), reason="Docker and Docker Compose are required for these tests."),
+    pytest.mark.skipif(
+        not ensure_docker_available() or not ensure_docker_compose_available(),
+        reason="Docker and Docker Compose are required for these tests.",
+    ),
 ]
 
 
@@ -53,7 +56,9 @@ class TestDockerCompose:
         check_for_existing_containers()
 
         # Detect whether desto containers are already present (e.g. started by class fixture)
-        res = subprocess.run(["docker", "ps", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True)
+        res = subprocess.run(
+            ["docker", "ps", "--filter", "name=desto-", "--format", "{{.Names}}"], capture_output=True, text=True
+        )
         containers_present = bool(res.stdout.strip())
 
         # Cleanup only if no desto containers are present; this avoids removing class-level compose
@@ -146,8 +151,16 @@ class TestDockerCompose:
 
         # Check that the files exist inside the container
         logger.info("Checking if files are accessible inside container...")
-        result_script = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"], capture_output=True, text=True)
-        result_log = subprocess.run(["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"], capture_output=True, text=True)
+        result_script = subprocess.run(
+            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_scripts/test_script.txt"],
+            capture_output=True,
+            text=True,
+        )
+        result_log = subprocess.run(
+            ["docker", "compose", "exec", "-T", "dashboard", "cat", "/app/desto_logs/test_log.txt"],
+            capture_output=True,
+            text=True,
+        )
 
         if result_script.returncode == 0:
             logger.info("Script file successfully accessed in container")
@@ -180,7 +193,9 @@ class TestDockerCompose:
 
         # Wait (short) for container to be running
         for _ in range(6):
-            status = subprocess.run(["docker", "compose", "ps", "--services", "--filter", "status=running"], capture_output=True, text=True)
+            status = subprocess.run(
+                ["docker", "compose", "ps", "--services", "--filter", "status=running"], capture_output=True, text=True
+            )
             if "dashboard" in status.stdout:
                 break
             time.sleep(0.5)

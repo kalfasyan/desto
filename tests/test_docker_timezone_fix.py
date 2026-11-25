@@ -39,7 +39,9 @@ def ensure_docker_containers(docker_compose):
     project_root = Path(__file__).parent.parent.resolve()
 
     # Check if desto-dashboard container is running
-    result = subprocess.run(["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["docker", "ps", "--filter", "name=desto-dashboard", "--format", "{{.Names}}"], capture_output=True, text=True
+    )
 
     if "desto-dashboard" not in result.stdout:
         # Clean up any existing desto containers first
@@ -68,7 +70,9 @@ def test_docker_container_timezone():
     host_date = subprocess.run(["date"], capture_output=True, text=True).stdout.strip()
 
     # Get container timezone
-    container_date = subprocess.run(["docker", "exec", "desto-dashboard", "date"], capture_output=True, text=True).stdout.strip()
+    container_date = subprocess.run(
+        ["docker", "exec", "desto-dashboard", "date"], capture_output=True, text=True
+    ).stdout.strip()
 
     print(f"Host date: {host_date}")
     print(f"Container date: {container_date}")
@@ -76,7 +80,9 @@ def test_docker_container_timezone():
     # Accept either matching timezone or UTC (common in Docker containers)
     # Both should contain CEST/CET or both use UTC
     if "CEST" in host_date:
-        assert "CEST" in container_date or "UTC" in container_date, "Container should use CEST timezone like host or UTC"
+        assert "CEST" in container_date or "UTC" in container_date, (
+            "Container should use CEST timezone like host or UTC"
+        )
     elif "CET" in host_date:
         assert "CET" in container_date or "UTC" in container_date, "Container should use CET timezone like host or UTC"
 
@@ -86,7 +92,9 @@ def test_docker_container_timezone():
 
 def test_docker_timezone_symlink():
     """Test that timezone symlink is correctly configured."""
-    result = subprocess.run(["docker", "exec", "desto-dashboard", "ls", "-la", "/etc/localtime"], capture_output=True, text=True)
+    result = subprocess.run(
+        ["docker", "exec", "desto-dashboard", "ls", "-la", "/etc/localtime"], capture_output=True, text=True
+    )
 
     assert "Europe/Berlin" in result.stdout, f"Expected Europe/Berlin timezone, got: {result.stdout}"
 
@@ -103,7 +111,9 @@ def test_scheduling_validation_past_date():
     # Test past date validation using the same logic as the UI
     python_code = 'from datetime import datetime; past_dt = datetime.strptime("2025-07-11 10:00", "%Y-%m-%d %H:%M"); now = datetime.now(); delta = (past_dt - now).total_seconds(); print(f"DELTA:{delta}"); print(f"VALID:{delta < 0}")'
 
-    result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
+    result = subprocess.run(
+        ["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True
+    )
 
     lines = result.stdout.strip().split("\n")
     delta_line = [line for line in lines if line.startswith("DELTA:")]
@@ -127,7 +137,9 @@ def test_scheduling_validation_future_date():
     future_dt = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
     python_code = f'from datetime import datetime; future_dt = datetime.strptime("{future_dt}", "%Y-%m-%d %H:%M"); now = datetime.now(); delta = (future_dt - now).total_seconds(); print(f"DELTA:{{delta}}"); print(f"VALID:{{delta > 0}}")'
 
-    result = subprocess.run(["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True)
+    result = subprocess.run(
+        ["docker", "exec", "desto-dashboard", "uv", "run", "python", "-c", python_code], capture_output=True, text=True
+    )
 
     lines = result.stdout.strip().split("\n")
     delta_line = [line for line in lines if line.startswith("DELTA:")]

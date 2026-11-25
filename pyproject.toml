@@ -45,7 +45,7 @@ build-backend = "hatchling.build"
 path = "src/desto/_version.py"
 
 [tool.ruff]
-line-length = 250  # Increased to handle long UI strings and f-strings
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -67,6 +67,7 @@ ignore = [
     "D106",  # Missing docstring in public nested class
     "D107",  # Missing docstring in __init__
     "D205",  # 1 blank line required between summary line and description
+    "E501",  # line length is the formatter's job; it leaves long string literals (CSS classes, messages) whole
 ]
 
 [tool.ruff.lint.mccabe]

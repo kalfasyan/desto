@@ -75,7 +75,9 @@ class FavoritesPane(Vertical):
                 else:
                     self.notify("Failed to save (name may exist)", severity="error")
 
-        self.app.push_screen(FormScreen("New favorite", [("name", "Name", ""), ("command", "Command", "")], validate=_required), done)
+        self.app.push_screen(
+            FormScreen("New favorite", [("name", "Name", ""), ("command", "Command", "")], validate=_required), done
+        )
 
     def action_edit(self) -> None:
         favorite = self.selected()
@@ -103,7 +105,9 @@ class FavoritesPane(Vertical):
                 self.notify(f"Deleted: {favorite.name}")
                 self.reload()
 
-        self.app.push_screen(ConfirmScreen("Delete favorite", f"Delete '{favorite.name}'? This cannot be undone.", "Delete"), done)
+        self.app.push_screen(
+            ConfirmScreen("Delete favorite", f"Delete '{favorite.name}'? This cannot be undone.", "Delete"), done
+        )
 
     def action_delete_all(self) -> None:
         count = len(self.manager.list_favorites())
@@ -118,6 +122,11 @@ class FavoritesPane(Vertical):
 
         message = f'This permanently deletes all {count} favorite(s). Type "DELETE" to confirm.'
         self.app.push_screen(
-            FormScreen("Delete ALL favorites", [("confirm", message, "")], "Delete all", validate=lambda v: None if v["confirm"] == "DELETE" else 'Type "DELETE" to confirm.'),
+            FormScreen(
+                "Delete ALL favorites",
+                [("confirm", message, "")],
+                "Delete all",
+                validate=lambda v: None if v["confirm"] == "DELETE" else 'Type "DELETE" to confirm.',
+            ),
             done,
         )

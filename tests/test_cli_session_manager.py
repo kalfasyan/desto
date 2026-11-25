@@ -96,8 +96,20 @@ class TestSessionManagement:
     def test_list_sessions_with_active_sessions(self, session_manager):
         """Test listing active sessions (Redis-centric)."""
         mock_sessions = [
-            Mock(session_name="session1", session_id="1", start_time=datetime.now(), end_time=None, status=Mock(value="running")),
-            Mock(session_name="session2", session_id="2", start_time=datetime.now(), end_time=datetime.now(), status=Mock(value="finished")),
+            Mock(
+                session_name="session1",
+                session_id="1",
+                start_time=datetime.now(),
+                end_time=None,
+                status=Mock(value="running"),
+            ),
+            Mock(
+                session_name="session2",
+                session_id="2",
+                start_time=datetime.now(),
+                end_time=datetime.now(),
+                status=Mock(value="finished"),
+            ),
         ]
         with patch.object(SessionManager, "list_all_sessions", return_value=mock_sessions):
             sessions = session_manager.list_sessions()
@@ -124,7 +136,10 @@ class TestSessionManagement:
 
     def test_kill_all_sessions_success(self, session_manager):
         """Test killing all sessions successfully."""
-        with patch.object(session_manager, "list_sessions") as mock_list, patch.object(session_manager, "kill_session", return_value=True):
+        with (
+            patch.object(session_manager, "list_sessions") as mock_list,
+            patch.object(session_manager, "kill_session", return_value=True),
+        ):
             mock_list.return_value = {"session1": {}, "session2": {}}
             with patch("desto.cli.session_manager.subprocess.run") as mock_run:
                 mock_run.return_value = Mock(returncode=0)
@@ -146,7 +161,10 @@ class TestSessionManagement:
 
     def test_kill_all_sessions_partial_failure(self, session_manager):
         """Test killing all sessions with some failures."""
-        with patch.object(session_manager, "list_sessions") as mock_list, patch.object(session_manager, "kill_session", side_effect=[True, False]):
+        with (
+            patch.object(session_manager, "list_sessions") as mock_list,
+            patch.object(session_manager, "kill_session", side_effect=[True, False]),
+        ):
             mock_list.return_value = {"session1": {}, "session2": {}}
             with patch("desto.cli.session_manager.subprocess.run") as mock_run:
                 mock_run.return_value = Mock(returncode=0)
@@ -288,7 +306,9 @@ class TestErrorHandling:
 
     def test_list_sessions_general_exception(self, session_manager):
         """Test handling of general exception during session listing."""
-        with patch("desto.cli.session_manager.SessionManager.list_all_sessions", side_effect=Exception("Unexpected error")):
+        with patch(
+            "desto.cli.session_manager.SessionManager.list_all_sessions", side_effect=Exception("Unexpected error")
+        ):
             sessions = session_manager.list_sessions()
         assert sessions == {}
 

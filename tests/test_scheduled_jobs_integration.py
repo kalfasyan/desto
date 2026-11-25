@@ -202,7 +202,9 @@ class TestCombinedFunctionalityIntegration:
             test_session_count = len([s for s in initial_sessions.keys() if s.startswith("test_session_")])
 
             # Kill all sessions and jobs
-            session_success, session_total, job_success, job_total, all_errors = tmux_manager.kill_all_sessions_and_jobs()
+            session_success, session_total, job_success, job_total, all_errors = (
+                tmux_manager.kill_all_sessions_and_jobs()
+            )
 
             # Verify results
             assert isinstance(session_success, int)

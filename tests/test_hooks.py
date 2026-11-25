@@ -16,7 +16,9 @@ from desto.store.models import SessionStatus
 
 
 def run_hook(module, *args, cwd):
-    return subprocess.run([sys.executable, "-m", f"desto.hooks.{module}", *args], cwd=cwd, capture_output=True, text=True, timeout=30)
+    return subprocess.run(
+        [sys.executable, "-m", f"desto.hooks.{module}", *args], cwd=cwd, capture_output=True, text=True, timeout=30
+    )
 
 
 @pytest.mark.parametrize("module", ["mark_job_finished", "start_scheduled_session"])

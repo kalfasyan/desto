@@ -35,7 +35,14 @@ def _jobs_redis(jobs):
 def test_job_info_reads_all_jobs_in_one_batch(tmux):
     tmux.redis_client.redis = _jobs_redis(
         [
-            {"job_id": "a", "session_id": "s1", "status": "failed", "exit_code": "", "error_message": "Job exited with code 3", "command": "echo a"},
+            {
+                "job_id": "a",
+                "session_id": "s1",
+                "status": "failed",
+                "exit_code": "",
+                "error_message": "Job exited with code 3",
+                "command": "echo a",
+            },
             {"job_id": "b", "session_id": "s2", "status": "finished", "exit_code": "0", "command": "echo b"},
             {"job_id": "c", "session_id": "s3", "status": "running", "command": "sleep 9"},
         ]
@@ -51,7 +58,12 @@ def test_job_info_reads_all_jobs_in_one_batch(tmux):
     "session,active,job_info,expected",
     [
         ({"status": "finished"}, False, {}, ("finished", "✅ Finished")),
-        ({"status": "failed", "session_id": "s"}, False, {"s": {"status": "failed", "exit_code": "2"}}, ("failed", "❌ Failed · exit 2")),
+        (
+            {"status": "failed", "session_id": "s"},
+            False,
+            {"s": {"status": "failed", "exit_code": "2"}},
+            ("failed", "❌ Failed · exit 2"),
+        ),
         ({"status": "running"}, True, {}, ("running", "🟡 Running")),
         ({"status": "running"}, False, {}, ("failed", "❌ Failed (tmux closed)")),
         ({"status": "running", "end_time": "2025-01-01T00:00:00"}, False, {}, ("finished", "✅ Finished")),
@@ -111,7 +123,10 @@ def test_set_status_filter_toggles(tmux):
 def test_rerun_uses_next_free_name(tmux):
     tmux.check_sessions = Mock(return_value={})
     tmux.desto_manager = MagicMock()
-    tmux.desto_manager.session_manager.list_all_sessions.return_value = [Mock(session_name="train"), Mock(session_name="train-2")]
+    tmux.desto_manager.session_manager.list_all_sessions.return_value = [
+        Mock(session_name="train"),
+        Mock(session_name="train-2"),
+    ]
     tmux.start_tmux_session = Mock()
     tmux.on_sessions_changed = Mock()
 

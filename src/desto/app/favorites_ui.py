@@ -32,24 +32,46 @@ class FavoritesTab:
         with self.favorites_container:
             with ui.grid(columns="repeat(auto-fill, minmax(300px, 1fr))").classes("w-full gap-4"):
                 for favorite in favorites:
-                    with ui.card().props("flat").classes("modern-card p-6 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"):
+                    with (
+                        ui.card()
+                        .props("flat")
+                        .classes(
+                            "modern-card p-6 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
+                        )
+                    ):
                         with ui.column().classes("w-full gap-3"):
                             with ui.row().classes("w-full justify-between items-start"):
                                 ui.label(favorite.name).classes("text-lg font-bold text-slate-900 dark:text-white")
                                 with ui.row().classes("gap-1"):
-                                    ui.button(icon="play_arrow", on_click=lambda f=favorite: self._run_favorite(f.favorite_id, f.name, f.command)).props("flat round color=positive dense")
-                                    ui.button(icon="edit", on_click=lambda f=favorite: self._edit_favorite(f.favorite_id)).props("flat round color=primary dense")
-                                    ui.button(icon="delete", on_click=lambda f=favorite: self._delete_favorite(f.favorite_id, f.name)).props("flat round color=negative dense")
+                                    ui.button(
+                                        icon="play_arrow",
+                                        on_click=lambda f=favorite: self._run_favorite(
+                                            f.favorite_id, f.name, f.command
+                                        ),
+                                    ).props("flat round color=positive dense")
+                                    ui.button(
+                                        icon="edit", on_click=lambda f=favorite: self._edit_favorite(f.favorite_id)
+                                    ).props("flat round color=primary dense")
+                                    ui.button(
+                                        icon="delete",
+                                        on_click=lambda f=favorite: self._delete_favorite(f.favorite_id, f.name),
+                                    ).props("flat round color=negative dense")
 
-                            ui.label(favorite.command).classes("font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 break-all w-full")
+                            ui.label(favorite.command).classes(
+                                "font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 break-all w-full"
+                            )
 
                             with ui.row().classes("w-full justify-between items-center mt-2"):
-                                with ui.row().classes("items-center gap-1 text-[10px] text-slate-400 uppercase tracking-wider"):
+                                with ui.row().classes(
+                                    "items-center gap-1 text-[10px] text-slate-400 uppercase tracking-wider"
+                                ):
                                     ui.icon("trending_up", size="12px")
                                     ui.label(f"{favorite.use_count} uses")
 
                                 if favorite.last_used_at:
-                                    ui.label(f"Used {favorite.last_used_at.strftime('%m/%d %H:%M')}").classes("text-[10px] text-slate-400")
+                                    ui.label(f"Used {favorite.last_used_at.strftime('%m/%d %H:%M')}").classes(
+                                        "text-[10px] text-slate-400"
+                                    )
 
     def _run_favorite(self, favorite_id: str, favorite_name: str, command: str):
         """Run a favorite command in a new session."""
@@ -77,7 +99,10 @@ class FavoritesTab:
 
                 with ui.row().classes("w-full justify-end gap-2 mt-6"):
                     ui.button("Cancel", on_click=dialog.close).props("flat color=slate-500")
-                    ui.button("Save Changes", on_click=lambda: self._save_favorite_edit(favorite_id, name_input, command_input, dialog)).props("unelevated color=primary")
+                    ui.button(
+                        "Save Changes",
+                        on_click=lambda: self._save_favorite_edit(favorite_id, name_input, command_input, dialog),
+                    ).props("unelevated color=primary")
 
         dialog.open()
 
@@ -104,7 +129,10 @@ class FavoritesTab:
                 ui.label("This action cannot be undone.").classes("text-slate-500 mb-6")
                 with ui.row().classes("w-full justify-end gap-2"):
                     ui.button("Cancel", on_click=confirm_dialog.close).props("flat color=slate-500")
-                    ui.button("Delete Permanent", on_click=lambda: self._confirm_delete(favorite_id, favorite_name, confirm_dialog)).props("unelevated color=negative")
+                    ui.button(
+                        "Delete Permanent",
+                        on_click=lambda: self._confirm_delete(favorite_id, favorite_name, confirm_dialog),
+                    ).props("unelevated color=negative")
         confirm_dialog.open()
 
     def _confirm_delete(self, favorite_id: str, favorite_name: str, dialog):
@@ -125,10 +153,14 @@ class FavoritesTab:
         with ui.dialog() as dialog:
             with ui.card().classes("p-6 w-96"):
                 ui.label("Save as Favorite").classes("text-xl font-bold mb-4")
-                name_input = ui.input(label="Favorite Name", value=session_name_input.value if session_name_input.value else "").classes("w-full")
+                name_input = ui.input(
+                    label="Favorite Name", value=session_name_input.value if session_name_input.value else ""
+                ).classes("w-full")
                 with ui.row().classes("w-full justify-end gap-2 mt-6"):
                     ui.button("Cancel", on_click=dialog.close).props("flat color=slate-500")
-                    ui.button("Save Favorite", on_click=lambda: self._save_new_favorite(name_input, command_input, dialog)).props("unelevated color=primary")
+                    ui.button(
+                        "Save Favorite", on_click=lambda: self._save_new_favorite(name_input, command_input, dialog)
+                    ).props("unelevated color=primary")
         dialog.open()
 
     def _save_new_favorite(self, name_input, command_input, dialog):
@@ -160,9 +192,13 @@ class FavoritesTab:
                 with ui.row().classes("items-center gap-2 mb-4"):
                     ui.icon("warning", color="red").classes("text-3xl")
                     ui.label("Delete ALL Favorites").classes("text-xl font-bold text-red-600")
-                ui.label(f"You are about to permanently delete all {count} favorite command(s). This will remove them from Redis and cannot be undone.").classes("text-slate-500 mb-4")
+                ui.label(
+                    f"You are about to permanently delete all {count} favorite command(s). This will remove them from Redis and cannot be undone."
+                ).classes("text-slate-500 mb-4")
 
-                ui.label('Type "DELETE" to confirm:').classes("text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1")
+                ui.label('Type "DELETE" to confirm:').classes(
+                    "text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1"
+                )
                 confirm_input = ui.input(placeholder="DELETE").props("dense outlined").classes("w-full mb-4")
 
                 delete_btn = ui.button(
@@ -199,7 +235,12 @@ class FavoritesTab:
             with ui.row().classes("w-full justify-between items-center mb-6"):
                 ui.label("Favorite Commands").classes("text-lg font-bold text-slate-900 dark:text-white")
                 with ui.row().classes("items-center gap-3"):
-                    self.search_input = ui.input(placeholder="Search favorites...").on("keyup", lambda: self.refresh_favorites_list()).props("dense outlined rounded").classes("w-64")
+                    self.search_input = (
+                        ui.input(placeholder="Search favorites...")
+                        .on("keyup", lambda: self.refresh_favorites_list())
+                        .props("dense outlined rounded")
+                        .classes("w-64")
+                    )
                     ui.button(
                         "Clear All",
                         icon="delete_forever",

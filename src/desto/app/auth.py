@@ -122,7 +122,12 @@ def setup_auth(password: str) -> None:
 
         with ui.card().classes("absolute-center w-80 gap-4"):
             ui.label("desto").classes("text-2xl font-black tracking-tighter text-primary italic uppercase")
-            password_input = ui.input("Password", password=True, password_toggle_button=True).props("autofocus").classes("w-full").on("keydown.enter", try_login)
+            password_input = (
+                ui.input("Password", password=True, password_toggle_button=True)
+                .props("autofocus")
+                .classes("w-full")
+                .on("keydown.enter", try_login)
+            )
             ui.button("Log in", on_click=try_login).classes("w-full")
         return None
 

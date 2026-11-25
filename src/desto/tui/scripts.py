@@ -17,7 +17,11 @@ LANGUAGES = {"python": "python", "bash": "bash"}
 
 
 def _name_error(values: dict) -> str | None:
-    return None if scripts.is_valid_name(values["name"].replace(" ", "_")) else f"Use 1-{scripts.MAX_NAME_LENGTH} letters, digits, '_' or '-'."
+    return (
+        None
+        if scripts.is_valid_name(values["name"].replace(" ", "_"))
+        else f"Use 1-{scripts.MAX_NAME_LENGTH} letters, digits, '_' or '-'."
+    )
 
 
 class ScriptsPane(Horizontal):
@@ -141,7 +145,11 @@ class ScriptsPane(Horizontal):
         """(command, script paths, description) for the chain if there is one, else for the selected script."""
         python = self.service.python_executable
         if self.chain:
-            return scripts.chain_command(self.chain, python), [p for p, _ in self.chain], f"chain of {len(self.chain)} scripts"
+            return (
+                scripts.chain_command(self.chain, python),
+                [p for p, _ in self.chain],
+                f"chain of {len(self.chain)} scripts",
+            )
         path = self._selected_path()
         if path is None:
             return None
@@ -167,7 +175,9 @@ class ScriptsPane(Horizontal):
         command, paths, what = plan
 
         def schedule(when, interval_minutes):
-            return self.service.schedule_launch(self._session_name(), command, paths, self._arguments(), when, interval_minutes)
+            return self.service.schedule_launch(
+                self._session_name(), command, paths, self._arguments(), when, interval_minutes
+            )
 
         def done(scheduled: bool | None) -> None:
             if scheduled:
@@ -192,7 +202,9 @@ class ScriptsPane(Horizontal):
     def show_chain(self) -> None:
         self.query_one("#chain-row").display = bool(self.chain)
         steps = "  →  ".join(f"[b]{i}[/] {Path(p).name} [dim]{args}[/]" for i, (p, args) in enumerate(self.chain, 1))
-        self.query_one("#chain", Static).update(f"Chain: {steps}   [dim](launch runs them in order; ctrl+b adds the selected script)[/]")
+        self.query_one("#chain", Static).update(
+            f"Chain: {steps}   [dim](launch runs them in order; ctrl+b adds the selected script)[/]"
+        )
 
     def action_favorite(self) -> None:
         path = self._selected_path()
@@ -210,7 +222,14 @@ class ScriptsPane(Horizontal):
                 self.notify("Failed to save (name may exist)", severity="error")
 
         fields = [("name", "Favorite name", self._session_name() or path.stem), ("command", "Command", command)]
-        self.app.push_screen(FormScreen("Save as favorite", fields, validate=lambda v: None if v["name"] and v["command"] else "Name and command are required."), done)
+        self.app.push_screen(
+            FormScreen(
+                "Save as favorite",
+                fields,
+                validate=lambda v: None if v["name"] and v["command"] else "Name and command are required.",
+            ),
+            done,
+        )
 
     def action_save(self) -> None:
         path = self._selected_path()
@@ -224,7 +243,9 @@ class ScriptsPane(Horizontal):
 
     def action_save_as(self) -> None:
         kind = scripts.script_type(self.current or "") if self.current else "bash"
-        self._create_script("Save as new script", self.query_one("#editor", TextArea).text, "bash" if kind == "unknown" else kind)
+        self._create_script(
+            "Save as new script", self.query_one("#editor", TextArea).text, "bash" if kind == "unknown" else kind
+        )
 
     def action_new_script(self) -> None:
         def done(values: dict | None) -> None:
@@ -232,7 +253,10 @@ class ScriptsPane(Horizontal):
                 kind = "python" if values["type"].lower().startswith("p") else "bash"
                 self._write_new(values["name"], scripts.TEMPLATES[kind], kind)
 
-        fields = [("name", f"Script name (max {scripts.MAX_NAME_LENGTH} characters)", ""), ("type", "Type: bash or python", "bash")]
+        fields = [
+            ("name", f"Script name (max {scripts.MAX_NAME_LENGTH} characters)", ""),
+            ("type", "Type: bash or python", "bash"),
+        ]
         self.app.push_screen(FormScreen("New script", fields, "Create", validate=_name_error), done)
 
     def _create_script(self, title: str, code: str, kind: str) -> None:
@@ -240,7 +264,12 @@ class ScriptsPane(Horizontal):
             if values:
                 self._write_new(values["name"], code, kind)
 
-        self.app.push_screen(FormScreen(title, [("name", f"Script name (max {scripts.MAX_NAME_LENGTH} characters)", "")], validate=_name_error), done)
+        self.app.push_screen(
+            FormScreen(
+                title, [("name", f"Script name (max {scripts.MAX_NAME_LENGTH} characters)", "")], validate=_name_error
+            ),
+            done,
+        )
 
     def _write_new(self, name: str, code: str, kind: str) -> None:
         target = self.service.get_script_file(f"{name.replace(' ', '_')}{scripts.EXTENSIONS[kind]}")
@@ -265,4 +294,6 @@ class ScriptsPane(Horizontal):
                 self.reload_scripts()
                 self.notify(f"Deleted script: {path.name}")
 
-        self.app.push_screen(ConfirmScreen("Delete script", f"Delete '{path.name}'? This cannot be undone.", "Delete"), done)
+        self.app.push_screen(
+            ConfirmScreen("Delete script", f"Delete '{path.name}'? This cannot be undone.", "Delete"), done
+        )

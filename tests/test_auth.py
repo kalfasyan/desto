@@ -9,7 +9,14 @@ from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 
-from desto.app.auth import AuthMiddleware, check_password, get_auth_config, is_loopback, safe_redirect_target, setup_auth
+from desto.app.auth import (
+    AuthMiddleware,
+    check_password,
+    get_auth_config,
+    is_loopback,
+    safe_redirect_target,
+    setup_auth,
+)
 
 AUTH_ENV_VARS = ("DESTO_HOST", "DESTO_PORT", "DESTO_PASSWORD", "DESTO_STORAGE_SECRET")
 
@@ -65,7 +72,9 @@ def test_pages_are_served_when_logged_in():
     assert response.text == "dashboard"
 
 
-@pytest.mark.parametrize("host", ["127.0.0.1", "127.5.5.5", "localhost", "LOCALHOST", "::1", "[::1]", "::ffff:127.0.0.1"])
+@pytest.mark.parametrize(
+    "host", ["127.0.0.1", "127.5.5.5", "localhost", "LOCALHOST", "::1", "[::1]", "::ffff:127.0.0.1"]
+)
 def test_is_loopback_accepts_local_addresses(host):
     assert is_loopback(host)
 
@@ -92,7 +101,9 @@ def test_safe_redirect_target_keeps_same_site_paths(target):
     assert safe_redirect_target(target) == target
 
 
-@pytest.mark.parametrize("target", [None, "", "scripts", "//evil.com", "http://evil.com", "https://evil.com/x", "/\\evil.com"])
+@pytest.mark.parametrize(
+    "target", [None, "", "scripts", "//evil.com", "http://evil.com", "https://evil.com/x", "/\\evil.com"]
+)
 def test_safe_redirect_target_falls_back_to_root(target):
     assert safe_redirect_target(target) == "/"
 

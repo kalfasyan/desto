@@ -62,7 +62,10 @@ class ScheduledJobsMixin:
             )
             if not schedule_id:
                 raise ScheduleError("Failed to schedule the first run with 'at'.")
-            self.notify(f"{what} will run {describe_interval(interval_minutes)} starting {when:%Y-%m-%d %H:%M}, as sessions named '{session_name}-<date>-<time>'", "info")
+            self.notify(
+                f"{what} will run {describe_interval(interval_minutes)} starting {when:%Y-%m-%d %H:%M}, as sessions named '{session_name}-<date>-<time>'",
+                "info",
+            )
             return schedule_id
 
         self.desto_manager.start_session_with_job(
@@ -100,7 +103,15 @@ class ScheduledJobsMixin:
             jobs = []
             for job_id, date_time, user in parse_atq_output(result.stdout):
                 command = self._get_scheduled_job_command(job_id) if include_command else ""
-                jobs.append({"id": job_id, "datetime": self._format_scheduled_datetime(date_time), "raw_datetime": date_time, "user": user, "command": command})
+                jobs.append(
+                    {
+                        "id": job_id,
+                        "datetime": self._format_scheduled_datetime(date_time),
+                        "raw_datetime": date_time,
+                        "user": user,
+                        "command": command,
+                    }
+                )
             return jobs
         except Exception as e:
             # Log once at warning level (e.g. `at` not installed), then quietly, since the dashboard polls this.
@@ -268,11 +279,15 @@ class ScheduledJobsMixin:
             return
 
         job_id = metadata.get("job_id")
-        self.logger.info(f"Internal scheduler detected overdue job {job_id} (scheduled for {scheduled_time_str}). Running now.")
+        self.logger.info(
+            f"Internal scheduler detected overdue job {job_id} (scheduled for {scheduled_time_str}). Running now."
+        )
 
         if self._claim_scheduled_job(key):
             # Run the command in a separate thread to not block the UI
-            threading.Thread(target=self._run_overdue_job, args=(metadata.get("command"), job_id, key), daemon=True).start()
+            threading.Thread(
+                target=self._run_overdue_job, args=(metadata.get("command"), job_id, key), daemon=True
+            ).start()
 
     def _claim_scheduled_job(self, key):
         """Atomically move a job from 'scheduled' to 'running_internal' so only one runner executes it."""
@@ -281,7 +296,10 @@ class ScheduledJobsMixin:
                 pipe.watch(key)
                 # Read using the main client, not the pipeline
                 current_status = self.redis_client.redis.hget(key, "status")
-                if current_status and (current_status == "scheduled" or (hasattr(current_status, "decode") and current_status.decode() == "scheduled")):
+                if current_status and (
+                    current_status == "scheduled"
+                    or (hasattr(current_status, "decode") and current_status.decode() == "scheduled")
+                ):
                     pipe.multi()
                     pipe.hset(key, "status", "running_internal")
                     pipe.execute()

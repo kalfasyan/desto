@@ -242,7 +242,9 @@ def edit_script_command(name: str, editor: Optional[str] = None):
 
     if not script_path:
         console.print(f"[red]Script '{name}' not found in {manager.scripts_dir}[/red]")
-        available_scripts = [f.name for f in manager.scripts_dir.glob("*.sh")] + [f.name for f in manager.scripts_dir.glob("*.py")]
+        available_scripts = [f.name for f in manager.scripts_dir.glob("*.sh")] + [
+            f.name for f in manager.scripts_dir.glob("*.py")
+        ]
         if available_scripts:
             console.print(f"Available scripts: {', '.join(available_scripts)}")
         raise typer.Exit(1)
@@ -474,7 +476,10 @@ def copy_script(
 
 @scripts_app.command("chain")
 def chain_scripts(
-    scripts: List[str] = typer.Argument(..., help="Scripts to run in sequence. Each entry can include arguments, e.g. 'myscript.sh arg1 arg2'. Use quotes for scripts with arguments."),
+    scripts: List[str] = typer.Argument(
+        ...,
+        help="Scripts to run in sequence. Each entry can include arguments, e.g. 'myscript.sh arg1 arg2'. Use quotes for scripts with arguments.",
+    ),
     continue_on_error: bool = typer.Option(False, "--continue-on-error", "-c", help="Continue chain if a script fails"),
 ):
     """Run multiple scripts in sequence (chain). Each script can have its own arguments.

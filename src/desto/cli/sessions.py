@@ -250,14 +250,33 @@ def session_usage(
     if not client.is_connected():
         console.print("[red]Redis is not available.[/red]")
         raise typer.Exit(1)
-    keys = [k[len(KEY_PREFIX) : -len(":summary")] for k in client.redis.scan_iter(match=f"{KEY_PREFIX}*:summary", count=500)]
-    summaries = [s for s in read_summaries(client.redis, keys).values() if not session_name or s.get("session_name") == session_name]
+    keys = [
+        k[len(KEY_PREFIX) : -len(":summary")] for k in client.redis.scan_iter(match=f"{KEY_PREFIX}*:summary", count=500)
+    ]
+    summaries = [
+        s
+        for s in read_summaries(client.redis, keys).values()
+        if not session_name or s.get("session_name") == session_name
+    ]
     if not summaries:
-        console.print("[yellow]No usage recorded yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.[/yellow]")
+        console.print(
+            "[yellow]No usage recorded yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.[/yellow]"
+        )
         return
 
     table = Table(title="Session resource usage")
-    for column in ("Session", "State", "CPU now", "Memory now", "Peak memory", "CPU time", "Peak procs", "Read", "Written", "Last sample"):
+    for column in (
+        "Session",
+        "State",
+        "CPU now",
+        "Memory now",
+        "Peak memory",
+        "CPU time",
+        "Peak procs",
+        "Read",
+        "Written",
+        "Last sample",
+    ):
         table.add_column(column)
     for s in sorted(summaries, key=lambda s: float(s.get("last_ts", 0)), reverse=True):
         active = s.get("active") == "1"

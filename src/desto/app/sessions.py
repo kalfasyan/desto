@@ -22,7 +22,9 @@ class TmuxManager(DestoService):
         self.pause_updates = None  # Function to pause updates, set by the dashboard page
         self.resume_updates = None  # Function to resume updates, set by the dashboard page
         self.sessions = {}  # For backward compatibility with tests
-        super().__init__(log_dir=log_dir, scripts_dir=scripts_dir, notifier=self._notify_in_browser, instance_logger=instance_logger)
+        super().__init__(
+            log_dir=log_dir, scripts_dir=scripts_dir, notifier=self._notify_in_browser, instance_logger=instance_logger
+        )
         self.dialogs = SessionDialogs(self)
         self.dashboard = SessionsDashboard(self, self.dialogs, sessions_container)
 

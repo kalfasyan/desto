@@ -57,7 +57,9 @@ class TestDashboardStatusDisplay(unittest.TestCase):
         with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
-            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(
+                self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir
+            )
             mock_desto_manager = Mock(spec=DestoManager)
             tmux_manager.desto_manager = mock_desto_manager
 
@@ -111,7 +113,9 @@ class TestDashboardStatusDisplay(unittest.TestCase):
         with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
             mock_redis_class.return_value = self.mock_redis_client
 
-            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
+            tmux_manager = TmuxManager(
+                self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir
+            )
             mock_desto_manager = Mock(spec=DestoManager)
             tmux_manager.desto_manager = mock_desto_manager
 

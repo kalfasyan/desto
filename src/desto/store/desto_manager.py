@@ -26,7 +26,9 @@ class DestoManager:
         self.favorites_manager = FavoriteCommandsManager(redis_client)
         self.sqlite_store = sqlite_store
 
-    def start_session_with_job(self, session_name: str, command: str, script_path: str, status=None) -> Tuple[DestoSession, DestoJob]:
+    def start_session_with_job(
+        self, session_name: str, command: str, script_path: str, status=None
+    ) -> Tuple[DestoSession, DestoJob]:
         """Start a new session with an initial job. If status is SCHEDULED, do not start immediately."""
         session_status = status if status is not None else SessionStatus.STARTING
         session = self.session_manager.create_session(

@@ -292,7 +292,9 @@ class SQLiteStore:
             logger.error(f"SQLite: Failed to count sessions: {e}")
             return 0
 
-    def search_sessions(self, name_query: str, limit: int = 100, offset: int = 0, status: Optional[str] = None) -> List[DestoSession]:
+    def search_sessions(
+        self, name_query: str, limit: int = 100, offset: int = 0, status: Optional[str] = None
+    ) -> List[DestoSession]:
         """Search sessions by name using SQL LIKE.
 
         Args:
@@ -359,7 +361,10 @@ class SQLiteStore:
         try:
             conn = self._get_connection()
             assignments = ", ".join(f"{k}=?" for k in values)
-            cur = conn.execute(f"UPDATE sessions SET {assignments}, updated_at=datetime('now') WHERE session_id=?", (*values.values(), session_id))
+            cur = conn.execute(
+                f"UPDATE sessions SET {assignments}, updated_at=datetime('now') WHERE session_id=?",
+                (*values.values(), session_id),
+            )
             conn.commit()
             return cur.rowcount > 0
         except Exception as e:
@@ -371,7 +376,11 @@ class SQLiteStore:
         if not self.enabled:
             return {}
         try:
-            row = self._get_connection().execute(f"SELECT {', '.join(METRIC_COLUMNS)} FROM sessions WHERE session_id=?", (session_id,)).fetchone()
+            row = (
+                self._get_connection()
+                .execute(f"SELECT {', '.join(METRIC_COLUMNS)} FROM sessions WHERE session_id=?", (session_id,))
+                .fetchone()
+            )
         except Exception as e:
             logger.error(f"SQLite: Failed to read metrics of session {session_id}: {e}")
             return {}

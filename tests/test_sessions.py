@@ -146,7 +146,9 @@ def test_is_tmux_session_active_true_false(mock_redis_class, mock_subprocess, mo
 
 @patch("desto.core.service.subprocess")
 @patch("desto.core.service.DestoRedisClient")
-def test_get_all_sessions_status_includes_tmux_and_redis(mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path):
+def test_get_all_sessions_status_includes_tmux_and_redis(
+    mock_redis_class, mock_subprocess, mock_ui, mock_logger, tmp_path
+):
     # Mock Redis to be available
     mock_redis_instance = Mock()
     mock_redis_instance.is_connected.return_value = True

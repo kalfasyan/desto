@@ -14,7 +14,13 @@ from desto.core.log_tailer import LogTailer
 from desto.core.recurring import REPEAT_UNITS
 from desto.core.scheduled_jobs import ScheduleError
 
-REPEAT_OPTIONS = [("Does not repeat", "never"), ("minute(s)", "minutes"), ("hour(s)", "hours"), ("day(s)", "days"), ("week(s)", "weeks")]
+REPEAT_OPTIONS = [
+    ("Does not repeat", "never"),
+    ("minute(s)", "minutes"),
+    ("hour(s)", "hours"),
+    ("day(s)", "days"),
+    ("week(s)", "weeks"),
+]
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -49,7 +55,13 @@ class FormScreen(ModalScreen[Optional[dict]]):
 
     BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
 
-    def __init__(self, title: str, fields: list[tuple[str, str, str]], submit_label: str = "Save", validate: Optional[Callable[[dict], Optional[str]]] = None) -> None:
+    def __init__(
+        self,
+        title: str,
+        fields: list[tuple[str, str, str]],
+        submit_label: str = "Save",
+        validate: Optional[Callable[[dict], Optional[str]]] = None,
+    ) -> None:
         super().__init__()
         self.title_text, self.fields, self.submit_label, self.validate = title, fields, submit_label, validate
 
@@ -225,13 +237,22 @@ class UsageScreen(ModalScreen[None]):
         with Vertical(classes="dialog usage-dialog"):
             yield Label(f"Resource usage: {self.session_name}", classes="dialog-title")
             if not self.points:
-                yield Static("No usage recorded for this session yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.", classes="dialog-body")
+                yield Static(
+                    "No usage recorded for this session yet. It is recorded while the dashboard, the TUI or `desto-cli monitor` runs.",
+                    classes="dialog-body",
+                )
             else:
                 first, last = self.points[0]["t"], self.points[-1]["t"]
                 span = format_seconds(int(last - first))
-                yield Label(f"CPU % over the last {span} (peak {max(p.get('cpu_max', 0) for p in self.points):.0f}%)", classes="field-label")
+                yield Label(
+                    f"CPU % over the last {span} (peak {max(p.get('cpu_max', 0) for p in self.points):.0f}%)",
+                    classes="field-label",
+                )
                 yield Sparkline([p.get("cpu", 0) for p in self.points], id="usage-cpu")
-                yield Label(f"Memory over the last {span} (peak {format_bytes(max(p.get('rss_max', 0) for p in self.points))})", classes="field-label")
+                yield Label(
+                    f"Memory over the last {span} (peak {format_bytes(max(p.get('rss_max', 0) for p in self.points))})",
+                    classes="field-label",
+                )
                 yield Sparkline([p.get("rss", 0) for p in self.points], id="usage-mem")
             s = self.summary
             if s:

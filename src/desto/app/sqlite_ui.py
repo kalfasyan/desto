@@ -50,7 +50,12 @@ class SQLiteHistoryTab:
                         .props("dense outlined rounded")
                         .classes("w-36")
                     )
-                    self.search_input = ui.input(placeholder="Search by name...").on("keyup", lambda _: self._on_filter_change()).props("dense outlined rounded").classes("w-64")
+                    self.search_input = (
+                        ui.input(placeholder="Search by name...")
+                        .on("keyup", lambda _: self._on_filter_change())
+                        .props("dense outlined rounded")
+                        .classes("w-64")
+                    )
                     ui.button(icon="refresh", on_click=self._on_filter_change).props("flat round color=primary dense")
                     ui.button(
                         "Clear History",
@@ -163,7 +168,13 @@ class SQLiteHistoryTab:
         jobs = self.sqlite_store.get_jobs_for_session(session.session_id)
         has_command = jobs and jobs[0].command
 
-        with ui.card().props("flat").classes("modern-card p-5 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"):
+        with (
+            ui.card()
+            .props("flat")
+            .classes(
+                "modern-card p-5 dark:!bg-slate-900 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800"
+            )
+        ):
             with ui.column().classes("w-full gap-3"):
                 # Top row: name + status badge
                 with ui.row().classes("w-full justify-between items-start"):
@@ -181,7 +192,9 @@ class SQLiteHistoryTab:
                     cmd_display = jobs[0].command
                     if len(cmd_display) > 80:
                         cmd_display = cmd_display[:77] + "…"
-                    ui.label(cmd_display).classes("font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 break-all w-full")
+                    ui.label(cmd_display).classes(
+                        "font-mono text-xs p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 break-all w-full"
+                    )
 
                 # Timestamps
                 with ui.column().classes("gap-1 text-xs text-slate-500 dark:text-slate-400"):
@@ -253,10 +266,16 @@ class SQLiteHistoryTab:
                     if session.start_time and session.end_time:
                         duration = session.end_time - session.start_time
                         ui.label("Duration").classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
-                        ui.label(_fmt_duration(duration)).classes("text-sm text-slate-800 dark:text-slate-200 font-mono")
+                        ui.label(_fmt_duration(duration)).classes(
+                            "text-sm text-slate-800 dark:text-slate-200 font-mono"
+                        )
 
                     # Resource usage totals, recorded when the session ended
-                    metrics = self.sqlite_store.get_session_metrics(session_id) if hasattr(self.sqlite_store, "get_session_metrics") else {}
+                    metrics = (
+                        self.sqlite_store.get_session_metrics(session_id)
+                        if hasattr(self.sqlite_store, "get_session_metrics")
+                        else {}
+                    )
                     for label, column, fmt in (
                         ("Peak Memory", "peak_rss_bytes", format_bytes),
                         ("CPU Time", "cpu_seconds", lambda v: format_seconds(int(v))),
@@ -266,7 +285,9 @@ class SQLiteHistoryTab:
                     ):
                         if column in metrics:
                             ui.label(label).classes("text-xs uppercase tracking-wider text-slate-500 font-semibold")
-                            ui.label(fmt(metrics[column])).classes("text-sm text-slate-800 dark:text-slate-200 font-mono")
+                            ui.label(fmt(metrics[column])).classes(
+                                "text-sm text-slate-800 dark:text-slate-200 font-mono"
+                            )
 
                 # Jobs table
                 jobs = self.sqlite_store.get_jobs_for_session(session_id)
@@ -296,14 +317,20 @@ class SQLiteHistoryTab:
                             }
                         )
 
-                    ui.table(columns=columns, rows=rows).props("flat dense bordered separator=cell").classes("w-full text-xs")
+                    ui.table(columns=columns, rows=rows).props("flat dense bordered separator=cell").classes(
+                        "w-full text-xs"
+                    )
 
                     # Show error messages if any
                     for job in jobs:
                         if job.error_message:
                             with ui.card().classes("w-full p-3 mt-2 bg-red-50 dark:bg-red-900/20 rounded-lg"):
-                                ui.label(f"Error (job {job.job_id[:8]}…):").classes("text-xs font-bold text-red-600 dark:text-red-400")
-                                ui.label(job.error_message).classes("text-xs font-mono text-red-500 dark:text-red-300 break-all")
+                                ui.label(f"Error (job {job.job_id[:8]}…):").classes(
+                                    "text-xs font-bold text-red-600 dark:text-red-400"
+                                )
+                                ui.label(job.error_message).classes(
+                                    "text-xs font-mono text-red-500 dark:text-red-300 break-all"
+                                )
                 else:
                     ui.label("No jobs recorded for this session.").classes("text-slate-400 italic text-sm mt-2")
 
@@ -359,7 +386,9 @@ class SQLiteHistoryTab:
         with ui.dialog() as confirm_dialog:
             with ui.card().classes("p-6 dark:!bg-slate-900"):
                 ui.label(f"Delete '{session_name}' from history?").classes("text-lg font-bold mb-2")
-                ui.label("This will permanently remove the session and its jobs from the database.").classes("text-slate-500 mb-6")
+                ui.label("This will permanently remove the session and its jobs from the database.").classes(
+                    "text-slate-500 mb-6"
+                )
                 with ui.row().classes("w-full justify-end gap-2"):
                     ui.button("Cancel", on_click=confirm_dialog.close).props("flat color=slate-500")
                     ui.button(
@@ -391,7 +420,9 @@ class SQLiteHistoryTab:
         with ui.dialog() as dialog:
             with ui.card().classes("p-6 dark:!bg-slate-900"):
                 ui.label("Clear Session History").classes("text-lg font-bold text-red-600 mb-2")
-                ui.label(f"This will permanently delete all {count} session(s) and their associated jobs from the database.").classes("text-slate-500 mb-2")
+                ui.label(
+                    f"This will permanently delete all {count} session(s) and their associated jobs from the database."
+                ).classes("text-slate-500 mb-2")
                 ui.label("This action cannot be undone.").classes("text-slate-500 mb-6 font-semibold")
                 with ui.row().classes("w-full justify-end gap-2"):
                     ui.button("Cancel", on_click=dialog.close).props("flat color=slate-500")

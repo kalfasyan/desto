@@ -55,11 +55,15 @@ class TestDuplicateSessionValidation:
                     mock_pubsub = Mock()
                     mock_pubsub_class.return_value = mock_pubsub
 
-                    tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
+                    tmux_manager = TmuxManager(
+                        mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"]
+                    )
 
                     return tmux_manager
 
-    @pytest.mark.skipif(not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available")
+    @pytest.mark.skipif(
+        not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available"
+    )
     def test_duplicate_session_validation(self, tmux_manager, temp_dirs):
         """Test that duplicate session validation prevents creating sessions with same name."""
         session_name = "test_duplicate_session"
@@ -84,13 +88,19 @@ class TestDuplicateSessionValidation:
                 # Check that error was logged
                 # Note: We can't easily check mock_logger.error since it's created in the fixture
                 # But we can check that negative notification was called
-                negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
+                negative_calls = [
+                    call for call in mock_notification.call_args_list if call[1].get("type") == "negative"
+                ]
                 assert len(negative_calls) > 0, "Negative notification should be called for duplicate session"
 
                 # Check the error message
                 notification_message = negative_calls[0][0][0]
-                assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
-                assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
+                assert "already exists" in notification_message, (
+                    f"Error message should mention 'already exists': {notification_message}"
+                )
+                assert session_name in notification_message, (
+                    f"Error message should mention session name: {notification_message}"
+                )
 
                 # Clean up
                 try:
@@ -98,7 +108,9 @@ class TestDuplicateSessionValidation:
                 except Exception:
                     pass
 
-    @pytest.mark.skipif(not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available")
+    @pytest.mark.skipif(
+        not subprocess.run(["tmux", "-V"], capture_output=True).returncode == 0, reason="tmux not available"
+    )
     def test_duplicate_session_validation_with_chain(self, tmux_manager, temp_dirs):
         """Test that duplicate session validation works with chained scripts."""
         session_name = "test_chain_duplicate"
@@ -128,13 +140,19 @@ class TestDuplicateSessionValidation:
                 tmux_manager.start_tmux_session(session_name, chain_command2, Mock())
 
                 # Check that duplicate session validation triggered
-                negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
+                negative_calls = [
+                    call for call in mock_notification.call_args_list if call[1].get("type") == "negative"
+                ]
                 assert len(negative_calls) > 0, "Negative notification should be called for duplicate chain session"
 
                 # Check the error message
                 notification_message = negative_calls[0][0][0]
-                assert "already exists" in notification_message, f"Error message should mention 'already exists': {notification_message}"
-                assert session_name in notification_message, f"Error message should mention session name: {notification_message}"
+                assert "already exists" in notification_message, (
+                    f"Error message should mention 'already exists': {notification_message}"
+                )
+                assert session_name in notification_message, (
+                    f"Error message should mention session name: {notification_message}"
+                )
 
                 # Clean up
                 try:
@@ -162,8 +180,12 @@ class TestDuplicateSessionValidation:
                         tmux_manager.start_tmux_session(session_name1, "echo 'test1'", Mock())
 
                         # Check that positive notification was called
-                        positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
-                        assert len(positive_calls) > 0, "Positive notification should be called for successful session start"
+                        positive_calls = [
+                            call for call in mock_notification.call_args_list if call[1].get("type") == "positive"
+                        ]
+                        assert len(positive_calls) > 0, (
+                            "Positive notification should be called for successful session start"
+                        )
 
                         # Reset mock
                         mock_notification.reset_mock()
@@ -172,9 +194,17 @@ class TestDuplicateSessionValidation:
                         tmux_manager.start_tmux_session(session_name2, "echo 'test2'", Mock())
 
                         # Check that positive notification was called again
-                        positive_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "positive"]
-                        assert len(positive_calls) > 0, "Positive notification should be called for second successful session start"
+                        positive_calls = [
+                            call for call in mock_notification.call_args_list if call[1].get("type") == "positive"
+                        ]
+                        assert len(positive_calls) > 0, (
+                            "Positive notification should be called for second successful session start"
+                        )
 
                         # Check that no negative notifications were called
-                        negative_calls = [call for call in mock_notification.call_args_list if call[1].get("type") == "negative"]
-                        assert len(negative_calls) == 0, "No negative notifications should be called for non-duplicate sessions"
+                        negative_calls = [
+                            call for call in mock_notification.call_args_list if call[1].get("type") == "negative"
+                        ]
+                        assert len(negative_calls) == 0, (
+                            "No negative notifications should be called for non-duplicate sessions"
+                        )
