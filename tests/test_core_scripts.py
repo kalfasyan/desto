@@ -1,6 +1,7 @@
 """Tests for desto.core.scripts: the script helpers shared by the dashboard, the TUI and the CLI."""
 
 import os
+import shlex
 
 import pytest
 
@@ -51,3 +52,15 @@ def test_create_script_writes_executable_file_with_shebang(tmp_path):
 def test_create_script_rejects_bad_input(tmp_path, name, kind):
     with pytest.raises(ValueError):
         scripts.create_script(tmp_path, name, "", kind)
+
+
+def test_session_script_creates_then_appends(tmp_path):
+    log_file = tmp_path / "it's.log"
+    fresh = scripts.session_script("s1", "echo hi", log_file)
+    assert "NEW SESSION" not in fresh
+    assert "> " + shlex.quote(str(log_file)) in fresh
+    assert "-m desto.hooks.mark_job_finished s1 $SCRIPT_EXIT_CODE" in fresh
+    log_file.write_text("old run\n")
+    again = scripts.session_script("s1", "echo hi", log_file)
+    assert "NEW SESSION" in again
+    assert ">> " + shlex.quote(str(log_file)) in again

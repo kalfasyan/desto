@@ -236,3 +236,22 @@ def test_cli_chain_runs_every_step(dirs):
         assert session.status.value == "finished"
     finally:
         forget(name)
+
+
+# --- Quoting -------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("launch", LAUNCHERS)
+def test_awkward_log_path_and_command(launch, tmp_path, monkeypatch, session_name):
+    """A quote in the logs path and `&&` inside an argument must not break any launch path."""
+    log_dir = tmp_path / "it's logs"
+    scripts_dir = tmp_path / "scripts"
+    log_dir.mkdir()
+    scripts_dir.mkdir()
+    monkeypatch.setenv("DESTO_LOGS_DIR", str(log_dir))
+    monkeypatch.setenv("DESTO_SCRIPTS_DIR", str(scripts_dir))
+    log_file = launch(session_name, "echo 'one && two'", (log_dir, scripts_dir))
+    text, session = wait_for_end(session_name, log_file)
+    assert "one && two" in text
+    assert text.count("=== SCRIPT FINISHED") == 1
+    assert session.status.value == "finished"
