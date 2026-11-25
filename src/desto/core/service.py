@@ -92,7 +92,6 @@ class DestoService(ScheduledJobsMixin):
         self.desto_manager = DestoManager(self.redis_client, sqlite_store=sqlite_store)
         self.pubsub = SessionPubSub(self.redis_client)
         self.job_manager = JobManager(self.redis_client)
-        self.use_redis = True
         logger.info(f"desto service initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
     # --- Front-end hooks ------------------------------------------------------------
@@ -340,15 +339,6 @@ class DestoService(ScheduledJobsMixin):
                     time.sleep(10)
 
         threading.Thread(target=monitor, daemon=True).start()
-
-    def get_job_completion_command(self, session_name, use_variable=False):
-        """Shell snippet that records the job's exit code in Redis.
-
-        Args:
-            session_name: Name of the session
-            use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
-        """
-        return scripts.completion_hook(session_name, "$SCRIPT_EXIT_CODE" if use_variable else "$?")
 
     def rerun_session(self, session_name, command) -> bool:
         """Launch the same command again in a new session (name-2, name-3, ...)."""

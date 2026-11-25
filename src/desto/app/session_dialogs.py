@@ -272,7 +272,7 @@ class SessionDialogs:
 
     # --- Live log viewer -------------------------------------------------------------
 
-    def view_log(self, session_name, ui):
+    def view_log(self, session_name, ui):  # noqa: C901
         """Pauses the app and opens a dialog that live-tails the session's log file (last 100 lines, then follows)."""
         logger.debug(f"User requested to view log for session: {session_name}")
         self.service.pause()

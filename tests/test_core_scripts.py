@@ -64,3 +64,11 @@ def test_session_script_creates_then_appends(tmp_path):
     again = scripts.session_script("s1", "echo hi", log_file)
     assert "NEW SESSION" in again
     assert ">> " + shlex.quote(str(log_file)) in again
+
+
+def test_completion_hook_runs_the_bundled_module_with_the_exit_code():
+    import sys
+
+    command = scripts.completion_hook("my session", "$SCRIPT_EXIT_CODE")
+    assert command.startswith(sys.executable) or command.startswith(f"'{sys.executable}'")
+    assert "-m desto.hooks.mark_job_finished 'my session' $SCRIPT_EXIT_CODE" in command

@@ -29,6 +29,7 @@ dev = [
     "pytest-xdist>=3.2.0",
     "pytest-instafail>=0.5.0",
     "twine>=6.1.0",
+    "pytest-cov>=5.0",
 ]
 
 [project.scripts]
@@ -54,6 +55,7 @@ select = [
     "F",  # pyflakes
     "I",  # isort
     "D",  # pydocstyle (docstring conventions)
+    "C901",  # function complexity, see [tool.ruff.lint.mccabe]
 ]
 ignore = [
     "D100",  # Missing docstring in public module
@@ -66,6 +68,10 @@ ignore = [
     "D107",  # Missing docstring in __init__
     "D205",  # 1 blank line required between summary line and description
 ]
+
+[tool.ruff.lint.mccabe]
+# New functions stay under this. The three older ones above it carry a noqa until they are split.
+max-complexity = 15
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -111,3 +117,12 @@ markers = [
     "docker: marks tests that require Docker",
     "integration: marks integration tests",
 ]
+
+[tool.vulture]
+# Dead code check, run in CI. Framework hooks (Textual handlers, Typer commands,
+# NiceGUI pages) are called by name or decorator, so they are ignored here; anything
+# else that vulture flags wrongly goes in vulture_whitelist.py.
+paths = ["src", "vulture_whitelist.py"]
+min_confidence = 60
+ignore_decorators = ["@*.command", "@*.callback", "@ui.page", "@app.*"]
+ignore_names = ["compose", "on_*", "action_*", "BINDINGS", "CSS", "DEFAULT_CSS", "dispatch"]

@@ -208,27 +208,6 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
-    def test_job_completion_command_generation(self):
-        """Test that job completion commands are generated correctly."""
-        # Mock Redis client
-        mock_redis_client = Mock(spec=DestoRedisClient)
-        mock_redis_client.is_connected.return_value = True
-        mock_redis_client.redis = Mock()  # Add the redis attribute
-
-        with patch("desto.core.service.DestoRedisClient") as mock_redis_class:
-            mock_redis_class.return_value = mock_redis_client
-
-            tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
-
-            command = tmux_manager.get_job_completion_command("test_session", use_variable=True)
-
-            # Verify command structure
-            # Use sys.executable instead of hardcoded python3 as the implementation uses sys.executable
-            self.assertIn(sys.executable, command)
-            self.assertIn("-m desto.hooks.mark_job_finished", command)
-            self.assertIn("test_session", command)
-            self.assertIn("$SCRIPT_EXIT_CODE", command)
-
     def test_job_completion_command_without_redis(self):
         """Test job completion command generation without Redis."""
         # Mock Redis client as disconnected

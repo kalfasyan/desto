@@ -49,11 +49,6 @@ class CLISessionManager:
             self._service = DestoService(log_dir=self.log_dir, scripts_dir=self.scripts_dir, notifier=_log_notifier)
         return self._service
 
-    def _get_redis_and_manager(self):
-        redis_client = DestoRedisClient()
-        session_manager = SessionManager(redis_client)
-        return redis_client, session_manager
-
     def find_script(self, name: str) -> Optional[Path]:
         """Resolve a script name, with or without its .sh/.py extension, in the scripts directory."""
         for candidate in (name, f"{name}.sh", f"{name}.py"):

@@ -29,5 +29,8 @@ jobs:
         run: uv sync --frozen --extra dev
       - name: Run ruff
         run: uv run --frozen ruff check .
+      - name: Check for dead code
+        run: uvx vulture@2.14
       - name: Run pytest (fast tests only, skip Docker)
-        run: uv run --frozen pytest -m "not docker and not slow" tests/
+        # The floor sits just under the coverage CI reaches today (57%); raise it as tests are added.
+        run: uv run --frozen pytest -m "not docker and not slow" --cov=desto --cov-report=term --cov-fail-under=55 tests/
