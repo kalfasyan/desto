@@ -158,7 +158,7 @@ class UserInterfaceManager:
                     ui.label("Chain Queue").classes("text-sm font-bold uppercase tracking-wider text-slate-500")
                     with ui.row().classes("gap-2"):
                         ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props("flat color=warning dense")
-                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.confirm_kill_all_sessions).props("flat color=negative dense")
+                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.dialogs.confirm_kill_all_sessions).props("flat color=negative dense")
 
                 self.chain_queue_display = ui.column().classes("modern-card w-full p-4 dark:!bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
                 self.refresh_chain_queue_display()

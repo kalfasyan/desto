@@ -6,17 +6,18 @@ from nicegui import ui
 from desto.core.log_tailer import LogTailer
 
 
-class SessionDialogsMixin:
-    """Dialogs of TmuxManager; the actions behind them live in DestoService.
+class SessionDialogs:
+    """Confirmation dialogs and the live log viewer; the actions behind them live in DestoService.
 
-    Every dialog pauses the dashboard timers while it is open (pause_updates/resume_updates).
-    Expects the host class to provide redis_client, desto_manager, LOG_DIR, ui and the
-    session and scheduled-job methods the dialogs call.
+    Every dialog pauses the dashboard timers while it is open (service.pause/service.resume).
     """
 
-    def _resume(self):
-        if self.resume_updates:
-            self.resume_updates()
+    def __init__(self, service):
+        self.service = service
+
+    @property
+    def ui(self):
+        return self.service.ui
 
     # --- Confirmations -------------------------------------------------------------
 
@@ -24,34 +25,33 @@ class SessionDialogsMixin:
         """Show a confirmation dialog before canceling a scheduled job by at_job_id.
         Pauses updates while dialog is open.
         """
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def do_cancel():
-            self.cancel_scheduled_job(at_job_id)
+            self.service.cancel_scheduled_job(at_job_id)
             dialog.close()
-            self._resume()
+            self.service.resume()
             # Force UI refresh
-            self.update_sessions_status()
+            self.service.on_sessions_changed()
 
         def cancel():
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            self.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
+            self.service.telemetry_event("confirm_cancel_scheduled_job.open", {"at_job_id": str(at_job_id)})
             ui.label(f"Are you sure you want to cancel scheduled job {at_job_id}?").style("font-size: 1.1em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
-            recurrence = self.get_recurring_info(at_job_id)
+            recurrence = self.service.get_recurring_info(at_job_id)
             if recurrence:
                 ui.label(f"This job is part of a recurring schedule ({recurrence[1]}). Cancelling it stops all future runs.").classes("text-slate-600 dark:text-slate-400")
 
             def _cancel():
                 cancel()
-                self.telemetry_event("confirm_cancel_scheduled_job.cancel", {"at_job_id": str(at_job_id)})
+                self.service.telemetry_event("confirm_cancel_scheduled_job.cancel", {"at_job_id": str(at_job_id)})
 
             def _confirm():
                 do_cancel()
-                self.telemetry_event("confirm_cancel_scheduled_job.confirm", {"at_job_id": str(at_job_id)})
+                self.service.telemetry_event("confirm_cancel_scheduled_job.confirm", {"at_job_id": str(at_job_id)})
 
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
                 ui.button("Cancel", on_click=_cancel).props("color=grey")
@@ -60,27 +60,26 @@ class SessionDialogsMixin:
 
     def confirm_clear_history(self):
         """Show confirmation dialog before clearing session history. Pauses updates while dialog is open."""
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def close_dialog():
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
-            self.telemetry_event("confirm_clear_history.open", {})
+            self.service.telemetry_event("confirm_clear_history.open", {})
             ui.label("⚠️ Clear Session History").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
             ui.label("This will permanently delete all session history from Redis.").style("margin-bottom: 15px;")
             ui.label("This action cannot be undone.").style("margin-bottom: 20px;").classes("text-slate-600 dark:text-slate-400")
 
             def _close_and_telemetry_cancel():
                 close_dialog()
-                self.telemetry_event("confirm_clear_history.cancel", {})
+                self.service.telemetry_event("confirm_clear_history.cancel", {})
 
             def _clear_and_telemetry_confirm():
-                self.clear_session_history()
+                self.service.clear_session_history()
                 close_dialog()
-                self.telemetry_event("confirm_clear_history.confirm", {})
+                self.service.telemetry_event("confirm_clear_history.confirm", {})
 
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%;"):
                 ui.button("Cancel", on_click=_close_and_telemetry_cancel).props("color=grey")
@@ -89,22 +88,21 @@ class SessionDialogsMixin:
 
     def confirm_clear_logs(self):
         """Show confirmation dialog before clearing log files. Pauses updates while dialog is open."""
-        log_dir = self.LOG_DIR
+        log_dir = self.service.LOG_DIR
         log_files = []
         if log_dir.exists():
             log_files = list(log_dir.glob("*.log"))
         if not log_files:
             ui.notification("No log files found to clear", type="info")
             return
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def close_dialog():
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
-            self.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
+            self.service.telemetry_event("confirm_clear_logs.open", {"num_files": len(log_files)})
             ui.label("🗂️ Clear Log Files").style("font-size: 1.3em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
             ui.label(f"This will permanently delete {len(log_files)} log file(s) from:").style("margin-bottom: 10px;")
             ui.label(str(log_dir)).style("font-family: monospace; padding: 5px; border-radius: 3px; margin-bottom: 15px;").classes("bg-slate-100 dark:!bg-slate-800")
@@ -117,12 +115,12 @@ class SessionDialogsMixin:
 
             def _close_logs_cancel():
                 close_dialog()
-                self.telemetry_event("confirm_clear_logs.cancel", {})
+                self.service.telemetry_event("confirm_clear_logs.cancel", {})
 
             def _confirm_clear_logs():
-                self.clear_log_files()
+                self.service.clear_log_files()
                 close_dialog()
-                self.telemetry_event("confirm_clear_logs.confirm", {})
+                self.service.telemetry_event("confirm_clear_logs.confirm", {})
 
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
                 ui.button("Cancel", on_click=_close_logs_cancel).props("color=grey")
@@ -132,25 +130,24 @@ class SessionDialogsMixin:
     def confirm_kill_session(self, session_name):
         """Displays a confirmation dialog before killing a tmux session and pauses updates."""
         logger.debug(f"User requested to kill session: {session_name}")
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         with self.ui.dialog() as dialog, self.ui.card():
-            self.telemetry_event("confirm_kill_session.open", {"session": session_name})
+            self.service.telemetry_event("confirm_kill_session.open", {"session": session_name})
             self.ui.label(f"Are you sure you want to kill the session '{session_name}'?")
 
             def _confirm_kill():
                 logger.info(f"User confirmed killing session: {session_name}")
-                self.telemetry_event("confirm_kill_session.confirm", {"session": session_name})
-                self.kill_tmux_session(session_name)
+                self.service.telemetry_event("confirm_kill_session.confirm", {"session": session_name})
+                self.service.kill_tmux_session(session_name)
                 dialog.close()
-                self.resume_updates()
+                self.service.resume()
 
             def _cancel_kill():
                 logger.debug(f"User cancelled killing session: {session_name}")
-                self.telemetry_event("confirm_kill_session.cancel", {"session": session_name})
+                self.service.telemetry_event("confirm_kill_session.cancel", {"session": session_name})
                 dialog.close()
-                self.resume_updates()
+                self.service.resume()
 
             with self.ui.row():
                 self.ui.button("Yes", on_click=_confirm_kill).props("color=red")
@@ -160,30 +157,29 @@ class SessionDialogsMixin:
 
     def confirm_clear_session(self, session_name, ui):
         """Show confirmation dialog before clearing a session (deletes log and removes from Redis)."""
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def do_clear():
-            self.clear_session(session_name)
+            self.service.clear_session(session_name)
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         def cancel():
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;"):
-            self.telemetry_event("confirm_clear_session.open", {"session": session_name})
+            self.service.telemetry_event("confirm_clear_session.open", {"session": session_name})
             ui.label(f"Are you sure you want to clear session '{session_name}'?").style("font-size: 1.1em; font-weight: bold; color: #ff9800; margin-bottom: 10px;")
             ui.label("This will delete its log file and remove it from the sessions table.").style("margin-bottom: 15px;")
 
             def _cancel_clear_session():
                 cancel()
-                self.telemetry_event("confirm_clear_session.cancel", {"session": session_name})
+                self.service.telemetry_event("confirm_clear_session.cancel", {"session": session_name})
 
             def _confirm_clear_session():
                 do_clear()
-                self.telemetry_event("confirm_clear_session.confirm", {"session": session_name})
+                self.service.telemetry_event("confirm_clear_session.confirm", {"session": session_name})
 
             with ui.row().style("gap: 10px; justify-content: flex-end; width: 100%; margin-top: 20px;"):
                 ui.button("Cancel", on_click=_cancel_clear_session).props("color=grey")
@@ -192,19 +188,18 @@ class SessionDialogsMixin:
 
     def confirm_kill_all_sessions(self):
         """Displays a confirmation dialog before killing all tmux sessions and scheduled jobs, and pauses updates."""
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
-        sessions_status = self.check_sessions()
+        sessions_status = self.service.check_sessions()
         session_count = len(sessions_status)
-        scheduled_jobs = self.get_scheduled_jobs()
+        scheduled_jobs = self.service.get_scheduled_jobs()
         job_count = len(scheduled_jobs)
 
         if session_count == 0 and job_count == 0:
             msg = "No active sessions or scheduled jobs to clear."
             logger.info(msg)
             self.ui.notification(msg, type="info")
-            self._resume()
+            self.service.resume()
             return
 
         running_sessions, finished_sessions = self._split_running_finished(sessions_status)
@@ -212,14 +207,14 @@ class SessionDialogsMixin:
         finished_count = len(finished_sessions)
 
         def do_kill_all():
-            self.kill_all_and_notify()
+            self.service.kill_all_and_notify()
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         def cancel_kill_all():
             logger.debug("User cancelled kill all sessions operation")
             dialog.close()
-            self._resume()
+            self.service.resume()
 
         with self.ui.dialog() as dialog, self.ui.card().style("min-width: 500px;"):
             self.ui.label("⚠️ Clear All Jobs").style("font-size: 1.3em; font-weight: bold; color: #d32f2f; margin-bottom: 10px;")
@@ -265,7 +260,7 @@ class SessionDialogsMixin:
         running, finished = [], []
         for session_name in sessions_status.keys():
             try:
-                job_status = self.desto_manager.get_job_status(session_name)
+                job_status = self.service.desto_manager.get_job_status(session_name)
                 if job_status in ["finished", "failed"]:
                     finished.append(session_name)
                 else:
@@ -280,10 +275,9 @@ class SessionDialogsMixin:
     def view_log(self, session_name, ui):
         """Pauses the app and opens a dialog that live-tails the session's log file (last 100 lines, then follows)."""
         logger.debug(f"User requested to view log for session: {session_name}")
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
-        log_file = self.get_log_file(session_name)
+        log_file = self.service.get_log_file(session_name)
         tailer = LogTailer(log_file)
         closed = False
 
@@ -301,7 +295,7 @@ class SessionDialogsMixin:
             except Exception:
                 logger.debug(f"Failed to close log dialog for session: {session_name}")
             logger.debug(f"User closed log view for session: {session_name}")
-            self._resume()
+            self.service.resume()
 
         def push_new_lines():
             for line in tailer.poll():
@@ -316,7 +310,7 @@ class SessionDialogsMixin:
                 push_new_lines()
             except Exception as e:
                 logger.error(f"Error refreshing log view for session {session_name}: {e}")
-            set_live_state(self.is_tmux_session_active(session_name))
+            set_live_state(self.service.is_tmux_session_active(session_name))
 
         def tick():
             if closed or not auto_refresh.value:
@@ -328,7 +322,7 @@ class SessionDialogsMixin:
                 log_view.push(f"[desto] log follow error: {e}")
                 timer.cancel()
                 return
-            if not self.is_tmux_session_active(session_name):
+            if not self.service.is_tmux_session_active(session_name):
                 try:
                     push_new_lines()  # One final read after the session ended
                 except Exception as e:
@@ -344,7 +338,7 @@ class SessionDialogsMixin:
             ui.download.file(log_file, filename=f"{session_name}.log", media_type="text/plain")
 
         initial_lines = tailer.initial_lines(100)
-        is_active = self.is_tmux_session_active(session_name)
+        is_active = self.service.is_tmux_session_active(session_name)
 
         with (
             ui.dialog() as dialog,

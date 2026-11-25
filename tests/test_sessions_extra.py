@@ -34,7 +34,7 @@ def test_view_log_missing_file(mock_subprocess, tmp_path):
     mock_ui = MagicMock()
     tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
     # Should not raise
-    tmux.view_log("notfound", mock_ui)
+    tmux.dialogs.view_log("notfound", mock_ui)
     mock_ui.log.assert_called_once()
     mock_ui.timer.assert_called_once()
     mock_ui.dialog.assert_called_once()
@@ -50,7 +50,7 @@ def test_view_log_existing_file_builds_dialog(mock_subprocess, tmp_path):
     log_file.write_text("hello\nworld\n")
 
     # Should not raise and should build the live viewer controls
-    tmux.view_log("mysess", mock_ui)
+    tmux.dialogs.view_log("mysess", mock_ui)
 
     mock_ui.log.assert_called_once()
     mock_ui.timer.assert_called_once()
@@ -69,7 +69,7 @@ def test_view_log_follows_and_stops_when_session_ends(mock_subprocess, tmp_path)
 
     log_file = tmux.get_log_file("mysess")
     log_file.write_text("initial\n")
-    tmux.view_log("mysess", mock_ui)
+    tmux.dialogs.view_log("mysess", mock_ui)
 
     tick = mock_ui.timer.call_args.args[1]
     timer = mock_ui.timer.return_value
@@ -127,7 +127,7 @@ def test_view_log_poll_error_cancels_timer(mock_subprocess, tmp_path):
 
     log_file = tmux.get_log_file("mysess")
     log_file.write_text("initial\n")
-    tmux.view_log("mysess", mock_ui)
+    tmux.dialogs.view_log("mysess", mock_ui)
 
     tick = mock_ui.timer.call_args.args[1]
     timer = mock_ui.timer.return_value
@@ -158,7 +158,7 @@ def test_view_log_download_guard(mock_subprocess, tmp_path):
 
     log_file = tmux.get_log_file("mysess")
     log_file.write_text("content\n")
-    tmux.view_log("mysess", mock_ui)
+    tmux.dialogs.view_log("mysess", mock_ui)
 
     download = next(call.kwargs["on_click"] for call in mock_ui.button.call_args_list if call.args == ("Download log",))
     download()
