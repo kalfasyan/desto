@@ -93,7 +93,6 @@ class DestoService(ScheduledJobsMixin):
         self.desto_manager = DestoManager(self.redis_client, sqlite_store=sqlite_store)
         self.pubsub = SessionPubSub(self.redis_client)
         self.job_manager = JobManager(self.redis_client)
-        self.use_redis = True
         logger.info(f"desto service initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
     # --- Front-end hooks ------------------------------------------------------------
@@ -361,8 +360,6 @@ class DestoService(ScheduledJobsMixin):
             use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
         """
         exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
-        if not self.use_redis:
-            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
         # The bundled hook module works from an installed package, not just a source checkout
         return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
 
@@ -561,13 +558,13 @@ class DestoService(ScheduledJobsMixin):
             return 0
 
     def clear_log_files(self) -> int:
-        """Delete every *.log and *.finished file in the logs directory. Returns how many were deleted."""
+        """Delete every *.log file in the logs directory. Returns how many were deleted."""
         log_dir = self.LOG_DIR
         if not log_dir.exists():
             self.notify("Logs directory not found", "warning")
             return 0
         try:
-            all_files = list(log_dir.glob("*.log")) + list(log_dir.glob("*.finished"))
+            all_files = list(log_dir.glob("*.log"))
             if not all_files:
                 self.notify("No log files found to clear", "info")
                 return 0

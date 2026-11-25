@@ -220,9 +220,6 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
 
             tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
 
-            # Test Redis-based command generation
-            self.assertTrue(tmux_manager.use_redis)
-
             command = tmux_manager.get_job_completion_command("test_session", use_variable=True)
 
             # Verify command structure
