@@ -1,21 +1,24 @@
 """CLI-specific session manager using Redis-backed session management."""
 
-import getpass
 import os
 import shlex
-import socket
 import subprocess
-import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from subprocess import CalledProcessError
 from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 
+from desto.core import scripts as core_scripts
 from desto.redis.client import DestoRedisClient
 from desto.redis.session_manager import SessionManager
+
+_LOG_LEVELS = {"positive": "SUCCESS", "negative": "ERROR", "warning": "WARNING"}
+
+
+def _log_notifier(message: str, level: str) -> None:
+    logger.log(_LOG_LEVELS.get(level, "INFO"), message)
 
 
 class CLISessionManager:
@@ -28,7 +31,7 @@ class CLISessionManager:
         self.scripts_dir = Path(self.scripts_dir_env) if self.scripts_dir_env else Path(scripts_dir or Path.cwd() / "desto_scripts")
         self.log_dir = Path(self.logs_dir_env) if self.logs_dir_env else Path(log_dir or Path.cwd() / "desto_logs")
 
-        self.sessions: Dict[str, str] = {}
+        self._service = None
 
         try:
             self.log_dir.mkdir(exist_ok=True)
@@ -37,193 +40,58 @@ class CLISessionManager:
             logger.error(f"Failed to create log/scripts directory: {e}")
             raise
 
+    @property
+    def service(self):
+        """The shared desto service, created on first use so read-only commands stay fast."""
+        if self._service is None:
+            from desto.core.service import DestoService
+
+            self._service = DestoService(log_dir=self.log_dir, scripts_dir=self.scripts_dir, notifier=_log_notifier)
+        return self._service
+
     def _get_redis_and_manager(self):
         redis_client = DestoRedisClient()
         session_manager = SessionManager(redis_client)
         return redis_client, session_manager
 
-    @staticmethod
-    def _completion_hook(session_name: str, exit_code_ref: str) -> str:
-        """Shell snippet that records the job's outcome in Redis (same hook the dashboard uses)."""
-        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
-
-    @staticmethod
-    def _register_job(redis_client, session_manager, session, command: str) -> None:
-        """Create the job record so the dashboard can show status, exit code and offer Re-run."""
-        try:
-            from desto.redis.job_manager import JobManager
-
-            job = JobManager(redis_client).queue_job(session.session_id, command, command)
-            session_manager.add_job_to_session(session.session_id, job.job_id)
-        except Exception as e:
-            logger.warning(f"Could not register job for session '{session.session_name}': {e}")
-
-    def _build_info_block(self, session_name: str, scripts: List[str]) -> str:
-        username = getpass.getuser()
-        hostname = socket.gethostname()
-        cwd = os.getcwd()
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-        info_lines = [
-            f"# Session: {session_name}",
-            f"# User: {username}@{hostname}",
-            f"# Working Directory: {cwd}",
-            f"# Started: {now_str}",
-            f"# Scripts: {', '.join(scripts)}",
-            "",
-        ]
-        return "\n".join(info_lines)
+    def find_script(self, name: str) -> Optional[Path]:
+        """Resolve a script name, with or without its .sh/.py extension, in the scripts directory."""
+        for candidate in (name, f"{name}.sh", f"{name}.py"):
+            path = self.get_script_file(candidate)
+            if path.exists():
+                return path
+        return None
 
     def start_session(self, session_name: str, command: str) -> bool:
-        """Start a new session using the Redis-based SessionManager and launch the command in tmux.
-        Also removes any existing .finished marker file for test compatibility.
-        """
-        # Check for duplicate session in-memory (for test compatibility)
-        if session_name in self.sessions:
-            logger.error(f"Session '{session_name}' already exists (in-memory check).")
-            return False
-
-        # Check if session already exists in Redis
-        redis_client, session_manager = self._get_redis_and_manager()
-        existing_session = session_manager.get_session_by_name(session_name)
-        if existing_session:
-            logger.error(f"Session '{session_name}' already exists in Redis.")
-            return False
-
-        # Create session in Redis with metadata
-        session = session_manager.create_session(session_name, tmux_session_name=session_name)
-        session_manager.start_session(session.session_id)
-        self._register_job(redis_client, session_manager, session, command)
-
-        # Launch the actual command in tmux (for CLI usability)
-        log_file = self.get_log_file(session_name)
-        try:
-            log_file.parent.mkdir(exist_ok=True)
-        except Exception as e:
-            logger.error(f"Failed to create log directory '{log_file.parent}': {e}")
-            return False
-
-        quoted_log_file = shlex.quote(str(log_file))
-        append_mode = log_file.exists()
-        if append_mode:
-            try:
-                with log_file.open("a") as f:
-                    f.write(f"\n---- NEW SESSION ({datetime.now()}) -----\n")
-            except Exception as e:
-                logger.error(f"Failed to write separator to log file: {e}")
-                return False
-
-        redir = ">>" if append_mode else ">"
-        # Run the command, then record finished/failed with its exit code.
-        full_command = f"({command}) {redir} {quoted_log_file} 2>&1; {self._completion_hook(session_name, '$?')}"
-
-        try:
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name, full_command],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
-            )
-            logger.info(f"Session '{session_name}' started in tmux and registered in Redis.")
-            self.sessions[session_name] = command
-            return True
-        except CalledProcessError as e:
-            error_output = e.stderr.strip() if e.stderr else "No stderr output"
-            logger.error(f"Failed to start session '{session_name}' in tmux: {error_output}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error starting session '{session_name}': {e}")
-            return False
+        """Start command in a new tmux session, the same way the dashboard and TUI do."""
+        return self.service.start_tmux_session(session_name, command)
 
     def start_chain_session(self, scripts_with_args: List[List[str]], continue_on_error: bool = False) -> Optional[str]:
-        """Start a chain session: runs multiple scripts in a single tmux session, logs info blocks, and registers in Redis.
+        """Run several scripts one after another in a single new tmux session.
+
         scripts_with_args: List of [script_name, arg1, arg2, ...]
         Returns the session name if started, else None.
         """
-        session_name = f"chain_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
-        script_names = [" ".join(map(str, s)) for s in scripts_with_args]
-        log_file = self.get_log_file(session_name)
-        quoted_log_file = shlex.quote(str(log_file))
-
-        # Build info block
-        info_block = self._build_info_block(session_name, script_names)
-        # Write info block to log file immediately so it always exists
-        try:
-            log_file.parent.mkdir(exist_ok=True)
-            with log_file.open("w") as f:
-                f.write(info_block + "\n")
-        except Exception as e:
-            logger.error(f"Failed to write info block to log file '{log_file}': {e}")
-            return None
-        cmd_parts = []
-
-        # For each script, add markers and execution
-        for idx, parts in enumerate(scripts_with_args):
+        chain = []
+        for parts in scripts_with_args:
             if not parts:
                 continue
             script_name, *script_args = parts
-            script_path = None
-            for candidate in [script_name, f"{script_name}.sh", f"{script_name}.py"]:
-                candidate_path = self.get_script_file(candidate)
-                if candidate_path.exists():
-                    script_path = candidate_path
-                    break
+            script_path = self.find_script(script_name)
             if not script_path:
                 logger.error(f"Script '{script_name}' not found in {self.scripts_dir}")
                 return None
-            if not os.access(script_path, os.X_OK):
-                script_path.chmod(script_path.stat().st_mode | 0o111)
-            # Determine interpreter
-            if script_path.suffix == ".py":
-                cmd = ["python3", str(script_path)]
-            else:
-                cmd = ["bash", str(script_path)]
-            cmd.extend(script_args)
-            script_cmd = " ".join(shlex.quote(arg) for arg in cmd)
-            # Script info block
-            script_info = f"printf '\\n=== SCRIPT {idx + 1}: {script_path.name} STARTING at %s ===\\n' \"$(date)\" >> {quoted_log_file}"
-            cmd_parts.append(script_info)
-            # Script execution with output redirection
-            cmd_parts.append(f"({script_cmd}) >> {quoted_log_file} 2>&1")
-            cmd_parts.append("SCRIPT_EXIT_CODE=$?")
-            script_end = f'printf \'\\n=== SCRIPT {idx + 1}: {script_path.name} FINISHED at %s (exit code: %s) ===\\n\' "$(date)" "$SCRIPT_EXIT_CODE" >> {quoted_log_file}'
-            cmd_parts.append(script_end)
-            if not continue_on_error:
-                cmd_parts.append("if [ $SCRIPT_EXIT_CODE -ne 0 ]; then exit $SCRIPT_EXIT_CODE; fi")
-
-        chain_command = " && ".join(cmd_parts) if not continue_on_error else " ; ".join(cmd_parts)
-
-        # Register chain session in Redis
-        redis_client, session_manager = self._get_redis_and_manager()
-        # metadata variable removed as it's not used by SessionManager.create_session
-        session = session_manager.create_session(session_name, tmux_session_name=session_name)
-        session_manager.start_session(session.session_id)
-        self._register_job(redis_client, session_manager, session, chain_command)
-
-        # Run the chain, then record finished/failed with its exit code.
-        chain_command = f"({chain_command}); DESTO_EXIT_CODE=$?; {self._completion_hook(session_name, '$DESTO_EXIT_CODE')}"
-
-        try:
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name, chain_command],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
-            )
-            logger.info(f"Chain session '{session_name}' started in tmux and registered in Redis.")
-            self.sessions[session_name] = chain_command
-            return session_name
-        except CalledProcessError as e:
-            error_output = e.stderr.strip() if e.stderr else "No stderr output"
-            logger.error(f"Failed to start chain session '{session_name}' in tmux: {error_output}")
+            chain.append((script_path, shlex.join(script_args)))
+        if not chain:
+            logger.error("No scripts given for the chain.")
             return None
-        except Exception as e:
-            logger.error(f"Unexpected error starting chain session '{session_name}': {e}")
-            return None
+
+        session_name = f"chain_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:6]}"
+        command = core_scripts.chain_command(chain, self.service.python_executable, continue_on_error=continue_on_error)
+        return session_name if self.service.start_tmux_session(session_name, command) else None
 
     def list_sessions(self) -> Dict[str, Dict]:
-        """List all sessions using the Redis-based SessionManager."""
+        """List all sessions recorded in Redis."""
         try:
             redis_client = DestoRedisClient()
             session_manager = SessionManager(redis_client)
@@ -249,50 +117,30 @@ class CLISessionManager:
             return {}
 
     def kill_session(self, session_name: str) -> bool:
-        """Mark a session as finished using the Redis-based SessionManager."""
-        logger.info(f"Attempting to finish session: '{session_name}' (Redis-based)")
-        redis_client = DestoRedisClient()
-        session_manager = SessionManager(redis_client)
-
-        # Find session by name
-        session = session_manager.get_session_by_name(session_name)
-        if not session:
-            logger.error(f"Session '{session_name}' not found in Redis.")
-            return False
-
-        # Mark as finished
-        result = session_manager.finish_session(session.session_id)
-        if result:
-            logger.success(f"Session '{session_name}' marked as finished in Redis.")
-            if session_name in self.sessions:
-                del self.sessions[session_name]
-            return True
-        else:
-            logger.error(f"Failed to mark session '{session_name}' as finished in Redis.")
-            return False
+        """Stop the session's tmux session and mark it finished."""
+        return self.service.kill_session(session_name)
 
     def kill_all_sessions(self) -> Tuple[int, int, list]:
-        """Mark all sessions as finished using the Redis-based SessionManager.
+        """Kill every desto session that is still running in tmux.
+
+        Unlike the dashboard's "kill all", tmux sessions that desto did not start are left alone.
 
         Returns:
             Tuple of (success_count, total_count, error_messages)
         """
-        sessions = self.list_sessions()
-        total_count = len(sessions)
-        success_count = 0
-        error_messages = []
-
-        if total_count == 0:
-            logger.info("No active sessions found in Redis")
+        running = [name for name in self.list_sessions() if self.service.is_tmux_session_active(name)]
+        if not running:
+            logger.info("No running desto sessions found")
             return (0, 0, [])
 
-        for session_name in sessions.keys():
+        success_count = 0
+        error_messages = []
+        for session_name in running:
             if self.kill_session(session_name):
                 success_count += 1
             else:
-                error_messages.append(f"Failed to finish session '{session_name}' in Redis")
-
-        return (success_count, total_count, error_messages)
+                error_messages.append(f"Failed to kill session '{session_name}'")
+        return (success_count, len(running), error_messages)
 
     def attach_session(self, session_name: str) -> bool:
         """Attach to an existing session (checks Redis, but still uses tmux for terminal attach)."""

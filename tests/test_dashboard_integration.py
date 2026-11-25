@@ -93,7 +93,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
             mock_ui.label = capture_label
             mock_ui.button = Mock()
 
-            tmux_manager.add_sessions_table(mock_session_data, mock_ui)
+            tmux_manager.dashboard.add_sessions_table(mock_session_data, mock_ui)
             self.assertTrue(mock_ui.row.called)
             self.assertTrue(len(captured_labels) > 0)
 
@@ -154,7 +154,7 @@ class TestDashboardStatusDisplay(unittest.TestCase):
                     mock_ui.row.return_value = mock_row
                     mock_ui.label = capture_label
                     mock_ui.button = Mock()
-                    tmux_manager.add_sessions_table(mock_session_data, mock_ui)
+                    tmux_manager.dashboard.add_sessions_table(mock_session_data, mock_ui)
                     # Find the status label (last label in the row)
                     if captured_labels:
                         self.assertIn(expected_display, captured_labels)
@@ -219,9 +219,6 @@ class TestJobCompletionMarkingIntegration(unittest.TestCase):
             mock_redis_class.return_value = mock_redis_client
 
             tmux_manager = TmuxManager(self.mock_ui, self.mock_logger, log_dir=self.log_dir, scripts_dir=self.scripts_dir)
-
-            # Test Redis-based command generation
-            self.assertTrue(tmux_manager.use_redis)
 
             command = tmux_manager.get_job_completion_command("test_session", use_variable=True)
 

@@ -11,11 +11,7 @@ dependencies = [
     "typer>=0.12.0",
     "rich>=13.0.0",
     "redis>=4.0.0",
-    "requests>=2.31.0",
-    "textual>=8.2",
-    "tree-sitter>=0.25",
-    "tree-sitter-bash>=0.23",
-    "tree-sitter-python>=0.23",
+    "textual[syntax]>=8.2",
 ]
 
 [project.urls]
@@ -28,23 +24,11 @@ Issues = "https://github.com/kalfasyan/desto/issues"
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",
-    "ipython>=9.2.0",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "pytest-xdist>=3.2.0",
     "pytest-instafail>=0.5.0",
     "twine>=6.1.0",
-]
-
-docs = [
-    "mkdocs>=1.6.1",
-    "mkdocs-material>=9.6.19",
-    "mkdocstrings>=0.30.0",
-    "mkdocstrings-python>=1.18.2",
-    "pymdown-extensions>=10.16.1",
-    "mkdocs-include-markdown-plugin>=6.0.0",
-    "mkdocs-htmlproofer-plugin>=1.2.1",
-    "loguru>=0.7.3", # For docs generation scripts
 ]
 
 [project.scripts]

@@ -93,7 +93,6 @@ class DestoService(ScheduledJobsMixin):
         self.desto_manager = DestoManager(self.redis_client, sqlite_store=sqlite_store)
         self.pubsub = SessionPubSub(self.redis_client)
         self.job_manager = JobManager(self.redis_client)
-        self.use_redis = True
         logger.info(f"desto service initialized - log_dir: {self.LOG_DIR}, scripts_dir: {self.SCRIPTS_DIR}")
 
     # --- Front-end hooks ------------------------------------------------------------
@@ -361,8 +360,6 @@ class DestoService(ScheduledJobsMixin):
             use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
         """
         exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
-        if not self.use_redis:
-            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
         # The bundled hook module works from an installed package, not just a source checkout
         return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
 
@@ -408,8 +405,13 @@ class DestoService(ScheduledJobsMixin):
     def kill_session(self, session_name) -> bool:
         """Kill a tmux session by name."""
         self.logger.info(f"Attempting to kill session: '{session_name}'")
-        result = subprocess.run(["tmux", "kill-session", "-t", shlex.quote(session_name)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
+            # The completion hook never runs for a killed session, so record the end here
+            try:
+                self.desto_manager.finish_session(session_name, exit_code=0)
+            except Exception as e:
+                logger.debug(f"Could not mark session '{session_name}' finished: {e}")
             msg = f"Session '{session_name}' killed successfully."
             self.logger.info(msg)
             self.notify(msg, "positive")
@@ -561,13 +563,13 @@ class DestoService(ScheduledJobsMixin):
             return 0
 
     def clear_log_files(self) -> int:
-        """Delete every *.log and *.finished file in the logs directory. Returns how many were deleted."""
+        """Delete every *.log file in the logs directory. Returns how many were deleted."""
         log_dir = self.LOG_DIR
         if not log_dir.exists():
             self.notify("Logs directory not found", "warning")
             return 0
         try:
-            all_files = list(log_dir.glob("*.log")) + list(log_dir.glob("*.finished"))
+            all_files = list(log_dir.glob("*.log"))
             if not all_files:
                 self.notify("No log files found to clear", "info")
                 return 0
@@ -599,13 +601,3 @@ class DestoService(ScheduledJobsMixin):
             logger.error(error_msg)
             self.notify(error_msg, "negative")
             return 0
-
-    def get_script_run_time(self, created_time, session_name):
-        """Return the elapsed seconds of a session, up to its end time if it has ended."""
-        try:
-            session = self.desto_manager.session_manager.get_session_by_name(session_name)
-            end_time = session.end_time.timestamp() if session and session.end_time else time.time()
-            return int(end_time - created_time)
-        except Exception as e:
-            logger.warning(f"Failed to get script run time for {session_name}: {e}")
-            return int(time.time() - created_time)

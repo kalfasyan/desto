@@ -259,7 +259,7 @@ class TestConfirmKillAllSessions:
         tmux_manager.pause_updates = MagicMock()
         tmux_manager.resume_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates, show notification, and resume updates
         tmux_manager.pause_updates.assert_called_once()
@@ -272,7 +272,7 @@ class TestConfirmKillAllSessions:
 
     @patch.object(TmuxManager, "get_scheduled_jobs")
     @patch.object(TmuxManager, "check_sessions")
-    def test_confirm_kill_all_sessions_with_jobs_and_sessions(self, mock_check_sessions, mock_get_jobs, tmux_manager, tmp_path):
+    def test_confirm_kill_all_sessions_with_jobs_and_sessions(self, mock_check_sessions, mock_get_jobs, tmux_manager):
         """Test confirmation dialog when both sessions and jobs exist."""
         # Mock sessions and jobs
         mock_check_sessions.return_value = {
@@ -281,14 +281,10 @@ class TestConfirmKillAllSessions:
         }
         mock_get_jobs.return_value = [{"id": "39", "datetime": "Mon Jun 30 15:30:00 2025", "user": "testuser"}]
 
-        # Create finished marker for session2 to test finished vs running logic
-        finished_marker = tmp_path / "session2.finished"
-        finished_marker.touch()
-
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()
@@ -308,7 +304,7 @@ class TestConfirmKillAllSessions:
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()
@@ -325,7 +321,7 @@ class TestConfirmKillAllSessions:
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()

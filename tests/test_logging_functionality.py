@@ -15,6 +15,23 @@ from desto.app.sessions import TmuxManager
 pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
 
+def wait_for_tmux_session_to_exit(session_name, timeout=10):
+    """Wait until the tmux session is gone, so a new one with the same name can start.
+
+    The completion hook runs a short Python process after the script, so the
+    session outlives the FINISHED line in the log by a moment.
+    """
+    import subprocess
+    import time
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if subprocess.run(["tmux", "has-session", "-t", session_name], capture_output=True).returncode != 0:
+            return True
+        time.sleep(0.1)
+    return False
+
+
 class TestTmuxManagerLogging:
     """Test enhanced logging functionality in TmuxManager."""
 
@@ -53,9 +70,6 @@ class TestTmuxManagerLogging:
             mock_redis_class.return_value = mock_redis_instance
 
             tmux_manager = TmuxManager(mock_ui, mock_logger, log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
-
-            # Force Redis to be disabled to ensure file-based markers are used
-            tmux_manager.use_redis = False
 
             return tmux_manager
 
@@ -113,6 +127,7 @@ class TestTmuxManagerLogging:
         assert "=== SCRIPT FINISHED at" in first_content
 
         # Second session (same name - should append, not overwrite)
+        assert wait_for_tmux_session_to_exit(session_name), "First tmux session did not exit"
         command2 = "echo 'Second session'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
         assert wait_for_file_contains(log_file, "Second session", timeout=5), "Second session output not found"
@@ -183,6 +198,7 @@ class TestTmuxManagerLogging:
         assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "First run", timeout=5), "First run output not found"
 
         # Second session with same name - should append to existing log
+        assert wait_for_tmux_session_to_exit(session_name), "First tmux session did not exit"
         command2 = "echo 'Second run'"
         tmux_manager.start_tmux_session(session_name, command2, Mock())
         assert wait_for_file_contains(temp_dirs["log_dir"] / f"{session_name}.log", "Second run", timeout=5), "Second run output not found"

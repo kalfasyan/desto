@@ -7,8 +7,6 @@ import time
 from nicegui import ui
 
 from desto.core.formatting import (
-    classify_session,
-    decode_hash,
     format_bytes,
     format_seconds,
     metrics_key,
@@ -22,17 +20,33 @@ from desto.core.formatting import (
 from desto.core.session_metrics import read_history, read_summaries
 
 
-class SessionsDashboardMixin:
-    """Dashboard rendering for TmuxManager.
+class SessionsDashboard:
+    """The sessions dashboard: stats cards, sessions table and scheduled jobs table.
 
-    Expects the host class to provide sessions_container, redis_client, status_filter,
-    pause_updates/resume_updates and the session/scheduled-job/dialog methods it calls.
+    Reads sessions and scheduled jobs from the service, opens dialogs through SessionDialogs
+    and renders into its own container.
     """
 
-    # Kept as attributes for callers that use the old private names.
-    _decode_hash = staticmethod(decode_hash)
-    _classify_session = staticmethod(classify_session)
-    _format_seconds = staticmethod(format_seconds)
+    def __init__(self, service, dialogs, container):
+        self.service = service
+        self.dialogs = dialogs
+        self.sessions_container = container
+        self.status_filter = None  # None, "running", "finished" or "failed"
+        self._last_render_signature = None  # Skip re-rendering when nothing changed
+        self._live_duration_labels = []  # (label, start datetime) for running sessions
+        self._usage_labels = {}  # metrics key -> CPU / memory label of a shown session
+        self._atd_cache = (0.0, True)  # (checked_at, is_running)
+
+    @property
+    def ui(self):
+        return self.service.ui
+
+    def clear_sessions_container(self):
+        self.sessions_container.clear()
+
+    def add_to_sessions_container(self, content):
+        with self.sessions_container:
+            content()
 
     def update_sessions_status(self, ui_manager=None, force=True):
         """Render the sessions dashboard (stats cards, sessions table, scheduled jobs).
@@ -42,10 +56,10 @@ class SessionsDashboardMixin:
         flicker and scroll position or open menus are not reset. Live durations of running
         sessions are updated in place by tick_live_durations().
         """
-        sessions_status = self.get_all_sessions_status()
-        tmux_active = set(self.check_sessions().keys())
-        job_info = self._job_info_by_session()
-        scheduled_jobs = self._get_scheduled_jobs_with_metadata()
+        sessions_status = self.service.get_all_sessions_status()
+        tmux_active = set(self.service.check_sessions().keys())
+        job_info = self.service._job_info_by_session()
+        scheduled_jobs = self.service._get_scheduled_jobs_with_metadata()
         self.tick_usage()
 
         signature = json.dumps([sessions_status, sorted(tmux_active), job_info, scheduled_jobs, self.status_filter], sort_keys=True, default=str)
@@ -53,7 +67,7 @@ class SessionsDashboardMixin:
             return
         self._last_render_signature = signature
 
-        counts = self._count_by_category(sessions_status, tmux_active, job_info)
+        counts = self.service._count_by_category(sessions_status, tmux_active, job_info)
         self.clear_sessions_container()
 
         def render():
@@ -72,11 +86,11 @@ class SessionsDashboardMixin:
 
     def tick_usage(self):
         """Update the CPU / memory labels of the shown sessions in place (no table rebuild)."""
-        labels = getattr(self, "_usage_labels", {})
+        labels = self._usage_labels
         if not labels:
             return
         try:
-            summaries = read_summaries(self.redis_client.redis, list(labels))
+            summaries = read_summaries(self.service.redis_client.redis, list(labels))
         except Exception:
             return
         for key, label in labels.items():
@@ -101,14 +115,14 @@ class SessionsDashboardMixin:
             ui.label("Sessions Dashboard").style("font-size: 1.5em; font-weight: bold; margin-left: 10px;")
             with ui.row().style("gap: 10px;"):
                 ui.button("Refresh", icon="refresh", on_click=lambda: self.update_sessions_status(force=True)).props("flat")
-                ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.confirm_clear_history).props("flat")
-                ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.confirm_clear_logs).props("flat")
+                ui.button("Clear History", icon="delete_sweep", color="red", on_click=self.dialogs.confirm_clear_history).props("flat")
+                ui.button("Clear Logs", icon="folder_delete", color="orange", on_click=self.dialogs.confirm_clear_logs).props("flat")
 
         self._render_atd_warning()
 
         # Counts use the same classification as the table rows, and clicking a card filters the table.
         if counts is None:
-            counts = self._count_by_category(sessions_status)
+            counts = self.service._count_by_category(sessions_status)
         self._render_stats_cards(counts)
 
     def _render_atd_warning(self):
@@ -154,9 +168,9 @@ class SessionsDashboardMixin:
     def add_sessions_table(self, sessions_status, ui, tmux_active=None, job_info=None, scheduled_jobs=None):
         """Adds the sessions table to the UI, using the history tab's columns plus an Actions column."""
         if tmux_active is None:
-            tmux_active = set(self.check_sessions().keys())
+            tmux_active = set(self.service.check_sessions().keys())
         if job_info is None:
-            job_info = self._job_info_by_session()
+            job_info = self.service._job_info_by_session()
         self._live_duration_labels = []
         self._usage_labels = {}
 
@@ -167,14 +181,14 @@ class SessionsDashboardMixin:
             ui.label(f"No {self.status_filter} sessions. Click the card again to show all.").style("padding: 12px;").classes("text-slate-500")
 
         try:
-            usage = read_summaries(self.redis_client.redis, [metrics_key(row.name, row.session) for row in rows])
+            usage = read_summaries(self.service.redis_client.redis, [metrics_key(row.name, row.session) for row in rows])
         except Exception:
             usage = {}
         for row in rows:
             self._render_session_row(ui, row.name, row.session, row.tmux_active, row.label, row.color, row.command, usage=usage)
 
         if scheduled_jobs is None:
-            scheduled_jobs = self._get_scheduled_jobs_with_metadata()
+            scheduled_jobs = self.service._get_scheduled_jobs_with_metadata()
         if scheduled_jobs:
             self._render_scheduled_jobs_table(ui, scheduled_jobs)
 
@@ -219,12 +233,12 @@ class SessionsDashboardMixin:
                 if tmux_active_row:
                     ui.button(
                         "Kill",
-                        on_click=lambda s=session_name: self.confirm_kill_session(s),
+                        on_click=lambda s=session_name: self.dialogs.confirm_kill_session(s),
                     ).props("color=red flat")
                 elif command:
                     ui.button(
                         "Re-run",
-                        on_click=lambda s=session_name, c=command: self.rerun_session(s, c),
+                        on_click=lambda s=session_name, c=command: self.service.rerun_session(s, c),
                     ).props("color=green flat").tooltip("Run the same command again in a new session")
                 else:
                     ui.button(
@@ -233,27 +247,25 @@ class SessionsDashboardMixin:
                     ).props("color=red flat disabled")
                 ui.button(
                     "View Log",
-                    on_click=lambda s=session_name: self.view_log(s, ui),
+                    on_click=lambda s=session_name: self.dialogs.view_log(s, ui),
                 ).props("color=blue flat")
                 ui.button(
                     "Clear",
-                    on_click=lambda s=session_name: self.confirm_clear_session(s, ui),
+                    on_click=lambda s=session_name: self.dialogs.confirm_clear_session(s, ui),
                 ).props("color=orange flat")
 
     def show_usage_dialog(self, ui, session_name, key):
         """CPU and memory of a session over its run, with its totals."""
         try:
-            points = read_history(self.redis_client.redis, key)
-            summary = read_summaries(self.redis_client.redis, [key]).get(key, {})
+            points = read_history(self.service.redis_client.redis, key)
+            summary = read_summaries(self.service.redis_client.redis, [key]).get(key, {})
         except Exception:
             points, summary = [], {}
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def close_dialog():
             dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 720px; max-width: 95vw;").classes("dark:!bg-slate-900"):
             ui.label(f"Resource usage: {session_name}").style("font-weight: bold; font-size: 1.1em;")
@@ -306,17 +318,15 @@ class SessionsDashboardMixin:
                 with ui.row().style("flex: 1; min-width: 120px; gap: 8px;"):
                     ui.button(
                         "Cancel",
-                        on_click=lambda j=job_id: self.confirm_cancel_scheduled_job_by_id(j),
+                        on_click=lambda j=job_id: self.dialogs.confirm_cancel_scheduled_job_by_id(j),
                     ).props("color=red flat")
 
     def _show_job_metadata_dialog(self, ui, job_id, metadata):
-        if self.pause_updates:
-            self.pause_updates()
+        self.service.pause()
 
         def close_dialog():
             dialog.close()
-            if self.resume_updates:
-                self.resume_updates()
+            self.service.resume()
 
         with ui.dialog() as dialog, ui.card().style("min-width: 400px;").classes("dark:!bg-slate-900"):
             ui.label(f"Job Metadata for ID: {job_id}").style("font-weight: bold; font-size: 1.1em;")

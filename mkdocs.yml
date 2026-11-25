@@ -4,6 +4,8 @@ site_url: https://desto.readthedocs.io/en/latest/
 docs_dir: docs
 watch:
   - README.md
+  - CONTRIBUTING.md
+  - SECURITY.md
 nav:
   - Home: index.md
   - Getting Started:
@@ -21,9 +23,6 @@ nav:
       - Contributing: community/CONTRIBUTING.md
       - Security: community/SECURITY.md
       - Code of Conduct: community/CODE_OF_CONDUCT.md
-
-exclude_docs: |
-  includes/*
 
 theme:
   name: material

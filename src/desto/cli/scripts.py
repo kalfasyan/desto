@@ -1,6 +1,7 @@
 """Script management commands for the desto CLI."""
 
 import os
+import shlex
 import stat
 import subprocess
 from datetime import datetime
@@ -360,15 +361,7 @@ def run_script(
 ):
     """Run a script directly or in a tmux session."""
     manager = CLISessionManager()
-
-    # Find the script file (try with and without extension)
-    script_path = None
-    for candidate in [name, f"{name}.sh", f"{name}.py"]:
-        candidate_path = manager.get_script_file(candidate)
-        if candidate_path.exists():
-            script_path = candidate_path
-            break
-
+    script_path = manager.find_script(name)
     if not script_path:
         console.print(f"[red]Script '{name}' not found in {manager.scripts_dir}[/red]")
         raise typer.Exit(1)
@@ -408,9 +401,9 @@ def run_script(
         if not session_name:
             session_name = f"{script_path.stem}_{int(datetime.now().timestamp())}"
 
-        command_str = " ".join(base_command)
+        command = core_scripts.launch_command(script_path, shlex.join(args or []), manager.service.python_executable)
 
-        if manager.start_session(session_name, command_str):
+        if manager.start_session(session_name, command):
             icon = get_script_icon(script_type)
             console.print(f"[green]✅ Started {icon} {script_path.name} in session '{session_name}'[/green]")
 
@@ -489,8 +482,6 @@ def chain_scripts(
     Example:
       desto-cli scripts chain "count_files.sh ./mydir" "other_script.py foo bar"
     """
-    import shlex
-
     manager = CLISessionManager()
     # Parse each script+args as a list
     scripts_with_args = [shlex.split(entry) for entry in scripts]
