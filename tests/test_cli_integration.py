@@ -89,31 +89,6 @@ class TestCLIIntegration:
                 check=True,
             )
 
-    def test_utility_functions_integration(self):
-        """Test utility functions working together."""
-        from datetime import datetime
-
-        from desto.cli.utils import (
-            format_duration,
-            format_timestamp,
-            validate_session_name,
-        )
-
-        # Test duration formatting for realistic values
-        assert format_duration(0) == "0s"
-        assert format_duration(3661) == "1h 1m"
-        assert format_duration(90061) == "1d 1h"
-
-        # Test timestamp formatting
-        now = datetime.now()
-        timestamp = now.timestamp()
-        formatted = format_timestamp(timestamp)
-        assert ":" in formatted  # Should contain time
-
-        # Test session name validation
-        assert validate_session_name("valid-session_name.123") is True
-        assert validate_session_name("invalid'session") is False
-
     @pytest.mark.skipif(os.getenv("CI") == "true", reason="Integration tests not run in CI")
     def test_error_handling_integration(self, temp_dirs):
         """Test error handling across CLI components."""
@@ -187,7 +162,7 @@ class TestCLIIntegration:
     def test_cross_module_functionality(self, temp_dirs):
         """Test functionality that spans multiple modules."""
         from desto.cli.session_manager import CLISessionManager
-        from desto.cli.utils import format_duration
+        from desto.core.formatting import format_seconds
 
         manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
@@ -205,8 +180,7 @@ class TestCLIIntegration:
             session_info = sessions["test_session"]
 
             # Format the runtime using utility function
-            formatted_runtime = format_duration(session_info["runtime"])
-            assert formatted_runtime == "1h 1m"
+            assert format_seconds(session_info["runtime"]) == "1h 1m 1s"
 
             # Check session exists
             assert manager.session_exists("test_session") is True

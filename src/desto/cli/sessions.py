@@ -7,8 +7,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from desto.core.formatting import format_seconds, format_timestamp
+
 from .session_manager import CLISessionManager
-from .utils import format_duration, format_timestamp
 
 # Create the sessions command group
 sessions_app = typer.Typer(help="Manage tmux sessions")
@@ -41,7 +42,7 @@ def list_sessions(
 
     for session_name, info in sessions.items():
         status = "🔴 Finished" if info["finished"] else "🟢 Running"
-        runtime = format_duration(info["runtime"])
+        runtime = format_seconds(info["runtime"])
         created = format_timestamp(info["created"])
 
         row = [session_name, status, runtime, created]
@@ -220,7 +221,7 @@ def session_status(
         console.print(f"  Status: [{status_color}]{status_text}[/{status_color}]")
         console.print(f"  ID: {info['id']}")
         console.print(f"  Created: {format_timestamp(info['created'])}")
-        console.print(f"  Runtime: {format_duration(info['runtime'])}")
+        console.print(f"  Runtime: {format_seconds(info['runtime'])}")
         console.print(f"  Windows: {info['windows']}")
         console.print(f"  Attached: {'Yes' if info['attached'] else 'No'}")
 
