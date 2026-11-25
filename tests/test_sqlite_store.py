@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from desto.redis.models import DestoJob, DestoSession, JobStatus, SessionStatus
-from desto.redis.sqlite_store import SQLiteStore
+from desto.store.models import DestoJob, DestoSession, JobStatus, SessionStatus
+from desto.store.sqlite_store import SQLiteStore
 
 
 @pytest.fixture

@@ -244,7 +244,7 @@ def session_usage(
     from desto.config import config as ui_settings
     from desto.core.formatting import format_bytes, format_seconds
     from desto.core.session_metrics import KEY_PREFIX, read_summaries
-    from desto.redis.client import DestoRedisClient
+    from desto.store.client import DestoRedisClient
 
     client = DestoRedisClient(ui_settings.get("redis"))
     if not client.is_connected():

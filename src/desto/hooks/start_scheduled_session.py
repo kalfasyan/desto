@@ -62,9 +62,9 @@ def main():
         try:
             from datetime import datetime
 
-            from desto.redis.client import DestoRedisClient
-            from desto.redis.desto_manager import DestoManager
-            from desto.redis.models import SessionStatus
+            from desto.store.client import DestoRedisClient
+            from desto.store.desto_manager import DestoManager
+            from desto.store.models import SessionStatus
 
             client = DestoRedisClient()
             if client.is_connected():
@@ -111,8 +111,8 @@ def main():
             sys.exit(0)  # Exit gracefully anyway since tmux session is running
 
     try:
-        from desto.redis.client import DestoRedisClient
-        from desto.redis.desto_manager import DestoManager
+        from desto.store.client import DestoRedisClient
+        from desto.store.desto_manager import DestoManager
 
         # Initialize Redis tracking
         client = DestoRedisClient()
@@ -120,7 +120,7 @@ def main():
             manager = DestoManager(client)
             from datetime import datetime
 
-            from desto.redis.models import SessionStatus
+            from desto.store.models import SessionStatus
 
             # Try to find an existing scheduled session with this name
             existing_session = None
@@ -172,7 +172,7 @@ def main():
                     # Update job's start_time in Redis
                     redis_client = manager.client if hasattr(manager, "client") else None
                     if redis_client is None:
-                        from desto.redis.client import DestoRedisClient
+                        from desto.store.client import DestoRedisClient
 
                         redis_client = DestoRedisClient()
                     redis_client.redis.hset(job_key, "start_time", session.start_time.isoformat())

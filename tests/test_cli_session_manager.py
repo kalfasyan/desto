@@ -12,7 +12,7 @@ import pytest
 from desto.cli.session_manager import CLISessionManager
 
 # Add missing imports for Redis session manager and datetime
-from desto.redis.session_manager import SessionManager
+from desto.store.session_manager import SessionManager
 
 
 @pytest.fixture

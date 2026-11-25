@@ -10,7 +10,7 @@ from typing import Dict, Optional
 from loguru import logger
 
 # Import DestoRedisClient from sibling module
-from .client import DestoRedisClient
+from desto.store.client import DestoRedisClient
 
 
 class AtJobManager:

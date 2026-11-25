@@ -21,8 +21,8 @@ sys.path.insert(0, str(project_root))
 try:
     from src.desto.app.sessions import TmuxManager
     from src.desto.app.ui import LogSection
-    from src.desto.redis.client import DestoRedisClient
-    from src.desto.redis.desto_manager import DestoManager
+    from src.desto.store.client import DestoRedisClient
+    from src.desto.store.desto_manager import DestoManager
 except ImportError as e:
     print(f"Import error: {e}")
     sys.exit(1)

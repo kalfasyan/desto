@@ -14,8 +14,8 @@ from typing import Dict, List, Optional
 
 from loguru import logger
 
-from .at_job_manager import AtJobManager
-from .client import DestoRedisClient
+from desto.core.at_job_manager import AtJobManager
+from desto.store.client import DestoRedisClient
 
 RECURRING_PREFIX = "desto:recurring:"
 CLAIM_PREFIX = "desto:recurring_claim:"

@@ -5,9 +5,9 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from desto.config import UISettings
-from desto.redis.desto_manager import DestoManager
-from desto.redis.models import DestoJob, DestoSession, JobStatus, SessionStatus
-from desto.redis.sqlite_store import SQLiteStore
+from desto.store.desto_manager import DestoManager
+from desto.store.models import DestoJob, DestoSession, JobStatus, SessionStatus
+from desto.store.sqlite_store import SQLiteStore
 
 # ─── SQLiteSettings Configuration Tests ──────────────────────────────────────
 

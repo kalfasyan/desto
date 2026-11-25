@@ -5,8 +5,8 @@ from datetime import datetime
 from nicegui import ui
 
 from desto.core import scripts
+from desto.core.recurring import REPEAT_UNITS
 from desto.core.scheduled_jobs import ScheduleError
-from desto.redis.recurring import REPEAT_UNITS
 
 REPEAT_OPTIONS = {"never": "Does not repeat", "minutes": "minute(s)", "hours": "hour(s)", "days": "day(s)", "weeks": "week(s)"}
 

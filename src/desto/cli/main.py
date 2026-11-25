@@ -129,7 +129,7 @@ def monitor(
     """
     from desto.config import config as ui_settings
     from desto.core.session_metrics import SessionMetricsSampler
-    from desto.redis.client import DestoRedisClient
+    from desto.store.client import DestoRedisClient
 
     client = DestoRedisClient(ui_settings.get("redis"))
     if not client.is_connected():
@@ -137,7 +137,7 @@ def monitor(
         raise typer.Exit(1)
     sqlite_store = None
     if ui_settings.get("sqlite", {}).get("enabled", False):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         sqlite_store = SQLiteStore(db_path=ui_settings["sqlite"].get("db_path") or None, enabled=True)
     every = interval or ui_settings.get("metrics", {}).get("interval", 5.0)
@@ -182,7 +182,7 @@ def doctor():
     # Check Redis connection
     try:
         from desto.config import config as ui_settings
-        from desto.redis.client import DestoRedisClient
+        from desto.store.client import DestoRedisClient
 
         redis_client = DestoRedisClient(ui_settings.get("redis"))
         if redis_client.is_connected():

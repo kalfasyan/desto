@@ -1,4 +1,4 @@
-"""Tests for recurring schedules (desto.redis.recurring and desto.hooks.run_recurring)."""
+"""Tests for recurring schedules (desto.core.recurring and desto.hooks.run_recurring)."""
 
 import subprocess
 import uuid
@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from desto.core.recurring import CLAIM_PREFIX, RECURRING_PREFIX, RecurringScheduleManager, describe_interval, next_occurrence, occurrence_session_name
 from desto.hooks import run_recurring
-from desto.redis.client import DestoRedisClient
-from desto.redis.recurring import CLAIM_PREFIX, RECURRING_PREFIX, RecurringScheduleManager, describe_interval, next_occurrence, occurrence_session_name
+from desto.store.client import DestoRedisClient
 
 
 @pytest.mark.parametrize(
@@ -162,7 +162,7 @@ class TestRunRecurringHook:
             return subprocess.CompletedProcess(cmd, 0)
 
         monkeypatch.setattr(run_recurring.subprocess, "run", fake_run)
-        monkeypatch.setattr("desto.redis.recurring.AtJobManager", lambda *a, **k: at_jobs)
+        monkeypatch.setattr("desto.core.recurring.AtJobManager", lambda *a, **k: at_jobs)
         return calls
 
     def fire(self, schedule_id, occurrence=FIRST_RUN):

@@ -126,7 +126,7 @@ class SessionsDashboard:
         self._render_stats_cards(counts)
 
     def _render_atd_warning(self):
-        from desto.redis.at_job_manager import AtJobManager
+        from desto.core.at_job_manager import AtJobManager
 
         if self._is_atd_running_cached(AtJobManager):
             return

@@ -11,8 +11,8 @@ import pytest
 
 from desto.core import session_metrics as sm
 from desto.core.formatting import format_bytes, metrics_key, usage_cells
-from desto.redis.models import DestoSession, SessionStatus
-from desto.redis.sqlite_store import METRIC_COLUMNS, SQLiteStore
+from desto.store.models import DestoSession, SessionStatus
+from desto.store.sqlite_store import METRIC_COLUMNS, SQLiteStore
 
 
 class FakeRedis:
