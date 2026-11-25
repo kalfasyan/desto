@@ -19,7 +19,7 @@ from typing import Callable, Optional
 
 from loguru import logger
 
-from desto.app.config import config as ui_settings
+from desto.config import config as ui_settings
 from desto.core import scripts
 from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, metrics_key, scheduled_job_rows, session_rows, summarize_jobs
 from desto.core.scheduled_jobs import ScheduledJobsMixin

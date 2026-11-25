@@ -127,7 +127,7 @@ def monitor(
     The dashboard and the terminal UI already do this while they run; use this command when
     neither is open. Only one sampler writes at a time, so it is safe to run alongside them.
     """
-    from desto.app.config import config as ui_settings
+    from desto.config import config as ui_settings
     from desto.core.session_metrics import SessionMetricsSampler
     from desto.redis.client import DestoRedisClient
 
@@ -181,7 +181,7 @@ def doctor():
 
     # Check Redis connection
     try:
-        from desto.app.config import config as ui_settings
+        from desto.config import config as ui_settings
         from desto.redis.client import DestoRedisClient
 
         redis_client = DestoRedisClient(ui_settings.get("redis"))

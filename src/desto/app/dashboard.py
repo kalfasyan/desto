@@ -6,9 +6,9 @@ from loguru import logger
 from nicegui import ui
 
 from desto.app.auth import get_auth_config, is_loopback, setup_auth
-from desto.app.config import config as ui_settings
 from desto.app.sessions import TmuxManager
 from desto.app.ui import UserInterfaceManager
+from desto.config import config as ui_settings
 from desto.core.formatting import session_event_message
 from desto.core.session_metrics import start_background_sampler
 

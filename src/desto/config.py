@@ -1,3 +1,5 @@
+"""desto settings: defaults, overridden by environment variables. Shared by the dashboard, TUI, CLI and core."""
+
 import os
 from dataclasses import asdict, dataclass, field
 

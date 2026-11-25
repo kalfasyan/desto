@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from desto.app.config import UISettings
+from desto.config import UISettings
 from desto.redis.desto_manager import DestoManager
 from desto.redis.models import DestoJob, DestoSession, JobStatus, SessionStatus
 from desto.redis.sqlite_store import SQLiteStore
