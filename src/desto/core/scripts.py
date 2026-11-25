@@ -65,14 +65,18 @@ def launch_command(script_path, arguments: str = "", python_executable: str = "p
     return f"{marker} && ({build_execution_command(script_path, arguments, python_executable)})"
 
 
-def chain_command(chain, python_executable: str = "python3") -> str:
-    """Command for launching a chain of (script_path, arguments) in order, stopping at the first failure."""
+def chain_command(chain, python_executable: str = "python3", continue_on_error: bool = False) -> str:
+    """Command for launching a chain of (script_path, arguments) in order.
+
+    The chain stops at the first failing script unless continue_on_error is set, in which case
+    every script runs and the chain's exit code is the last script's.
+    """
     total = len(chain)
     parts = []
     for idx, (script_path, arguments) in enumerate(chain, 1):
         marker = f"echo {shlex.quote(f'=== Running script {idx} of {total}: {Path(script_path).name} ===')}"
         parts.append(f"{marker} && ({build_execution_command(script_path, arguments, python_executable)})")
-    return " && ".join(parts)
+    return (" ; " if continue_on_error else " && ").join(parts)
 
 
 def create_script(scripts_dir: Path, name: str, code: str, kind: str = "bash") -> Path:

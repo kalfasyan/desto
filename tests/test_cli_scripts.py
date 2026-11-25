@@ -17,6 +17,7 @@ from desto.cli.scripts import (
     show_script,
     validate_script_name,
 )
+from desto.cli.session_manager import CLISessionManager
 
 
 class TestScriptUtilities:
@@ -72,6 +73,8 @@ class TestScriptCommands:
             manager = Mock()
             manager.scripts_dir = temp_scripts_dir
             manager.get_script_file.side_effect = lambda name: temp_scripts_dir / name
+            manager.find_script.side_effect = lambda name: CLISessionManager.find_script(manager, name)
+            manager.service.python_executable = "python3"
             mock.return_value = manager
             yield manager
 
@@ -227,8 +230,11 @@ class TestScriptCommands:
 
         mock_session_manager.start_session.assert_called_once()
         call_args = mock_session_manager.start_session.call_args
-        assert "python3" in call_args[0][1]  # Command should contain python3
-        assert str(script_path) in call_args[0][1]  # Command should contain script path
+        command = call_args[0][1]
+        assert "python3" in command
+        assert str(script_path) in command
+        assert "arg1" in command
+        assert "=== Running script: session_runner.py ===" in command
 
         mock_console.print.assert_any_call("[green]✅ Started 🐍 session_runner.py in session 'test_session'[/green]")
 

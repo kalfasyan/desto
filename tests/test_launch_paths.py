@@ -108,8 +108,6 @@ def launch_hook(name, command, dirs):
     return log_dir / f"{name}.log"
 
 
-CLI_NO_FINISH_BANNER = pytest.mark.xfail(strict=True, reason="CLI launch writes no SCRIPT FINISHED banner (plan F1)")
-
 LAUNCHERS = [
     pytest.param(launch_service, id="service"),
     pytest.param(launch_cli, id="cli"),
@@ -137,7 +135,7 @@ def test_failure_is_recorded_with_exit_code(launch, dirs, session_name):
     "launch",
     [
         pytest.param(launch_service, id="service"),
-        pytest.param(launch_cli, id="cli", marks=CLI_NO_FINISH_BANNER),
+        pytest.param(launch_cli, id="cli"),
         pytest.param(launch_hook, id="scheduled-hook"),
     ],
 )
@@ -153,7 +151,7 @@ def test_log_has_start_and_finish_banners(launch, dirs, session_name):
     "launch",
     [
         pytest.param(launch_service, id="service"),
-        pytest.param(launch_cli, id="cli", marks=CLI_NO_FINISH_BANNER),
+        pytest.param(launch_cli, id="cli"),
     ],
 )
 def test_relaunch_appends_to_existing_log(launch, dirs, session_name):
