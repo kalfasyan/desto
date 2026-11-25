@@ -12,8 +12,6 @@ import sys
 
 # Ensure loguru outputs to both stdout and a file, and set level to DEBUG
 import sys as _sys
-import threading
-import time
 from pathlib import Path
 
 from loguru import logger
@@ -43,44 +41,6 @@ try:
 except Exception as e:
     print(f"[SCHEDULED WRAPPER] ERROR: Could not add log file handler for '{_log_path}': {e}")
     logger.error(f"[SCHEDULED WRAPPER] Could not add log file handler for '{_log_path}': {e}")
-
-
-def start_redis_monitoring(session_name, desto_manager):
-    """Monitor tmux session and update Redis - same logic as TmuxManager._start_redis_monitoring."""
-
-    def monitor():
-        try:
-            while True:
-                time.sleep(1)
-                result = subprocess.run(
-                    ["tmux", "list-sessions", "-F", "#{session_name}"],
-                    capture_output=True,
-                    text=True,
-                )
-
-                if result.returncode != 0 or session_name not in result.stdout:
-                    # Session finished (entire tmux session ended)
-                    try:
-                        # Try to get exit status from Redis job
-                        job_status = desto_manager.get_job_status(session_name)
-                        if job_status not in ["finished", "failed"]:
-                            # Session ended but job wasn't marked complete - mark as finished
-                            desto_manager.finish_job(session_name, 0)
-                            logger.debug(f"Session '{session_name}' ended - marked as finished in Redis")
-                        else:
-                            logger.debug(f"Session '{session_name}' ended - already marked as {job_status} in Redis")
-
-                        # Mark session as finished
-                        desto_manager.session_manager.finish_session(session_name)
-                        break
-                    except Exception as e:
-                        logger.debug(f"Error updating Redis for finished session {session_name}: {e}")
-                        break
-        except Exception as e:
-            logger.debug(f"Error in Redis monitoring for {session_name}: {e}")
-
-    # Start monitoring in a daemon thread
-    threading.Thread(target=monitor, daemon=True).start()
 
 
 def main():

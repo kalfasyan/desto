@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional
 
 from loguru import logger
 
@@ -128,52 +128,6 @@ class AtJobManager:
         except Exception as e:
             logger.error(f"Exception during scheduling: {e}")
             return None
-
-    def list_jobs(self) -> List[Dict[str, Any]]:
-        """List all jobs scheduled with 'atq'. Returns a list of dicts with job info and metadata from Redis if available."""
-        jobs = []
-        try:
-            proc = subprocess.run(["atq"], capture_output=True, text=True, check=False)
-            for line in proc.stdout.splitlines():
-                # Example: 123\tSat Jul 20 12:00:00 2025 a user
-                parts = line.split()
-                if len(parts) >= 7:
-                    job_id = parts[0]
-                    date_str = " ".join(parts[1:6])
-                    queue = parts[6]
-                    user = parts[7] if len(parts) > 7 else ""
-                    job_info = {
-                        "id": job_id,
-                        "datetime": date_str,
-                        "queue": queue,
-                        "user": user,
-                    }
-                    # Add metadata from Redis if available
-                    if self.redis_client and self.redis_client.is_connected():
-                        key = f"desto:atjob:{job_id}"
-                        metadata = self.redis_client.redis.hgetall(key)
-                        if metadata:
-                            job_info["metadata"] = metadata
-                    jobs.append(job_info)
-        except Exception as e:
-            logger.debug(f"Failed to list jobs with 'atq': {e}")
-        return jobs
-
-    def get_job_command(self, job_id: str) -> str:
-        """Get the command for a scheduled job by job ID."""
-        try:
-            proc = subprocess.run(["at", "-c", str(job_id)], capture_output=True, text=True, check=True)
-            return proc.stdout
-        except Exception as e:
-            return f"Unknown command (error: {e})"
-
-    def get_job_metadata(self, job_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve job metadata from Redis for a given job_id."""
-        if self.redis_client and self.redis_client.is_connected():
-            key = f"desto:atjob:{job_id}"
-            metadata = self.redis_client.redis.hgetall(key)
-            return metadata if metadata else None
-        return None
 
     def cancel(self, job_id: str) -> bool:
         """Cancel a scheduled job by job ID. Returns True if successful. Updates status in Redis if enabled."""
