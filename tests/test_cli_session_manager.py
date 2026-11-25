@@ -74,50 +74,18 @@ class TestCLISessionManagerInit:
 class TestSessionManagement:
     """Test session management operations."""
 
-    def test_start_session_success(self, session_manager, temp_dirs):
-        """Test successful session start."""
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.cli.session_manager.SessionManager.get_session_by_name", return_value=None),
-            patch("desto.cli.session_manager.SessionManager.create_session") as mock_create,
-            patch("desto.cli.session_manager.SessionManager.start_session", return_value=True),
-        ):
-            mock_run.return_value = Mock(returncode=0)
-            mock_create.return_value = Mock(session_id="1", session_name="test_session")
-            result = session_manager.start_session("test_session", "echo hello")
-        assert result is True
-        assert "test_session" in session_manager.sessions
-        mock_run.assert_called()
+    def test_start_session_delegates_to_service(self, session_manager):
+        """CLI launches go through the same DestoService as the dashboard and TUI."""
+        session_manager._service = Mock()
+        session_manager._service.start_tmux_session.return_value = True
+        assert session_manager.start_session("test_session", "echo hello") is True
+        session_manager._service.start_tmux_session.assert_called_once_with("test_session", "echo hello")
 
-    def test_start_session_duplicate_name(self, session_manager):
-        """Test starting session with duplicate name."""
-        session_manager.sessions["existing"] = "some_command"
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.cli.session_manager.SessionManager.get_session_by_name", return_value=None),
-        ):
-            result = session_manager.start_session("existing", "echo hello")
-        assert result is False
-        mock_run.assert_not_called()
-
-    def test_start_session_subprocess_error(self, session_manager):
-        """Test session start with subprocess error."""
-        import subprocess as real_subprocess
-
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.cli.session_manager.SessionManager.get_session_by_name", return_value=None),
-            patch("desto.cli.session_manager.SessionManager.create_session") as mock_create,
-            patch("desto.cli.session_manager.SessionManager.start_session", return_value=True),
-        ):
-            mock_run.side_effect = real_subprocess.CalledProcessError(1, "tmux")
-            mock_create.return_value = Mock(session_id="1", session_name="test")
-            result = session_manager.start_session("test", "echo hello")
-        assert result is False
-
-    # Legacy marker file logic removed; no longer relevant with Redis-centric manager.
-    # def test_start_session_removes_finished_marker(self, session_manager, temp_dirs):
-    #     pass
+    def test_start_session_reports_service_failure(self, session_manager):
+        """A refused launch (duplicate name, tmux error) is reported as False."""
+        session_manager._service = Mock()
+        session_manager._service.start_tmux_session.return_value = False
+        assert session_manager.start_session("existing", "echo hello") is False
 
     def test_list_sessions_empty(self, session_manager):
         """Test listing sessions when none exist (Redis-centric)."""
@@ -138,15 +106,21 @@ class TestSessionManagement:
             assert sessions["session1"]["finished"] is False
             assert sessions["session2"]["finished"] is True
 
-    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Integration tests not run in CI")
-    def test_kill_session_not_found(self, session_manager):
-        """Test killing non-existent session."""
-        import subprocess as real_subprocess
+    def test_kill_session_delegates_to_service(self, session_manager):
+        """Killing goes through DestoService, which stops tmux and records the end."""
+        session_manager._service = Mock()
+        session_manager._service.kill_session.return_value = False
+        assert session_manager.kill_session("nonexistent") is False
+        session_manager._service.kill_session.assert_called_once_with("nonexistent")
 
-        with patch("desto.cli.session_manager.subprocess.run") as mock_run:
-            mock_run.side_effect = real_subprocess.CalledProcessError(1, "tmux")
-            result = session_manager.kill_session("nonexistent")
-        assert result is False
+    def test_kill_all_only_touches_running_desto_sessions(self, session_manager):
+        """Finished desto sessions and tmux sessions desto did not start are left alone."""
+        session_manager._service = Mock()
+        session_manager._service.is_tmux_session_active.side_effect = lambda name: name == "running"
+        session_manager._service.kill_session.return_value = True
+        with patch.object(session_manager, "list_sessions", return_value={"running": {}, "done": {}}):
+            assert session_manager.kill_all_sessions() == (1, 1, [])
+        session_manager._service.kill_session.assert_called_once_with("running")
 
     def test_kill_all_sessions_success(self, session_manager):
         """Test killing all sessions successfully."""
@@ -207,92 +181,44 @@ class TestSessionManagement:
 
             assert result is False
 
-    def test_start_chain_session_creates_redis_and_log(self, tmp_path):
-        # Setup
+    def test_start_chain_session_builds_one_chain_command(self, tmp_path):
+        """Scripts are resolved with or without extension and launched as one chain."""
         scripts_dir = tmp_path / "scripts"
         log_dir = tmp_path / "logs"
         scripts_dir.mkdir()
         log_dir.mkdir()
-        # Create dummy scripts
-        script1 = scripts_dir / "a.sh"
-        script1.write_text("#!/bin/bash\necho 'A'\n")
-        script1.chmod(0o755)
-        script2 = scripts_dir / "b.sh"
-        script2.write_text("#!/bin/bash\necho 'B'\n")
-        script2.chmod(0o755)
+        (scripts_dir / "a.sh").write_text("#!/bin/bash\necho 'A'\n")
+        (scripts_dir / "b.py").write_text("print('B')\n")
 
         manager = CLISessionManager(log_dir=log_dir, scripts_dir=scripts_dir)
-        scripts_with_args = [["a.sh"], ["b.sh"]]
+        manager._service = Mock(python_executable="python3")
+        manager._service.start_tmux_session.return_value = True
 
-        # Patch subprocess and Redis
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.redis.session_manager.SessionManager.create_session") as mock_create,
-            patch("desto.redis.session_manager.SessionManager.start_session") as mock_start,
-            patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=None),
-        ):
-            mock_run.return_value.returncode = 0
-            mock_create.return_value = Mock(session_id="id1", session_name="chain_test", metadata={})
-            mock_start.return_value = True
+        session_name = manager.start_chain_session([["a.sh", "x y"], ["b"]])
+        assert session_name.startswith("chain_")
+        name, command = manager._service.start_tmux_session.call_args[0]
+        assert name == session_name
+        assert "Running script 1 of 2: a.sh" in command and "Running script 2 of 2: b.py" in command
+        assert "'x y'" in command
+        assert " && " in command
 
-            session_name = manager.start_chain_session(scripts_with_args)
-            assert session_name is not None
-
-            # Check Redis registration
-            mock_create.assert_called()
-            args, kwargs = mock_create.call_args
-            assert "chain" in kwargs.get("metadata", {}).get("type", "chain")
-
-            # Check log file
-            log_file = log_dir / f"{session_name}.log"
-            assert log_file.exists()
-            content = log_file.read_text()
-            assert "# Session:" in content
-            # Do not check for script markers, as they are only written by tmux at runtime
-
-    def test_chain_session_registers_in_redis_and_logs(self, tmp_path):
-        from unittest.mock import Mock, patch
-
-        from desto.cli.session_manager import CLISessionManager
-
+    def test_start_chain_session_continue_on_error(self, tmp_path):
         scripts_dir = tmp_path / "scripts"
-        log_dir = tmp_path / "logs"
         scripts_dir.mkdir()
-        log_dir.mkdir()
-        script1 = scripts_dir / "a.sh"
-        script1.write_text("#!/bin/bash\necho 'A'\n")
-        script1.chmod(0o755)
-        script2 = scripts_dir / "b.sh"
-        script2.write_text("#!/bin/bash\necho 'B'\n")
-        script2.chmod(0o755)
+        (scripts_dir / "a.sh").write_text("exit 1\n")
+        (scripts_dir / "b.sh").write_text("echo b\n")
+        manager = CLISessionManager(log_dir=tmp_path / "logs", scripts_dir=scripts_dir)
+        manager._service = Mock(python_executable="python3")
+        manager._service.start_tmux_session.return_value = True
+        assert manager.start_chain_session([["a"], ["b"]], continue_on_error=True)
+        command = manager._service.start_tmux_session.call_args[0][1]
+        assert " ; " in command
 
-        manager = CLISessionManager(log_dir=log_dir, scripts_dir=scripts_dir)
-        scripts_with_args = [["a.sh"], ["b.sh"]]
-
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.redis.session_manager.SessionManager.create_session") as mock_create,
-            patch("desto.redis.session_manager.SessionManager.start_session") as mock_start,
-            patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=None),
-        ):
-            mock_run.return_value.returncode = 0
-            mock_create.return_value = Mock(session_id="id1", session_name="chain_test", metadata={})
-            mock_start.return_value = True
-
-            session_name = manager.start_chain_session(scripts_with_args)
-            assert session_name is not None
-
-            # Check Redis registration
-            mock_create.assert_called()
-            args, kwargs = mock_create.call_args
-            assert "chain" in kwargs.get("metadata", {}).get("type", "chain")
-
-            # Check log file
-            log_file = log_dir / f"{session_name}.log"
-            assert log_file.exists()
-            content = log_file.read_text()
-            assert "# Session:" in content
-            # Do not check for script markers, as they are only written by tmux at runtime
+    def test_start_chain_session_missing_script(self, tmp_path):
+        manager = CLISessionManager(log_dir=tmp_path / "logs", scripts_dir=tmp_path / "scripts")
+        manager._service = Mock()
+        assert manager.start_chain_session([["nope"]]) is None
+        manager._service.start_tmux_session.assert_not_called()
 
 
 class TestLogManagement:
@@ -359,14 +285,6 @@ class TestLogManagement:
 
 class TestErrorHandling:
     """Test error handling scenarios."""
-
-    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Integration tests not run in CI")
-    def test_start_session_general_exception(self, session_manager):
-        """Test handling of general exception during session start."""
-        with patch("desto.cli.session_manager.subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("Unexpected error")
-            result = session_manager.start_session("test", "echo hello")
-        assert result is False
 
     def test_list_sessions_general_exception(self, session_manager):
         """Test handling of general exception during session listing."""

@@ -405,8 +405,13 @@ class DestoService(ScheduledJobsMixin):
     def kill_session(self, session_name) -> bool:
         """Kill a tmux session by name."""
         self.logger.info(f"Attempting to kill session: '{session_name}'")
-        result = subprocess.run(["tmux", "kill-session", "-t", shlex.quote(session_name)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        result = subprocess.run(["tmux", "kill-session", "-t", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
+            # The completion hook never runs for a killed session, so record the end here
+            try:
+                self.desto_manager.finish_session(session_name, exit_code=0)
+            except Exception as e:
+                logger.debug(f"Could not mark session '{session_name}' finished: {e}")
             msg = f"Session '{session_name}' killed successfully."
             self.logger.info(msg)
             self.notify(msg, "positive")
