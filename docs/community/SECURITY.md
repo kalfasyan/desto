@@ -1,3 +1,3 @@
 # Security
 
-{% include "includes/SECURITY.md" %}
+{% include "../../SECURITY.md" %}

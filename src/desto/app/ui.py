@@ -9,12 +9,12 @@ from desto.core.system_stats import SystemMonitor
 
 from .auth import logout
 from .favorites_ui import FavoritesTab
-from .schedule_ui import ScheduleLaunchMixin
+from .schedule_ui import ScheduleDialog
 from .sqlite_ui import SQLiteHistoryTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
-class UserInterfaceManager(ScheduleLaunchMixin):
+class UserInterfaceManager:
     def __init__(self, ui, ui_settings, tmux_manager, desto_manager=None):
         from nicegui import ui as nicegui_ui
 
@@ -27,6 +27,7 @@ class UserInterfaceManager(ScheduleLaunchMixin):
         self.stats_panel = SystemStatsPanel(ui_settings)
         self.system_monitor = SystemMonitor()
         self.new_script_tab = NewScriptTab(tmux_manager, self)
+        self.schedule_dialog = ScheduleDialog(tmux_manager, self)
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
@@ -157,7 +158,7 @@ class UserInterfaceManager(ScheduleLaunchMixin):
                     ui.label("Chain Queue").classes("text-sm font-bold uppercase tracking-wider text-slate-500")
                     with ui.row().classes("gap-2"):
                         ui.button("Clear Chain", icon="clear_all", on_click=self.clear_chain_queue).props("flat color=warning dense")
-                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.confirm_kill_all_sessions).props("flat color=negative dense")
+                        ui.button("Kill All Sessions", icon="delete_forever", on_click=self.tmux_manager.dialogs.confirm_kill_all_sessions).props("flat color=negative dense")
 
                 self.chain_queue_display = ui.column().classes("modern-card w-full p-4 dark:!bg-slate-900 rounded-xl min-h-[60px] gap-2 border border-slate-100 dark:border-slate-800")
                 self.refresh_chain_queue_display()

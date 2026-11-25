@@ -259,7 +259,7 @@ class TestConfirmKillAllSessions:
         tmux_manager.pause_updates = MagicMock()
         tmux_manager.resume_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates, show notification, and resume updates
         tmux_manager.pause_updates.assert_called_once()
@@ -288,7 +288,7 @@ class TestConfirmKillAllSessions:
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()
@@ -308,7 +308,7 @@ class TestConfirmKillAllSessions:
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()
@@ -325,7 +325,7 @@ class TestConfirmKillAllSessions:
         # Mock pause function
         tmux_manager.pause_updates = MagicMock()
 
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should pause updates and open dialog
         tmux_manager.pause_updates.assert_called_once()
