@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from desto.app.sessions import TmuxManager
+from desto.core.formatting import classify_session
 
 pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 
@@ -59,7 +60,7 @@ def test_job_info_reads_all_jobs_in_one_batch(tmux):
     ],
 )
 def test_classify_session(session, active, job_info, expected):
-    category, label, _ = TmuxManager._classify_session("x", session, active, job_info)
+    category, label, _ = classify_session("x", session, active, job_info)
     assert (category, label) == expected
 
 
@@ -79,30 +80,32 @@ def test_periodic_refresh_skips_render_when_nothing_changed(tmux):
     tmux.check_sessions = Mock(return_value={})
     tmux._job_info_by_session = Mock(return_value={})
     tmux._get_scheduled_jobs_with_metadata = Mock(return_value=[])
-    tmux.add_to_sessions_container = Mock()
-    tmux.clear_sessions_container = Mock()
+    dashboard = tmux.dashboard
+    dashboard.add_to_sessions_container = Mock()
+    dashboard.clear_sessions_container = Mock()
 
-    tmux.update_sessions_status(force=False)
-    tmux.update_sessions_status(force=False)
-    assert tmux.add_to_sessions_container.call_count == 1
+    dashboard.update_sessions_status(force=False)
+    dashboard.update_sessions_status(force=False)
+    assert dashboard.add_to_sessions_container.call_count == 1
 
     tmux.get_all_sessions_status.return_value = {"a": {"status": "finished"}, "b": {"status": "running"}}
-    tmux.update_sessions_status(force=False)
-    assert tmux.add_to_sessions_container.call_count == 2
+    dashboard.update_sessions_status(force=False)
+    assert dashboard.add_to_sessions_container.call_count == 2
 
-    tmux.update_sessions_status(force=True)
-    assert tmux.add_to_sessions_container.call_count == 3
+    dashboard.update_sessions_status(force=True)
+    assert dashboard.add_to_sessions_container.call_count == 3
 
 
 def test_set_status_filter_toggles(tmux):
-    tmux.update_sessions_status = Mock()
-    tmux.set_status_filter("failed")
-    assert tmux.status_filter == "failed"
-    tmux.set_status_filter("failed")
-    assert tmux.status_filter is None
-    tmux.set_status_filter("running")
-    tmux.set_status_filter(None)
-    assert tmux.status_filter is None
+    dashboard = tmux.dashboard
+    dashboard.update_sessions_status = Mock()
+    dashboard.set_status_filter("failed")
+    assert dashboard.status_filter == "failed"
+    dashboard.set_status_filter("failed")
+    assert dashboard.status_filter is None
+    dashboard.set_status_filter("running")
+    dashboard.set_status_filter(None)
+    assert dashboard.status_filter is None
 
 
 def test_rerun_uses_next_free_name(tmux):
@@ -110,7 +113,7 @@ def test_rerun_uses_next_free_name(tmux):
     tmux.desto_manager = MagicMock()
     tmux.desto_manager.session_manager.list_all_sessions.return_value = [Mock(session_name="train"), Mock(session_name="train-2")]
     tmux.start_tmux_session = Mock()
-    tmux.update_sessions_status = Mock()
+    tmux.on_sessions_changed = Mock()
 
     tmux.rerun_session("train-2", "python train.py")
     tmux.start_tmux_session.assert_called_once()
