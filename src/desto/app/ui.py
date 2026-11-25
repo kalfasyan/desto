@@ -1,6 +1,4 @@
-import getpass
 import os
-import socket
 from pathlib import Path
 
 from loguru import logger
@@ -339,23 +337,6 @@ class UserInterfaceManager(ScheduleLaunchMixin):
         self.chain_queue.append((str(script_path), arguments))
         ui.notification(f"Added {actual_filename} to chain.", type="positive")
         self.refresh_chain_queue_display()
-
-    def get_log_info_block(self, script_file_path, session_name, scheduled_dt=None):
-        username = getpass.getuser()
-        hostname = socket.gethostname()
-        script_name = Path(script_file_path).name
-        cwd = os.getcwd()
-        now_str = scheduled_dt.strftime("%Y-%m-%d %H:%M") if scheduled_dt else ""
-        info_lines = [
-            f"# Script: {script_name}",
-            f"# Session: {session_name}",
-            f"# User: {username}@{hostname}",
-            f"# Working Directory: {cwd}",
-        ]
-        if now_str:
-            info_lines.append(f"# Scheduled for: {now_str}")
-        info_lines.append("")  # Blank line
-        return "\n".join(info_lines)
 
     def refresh_chain_queue_display(self):
         """Update the chain queue display in the UI."""
