@@ -163,3 +163,18 @@ def test_scheduled_job_rows_hide_internal_jobs_and_label_recurring():
 )
 def test_session_event_message(update, expected):
     assert session_event_message(update) == expected
+
+
+def test_format_timestamp_accepts_unix_time_and_none():
+    from datetime import datetime
+
+    ts = datetime(2025, 1, 2, 3, 4, 5).timestamp()
+    assert format_timestamp(ts) == "2025-01-02 03:04:05"
+    assert format_timestamp(int(ts)) == "2025-01-02 03:04:05"
+    assert format_timestamp(None) == "N/A"
+
+
+def test_format_seconds_none():
+    from desto.core.formatting import format_seconds
+
+    assert format_seconds(None) == "N/A"

@@ -25,8 +25,8 @@ def seconds_since(start_dt):
 
 
 def format_seconds(elapsed_seconds):
-    """Format seconds as '1h 2m 3s', '2m 3s' or '3s'; negative values give 'N/A'."""
-    if elapsed_seconds < 0:
+    """Format seconds as '1h 2m 3s', '2m 3s' or '3s'; negative values and None give 'N/A'."""
+    if elapsed_seconds is None or elapsed_seconds < 0:
         return "N/A"
     hours, remainder = divmod(elapsed_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -67,8 +67,15 @@ def format_duration(duration_str):
 
 
 def format_timestamp(value):
-    """Format an ISO timestamp as 'YYYY-MM-DD HH:MM:SS', or its first 19 characters if it does not parse."""
+    """Format an ISO timestamp or Unix time as 'YYYY-MM-DD HH:MM:SS'.
+
+    Anything else gives its first 19 characters, and None gives 'N/A'.
+    """
+    if value is None:
+        return "N/A"
     try:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value).strftime("%Y-%m-%d %H:%M:%S")
         return parse_iso(value).strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return str(value)[:19]
