@@ -44,13 +44,27 @@ def dirs(tmp_path, monkeypatch):
     return log_dir, scripts_dir
 
 
+def forget(name):
+    """Kill the tmux session and delete every Redis record (sessions and their jobs) with this name."""
+    subprocess.run(["tmux", "kill-session", "-t", name], capture_output=True)
+    redis = DestoRedisClient().redis
+    session_ids = set()
+    for key in redis.scan_iter("desto:session:*"):
+        if redis.type(key) == "hash" and redis.hget(key, "session_name") == name:
+            session_ids.add(redis.hget(key, "session_id"))
+            redis.delete(key)
+    for key in redis.scan_iter("desto:job:*"):
+        if redis.type(key) == "hash" and redis.hget(key, "session_id") in session_ids:
+            redis.delete(key)
+    for key in redis.scan_iter(f"*{name}*"):
+        redis.delete(key)
+
+
 @pytest.fixture
 def session_name(redis_client):
     name = f"launchtest-{uuid.uuid4().hex[:8]}"
     yield name
-    subprocess.run(["tmux", "kill-session", "-t", name], capture_output=True)
-    for key in redis_client.redis.scan_iter(f"*{name}*"):
-        redis_client.redis.delete(key)
+    forget(name)
 
 
 def tmux_alive(name):
@@ -157,8 +171,7 @@ def test_log_has_start_and_finish_banners(launch, dirs, session_name):
 def test_relaunch_appends_to_existing_log(launch, dirs, session_name):
     log_file = launch(session_name, "echo first-run", dirs)
     wait_for_end(session_name, log_file)
-    for key in DestoRedisClient().redis.scan_iter(f"*{session_name}*"):
-        DestoRedisClient().redis.delete(key)
+    forget(session_name)
     launch(session_name, "echo second-run", dirs)
     text, _ = wait_for_end(session_name, log_file)
     assert "first-run" in text and "second-run" in text
@@ -222,9 +235,7 @@ def test_cli_chain_runs_every_step(dirs):
         assert "step-1-ran" in text and "step-2-ran" in text
         assert session.status.value == "finished"
     finally:
-        subprocess.run(["tmux", "kill-session", "-t", name], capture_output=True)
-        for key in DestoRedisClient().redis.scan_iter(f"*{name}*"):
-            DestoRedisClient().redis.delete(key)
+        forget(name)
 
 
 # --- Quoting -------------------------------------------------------------------------------------
