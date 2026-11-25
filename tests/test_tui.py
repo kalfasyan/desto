@@ -55,7 +55,7 @@ def run(service, scenario, size=(140, 40)):
     async def main():
         monitor = MagicMock()
         monitor.read.return_value = STATS
-        with patch("desto.redis.at_job_manager.AtJobManager.is_atd_running", return_value=True):
+        with patch("desto.core.at_job_manager.AtJobManager.is_atd_running", return_value=True):
             app = DestoApp(service, monitor=monitor)
             async with app.run_test(size=size) as pilot:
                 await settle(app, pilot)

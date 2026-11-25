@@ -18,8 +18,8 @@ def main(argv=None) -> int:
         print("Usage: python -m desto.hooks.run_recurring <schedule_id> <occurrence>", file=sys.stderr)
         return 1
 
-    from desto.redis.client import DestoRedisClient
-    from desto.redis.recurring import OCCURRENCE_FORMAT, RecurringScheduleManager, next_occurrence, occurrence_session_name
+    from desto.core.recurring import OCCURRENCE_FORMAT, RecurringScheduleManager, next_occurrence, occurrence_session_name
+    from desto.store.client import DestoRedisClient
 
     schedule_id = argv[0]
     try:

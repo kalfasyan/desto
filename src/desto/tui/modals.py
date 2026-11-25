@@ -11,8 +11,8 @@ from textual.widgets import Button, Input, Label, Log, Select, Sparkline, Static
 
 from desto.core.formatting import format_bytes, format_seconds
 from desto.core.log_tailer import LogTailer
+from desto.core.recurring import REPEAT_UNITS
 from desto.core.scheduled_jobs import ScheduleError
-from desto.redis.recurring import REPEAT_UNITS
 
 REPEAT_OPTIONS = [("Does not repeat", "never"), ("minute(s)", "minutes"), ("hour(s)", "hours"), ("day(s)", "days"), ("week(s)", "weeks")]
 

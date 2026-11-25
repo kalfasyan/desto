@@ -6,8 +6,8 @@ import pytest
 
 from desto.app.favorites_ui import FavoritesTab
 from desto.app.ui import UserInterfaceManager
-from desto.redis.client import DestoRedisClient
-from desto.redis.desto_manager import DestoManager
+from desto.store.client import DestoRedisClient
+from desto.store.desto_manager import DestoManager
 
 pytestmark = pytest.mark.skipif(os.getenv("CI") == "true", reason="Redis is not available on GitHub Actions")
 

@@ -477,7 +477,7 @@ def start_background_sampler(settings: Optional[dict] = None) -> Optional[Sessio
         if _background is not None:
             return _background
         from desto.config import config as default_settings
-        from desto.redis.client import DestoRedisClient
+        from desto.store.client import DestoRedisClient
 
         settings = settings or default_settings
         metrics_cfg = settings.get("metrics", {})
@@ -490,7 +490,7 @@ def start_background_sampler(settings: Optional[dict] = None) -> Optional[Sessio
         sqlite_store = None
         sqlite_cfg = settings.get("sqlite", {})
         if sqlite_cfg.get("enabled", False):
-            from desto.redis.sqlite_store import SQLiteStore
+            from desto.store.sqlite_store import SQLiteStore
 
             sqlite_store = SQLiteStore(db_path=sqlite_cfg.get("db_path") or None, enabled=True)
         retention = int(settings.get("redis", {}).get("session_history_days", 7)) * 86400

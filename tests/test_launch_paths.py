@@ -20,7 +20,7 @@ import uuid
 
 import pytest
 
-from desto.redis.client import DestoRedisClient
+from desto.store.client import DestoRedisClient
 
 pytestmark = pytest.mark.skipif(not shutil.which("tmux"), reason="tmux not available")
 
@@ -81,7 +81,7 @@ def wait_until(predicate, timeout=10.0):
 
 
 def redis_session(name):
-    from desto.redis.session_manager import SessionManager
+    from desto.store.session_manager import SessionManager
 
     return SessionManager(DestoRedisClient()).get_session_by_name(name)
 

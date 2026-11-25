@@ -44,7 +44,7 @@ class TestCLIIntegration:
 
         assert manager.start_session("integration_test", "echo 'hello world'") is True
 
-        with patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[mock_session]):
+        with patch("desto.store.session_manager.SessionManager.list_all_sessions", return_value=[mock_session]):
             sessions = manager.list_sessions()
             assert "integration_test" in sessions
 
@@ -85,7 +85,7 @@ class TestCLIIntegration:
         manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
         # Test handling non-existent session
-        with patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[]):
+        with patch("desto.store.session_manager.SessionManager.list_all_sessions", return_value=[]):
             assert manager.session_exists("nonexistent") is False
             content = manager.get_log_content("nonexistent")
             assert content is None
@@ -206,7 +206,7 @@ class TestCLIIntegration:
         # Both should be able to check for sessions independently
         with (
             patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[]),
+            patch("desto.store.session_manager.SessionManager.list_all_sessions", return_value=[]),
         ):
             mock_run.return_value = Mock(stdout="", returncode=0)
 

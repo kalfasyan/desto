@@ -70,7 +70,7 @@ def test_schedule_links_at_job_id_to_session(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run_at)
 
     # Import here so monkeypatch applies before module usage
-    from desto.redis.at_job_manager import AtJobManager
+    from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
 
@@ -93,7 +93,7 @@ def test_schedule_with_no_matching_session_still_stores_atjob(monkeypatch):
     client = FakeClient(fake_redis)
 
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run_at)
-    from desto.redis.at_job_manager import AtJobManager
+    from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
     job_id = atm.schedule(command="echo hi", time_spec="12:00 2025-09-02", session_name="nonexistent-session", script_path=["/tmp/s"], arguments="")
@@ -114,7 +114,7 @@ def test_schedule_fails_when_at_fails(monkeypatch):
     client = FakeClient(fake_redis)
 
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run_at_failure)
-    from desto.redis.at_job_manager import AtJobManager
+    from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
     job_id = atm.schedule(command="", time_spec="", session_name="my-session")
@@ -138,7 +138,7 @@ def test_direct_lookup_used_when_get_session_key_available(monkeypatch):
     client = ClientWithGetKey(fake_redis)
 
     monkeypatch.setattr(subprocess, "run", fake_subprocess_run_at)
-    from desto.redis.at_job_manager import AtJobManager
+    from desto.core.at_job_manager import AtJobManager
 
     atm = AtJobManager(redis_client=client)
     job_id = atm.schedule(command="echo hi", time_spec="12:00 2025-09-02", session_name="my-session", script_path=["/tmp/s"], arguments="")

@@ -32,7 +32,7 @@ def tmux_manager(mock_ui, mock_logger, tmp_path):
 @pytest.fixture(autouse=True)
 def cancel_all_recurring():
     """Keep kill_scheduled_jobs from cancelling real recurring schedules in the local Redis."""
-    with patch("desto.redis.recurring.RecurringScheduleManager.cancel_all", return_value=0) as mock_cancel_all:
+    with patch("desto.core.recurring.RecurringScheduleManager.cancel_all", return_value=0) as mock_cancel_all:
         yield mock_cancel_all
 
 

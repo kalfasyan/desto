@@ -24,11 +24,11 @@ from desto.core import scripts
 from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, metrics_key, scheduled_job_rows, session_rows, summarize_jobs
 from desto.core.scheduled_jobs import ScheduledJobsMixin
 from desto.core.session_metrics import read_history, read_summaries
-from desto.redis.client import DestoRedisClient
-from desto.redis.desto_manager import DestoManager
-from desto.redis.job_manager import JobManager
-from desto.redis.models import SessionStatus
-from desto.redis.pubsub import SessionPubSub
+from desto.store.client import DestoRedisClient
+from desto.store.desto_manager import DestoManager
+from desto.store.job_manager import JobManager
+from desto.store.models import SessionStatus
+from desto.store.pubsub import SessionPubSub
 
 # notify(message, level) with level one of "positive", "negative", "warning" or "info"
 Notifier = Callable[[str, str], None]
@@ -84,7 +84,7 @@ class DestoService(ScheduledJobsMixin):
         sqlite_store = None
         sqlite_config = ui_settings.get("sqlite", {})
         if sqlite_config.get("enabled", False):
-            from desto.redis.sqlite_store import SQLiteStore
+            from desto.store.sqlite_store import SQLiteStore
 
             sqlite_store = SQLiteStore(db_path=sqlite_config.get("db_path") or None, enabled=True)
             logger.info("SQLite enabled for long-term session persistence")

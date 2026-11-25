@@ -142,7 +142,7 @@ class TestDockerIntegration:
 
     def test_redis_environment_variables(self):
         """Test that Redis environment variables are properly handled."""
-        from desto.redis.client import DestoRedisClient
+        from desto.store.client import DestoRedisClient
 
         # Test with custom config
         config = {
@@ -175,7 +175,7 @@ class TestDockerIntegration:
         }
 
         with patch.dict(os.environ, env_vars):
-            from desto.redis.client import DestoRedisClient
+            from desto.store.client import DestoRedisClient
 
             # Create client with no config (should use env vars)
             client = DestoRedisClient()

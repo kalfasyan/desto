@@ -10,10 +10,10 @@ from datetime import datetime
 import redis
 from loguru import logger
 
+from desto.core.at_job_manager import AtJobManager
 from desto.core.formatting import decode_hash, extract_at_command, format_scheduled_datetime, parse_atq_output
-from desto.redis.at_job_manager import AtJobManager
-from desto.redis.models import SessionStatus
-from desto.redis.recurring import RecurringScheduleManager, describe_interval
+from desto.core.recurring import RecurringScheduleManager, describe_interval
+from desto.store.models import SessionStatus
 
 
 class ScheduleError(ValueError):

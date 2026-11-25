@@ -107,7 +107,7 @@ class DestoApp(App):
 
     @work(thread=True)
     def warn_if_atd_stopped(self) -> None:
-        from desto.redis.at_job_manager import AtJobManager
+        from desto.core.at_job_manager import AtJobManager
 
         if not AtJobManager.is_atd_running():
             self.call_from_thread(

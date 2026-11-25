@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from desto.redis.models import DestoJob, DestoSession, JobStatus, SessionStatus
+from desto.store.models import DestoJob, DestoSession, JobStatus, SessionStatus
 
 # ─── Helper formatting tests ──────────────────────────────────────────
 
@@ -64,7 +64,7 @@ class TestSQLiteStoreSearchSessions:
 
     @pytest.fixture
     def sqlite_store(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         db_path = str(tmp_path / "test_search.db")
         store = SQLiteStore(db_path=db_path, enabled=True)
@@ -109,7 +109,7 @@ class TestSQLiteStoreSearchSessions:
         assert results == []
 
     def test_search_disabled_store(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         store = SQLiteStore(db_path=str(tmp_path / "disabled.db"), enabled=False)
         assert store.search_sessions("anything") == []
@@ -140,7 +140,7 @@ class TestSQLiteHistoryTabRestart:
         return tab
 
     def test_restart_extracts_command_and_starts_session(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         store = SQLiteStore(db_path=str(tmp_path / "restart.db"), enabled=True)
         session = DestoSession(
@@ -175,7 +175,7 @@ class TestSQLiteHistoryTabRestart:
         assert call_args[0][1] == "python train.py --epochs 10"
 
     def test_restart_missing_session(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         store = SQLiteStore(db_path=str(tmp_path / "empty.db"), enabled=True)
         tab = self._make_tab(store)
@@ -186,7 +186,7 @@ class TestSQLiteHistoryTabRestart:
             assert "not found" in mock_ui.notification.call_args[0][0]
 
     def test_restart_session_no_jobs(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         store = SQLiteStore(db_path=str(tmp_path / "nojobs.db"), enabled=True)
         session = DestoSession(
@@ -203,7 +203,7 @@ class TestSQLiteHistoryTabRestart:
             assert "No jobs" in mock_ui.notification.call_args[0][0]
 
     def test_delete_calls_sqlite_store(self, tmp_path):
-        from desto.redis.sqlite_store import SQLiteStore
+        from desto.store.sqlite_store import SQLiteStore
 
         store = SQLiteStore(db_path=str(tmp_path / "delete.db"), enabled=True)
         session = DestoSession(

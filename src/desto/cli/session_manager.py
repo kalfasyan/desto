@@ -11,8 +11,8 @@ from typing import Dict, List, Optional, Tuple
 from loguru import logger
 
 from desto.core import scripts as core_scripts
-from desto.redis.client import DestoRedisClient
-from desto.redis.session_manager import SessionManager
+from desto.store.client import DestoRedisClient
+from desto.store.session_manager import SessionManager
 
 _LOG_LEVELS = {"positive": "SUCCESS", "negative": "ERROR", "warning": "WARNING"}
 

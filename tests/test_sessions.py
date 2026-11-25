@@ -167,7 +167,7 @@ def test_get_all_sessions_status_includes_tmux_and_redis(mock_redis_class, mock_
 
 @patch("desto.core.service.DestoRedisClient")
 def test_session_heartbeat_and_finish(mock_redis_class, mock_ui, mock_logger, tmp_path):
-    from desto.redis.session_manager import DestoSession, SessionManager, SessionStatus
+    from desto.store.session_manager import DestoSession, SessionManager, SessionStatus
 
     # Mock Redis
     mock_redis_instance = Mock()

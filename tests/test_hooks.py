@@ -10,9 +10,9 @@ import uuid
 
 import pytest
 
-from desto.redis.client import DestoRedisClient
-from desto.redis.desto_manager import DestoManager
-from desto.redis.models import SessionStatus
+from desto.store.client import DestoRedisClient
+from desto.store.desto_manager import DestoManager
+from desto.store.models import SessionStatus
 
 
 def run_hook(module, *args, cwd):

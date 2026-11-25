@@ -1,4 +1,4 @@
-"""Redis-based session and job tracking for Desto."""
+"""Session, job and favorites storage for desto: Redis for live state, optional SQLite for history."""
 
 from .client import DestoRedisClient
 from .desto_manager import DestoManager

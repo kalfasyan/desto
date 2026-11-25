@@ -18,8 +18,8 @@ def main(argv=None) -> int:
 
     try:
         from desto.notifications import notify_job_finished
-        from desto.redis.client import DestoRedisClient
-        from desto.redis.desto_manager import DestoManager
+        from desto.store.client import DestoRedisClient
+        from desto.store.desto_manager import DestoManager
 
         session_name = argv[0]
         exit_code = int(argv[1])
