@@ -49,6 +49,16 @@ def fetch_item(key: str) -> dict:
 	"""
 ```
 
+## Code structure rules
+
+These keep desto small and its front ends (web dashboard, TUI, CLI and scheduled jobs) behaving the same:
+
+- **One launch path.** Every tmux session starts through `DestoService.start_tmux_session` in `src/desto/core/service.py`, which wraps the command with `core.scripts.session_script`. Do not build tmux or log-wrapper commands anywhere else; `tests/test_launch_paths.py` checks every launcher against the same behaviour.
+- **Front ends stay thin.** `app/`, `tui/` and `cli/` handle display and input only. Logic they share belongs in `core/`, storage in `store/`, settings in `desto/config.py`.
+- **Delete rather than add.** Before adding a helper, look for one in `core/`. CI runs [vulture](https://github.com/jendrikseipp/vulture) (`uvx vulture@2.14`) for dead code: remove what it finds, and only add a name to `vulture_whitelist.py` when a framework uses it.
+- **Keep functions small.** ruff's C901 check fails functions over complexity 15. Split them rather than adding a `noqa`.
+- **Coverage does not go down.** CI fails if test coverage drops below the `--cov-fail-under` floor in `.github/workflows/ci.yml`.
+
 You can auto-fix many issues:
 
 ```bash

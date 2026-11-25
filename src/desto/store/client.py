@@ -20,7 +20,6 @@ class DestoRedisClient:
         self.config = config
         self.redis = None
         self.session_prefix = "desto:session:"
-        self.status_prefix = "desto:status:"
 
         # Only initialize Redis if enabled
         if self.config.get("enabled", True):

@@ -12,8 +12,6 @@ class FavoritesTab:
         self.desto_manager = desto_manager
         self.favorites_container = None
         self.search_input = None
-        self.favorite_name_input = None
-        self.favorite_command_input = None
 
     def refresh_favorites_list(self):
         """Refresh the list of favorite commands."""

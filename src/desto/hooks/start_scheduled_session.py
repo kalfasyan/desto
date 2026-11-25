@@ -42,7 +42,7 @@ except Exception as e:
     logger.error(f"[SCHEDULED WRAPPER] Could not add log file handler for '{_log_path}': {e}")
 
 
-def main():
+def main():  # noqa: C901
     print("[SCHEDULED WRAPPER] main() entered", sys.argv)
     logger.info("[SCHEDULED WRAPPER] start_scheduled_session.py script started with args: {}", sys.argv)
     if len(sys.argv) < 3:

@@ -20,7 +20,7 @@ class AtJobManager:
         """Optionally pass a DestoRedisClient to enable Redis metadata tracking."""
         self.redis_client = redis_client
 
-    def schedule(
+    def schedule(  # noqa: C901
         self,
         command: str,
         time_spec: str,
