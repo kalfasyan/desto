@@ -436,7 +436,7 @@ class ScriptManagerTab:
                             await self._launch_single_script(session_name, selected_script, arguments)
 
                     ui.button("Launch Now", icon="rocket_launch", on_click=launch_with_save_check).props("unelevated color=positive").classes("px-6")
-                    ui.button(icon="history", on_click=self.ui_manager.schedule_launch).props("outline color=secondary round")
+                    ui.button(icon="history", on_click=self.ui_manager.schedule_dialog.open).props("outline color=secondary round")
                     ui.button(icon="add_link", on_click=self.ui_manager.chain_current_script).props("outline color=secondary round")
 
                     if self.ui_manager.favorites_tab:

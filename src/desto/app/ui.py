@@ -11,12 +11,12 @@ from desto.core.system_stats import SystemMonitor
 
 from .auth import logout
 from .favorites_ui import FavoritesTab
-from .schedule_ui import ScheduleLaunchMixin
+from .schedule_ui import ScheduleDialog
 from .sqlite_ui import SQLiteHistoryTab
 from .ui_elements import LogSection, NewScriptTab, ScriptManagerTab, SettingsPanel, SystemStatsPanel
 
 
-class UserInterfaceManager(ScheduleLaunchMixin):
+class UserInterfaceManager:
     def __init__(self, ui, ui_settings, tmux_manager, desto_manager=None):
         from nicegui import ui as nicegui_ui
 
@@ -29,6 +29,7 @@ class UserInterfaceManager(ScheduleLaunchMixin):
         self.stats_panel = SystemStatsPanel(ui_settings)
         self.system_monitor = SystemMonitor()
         self.new_script_tab = NewScriptTab(tmux_manager, self)
+        self.schedule_dialog = ScheduleDialog(tmux_manager, self)
         self.log_section = LogSection()
         self.script_manager_tab = ScriptManagerTab(self)
         self.favorites_tab = FavoritesTab(self, desto_manager) if desto_manager else None
