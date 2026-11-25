@@ -119,17 +119,6 @@ class SessionManager:
                     return session
         return None
 
-    def list_active_sessions(self) -> List[DestoSession]:
-        """List all active sessions."""
-        sessions = []
-        for key in self.redis.redis.scan_iter(match="desto:session:*"):
-            data = self.redis.redis.hgetall(key)
-            if data:
-                session = DestoSession.from_dict(data)
-                if session.status in [SessionStatus.STARTING, SessionStatus.RUNNING]:
-                    sessions.append(session)
-        return sessions
-
     def list_all_sessions(self) -> List[DestoSession]:
         """List all sessions."""
         sessions = []
