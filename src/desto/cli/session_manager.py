@@ -249,27 +249,31 @@ class CLISessionManager:
             return {}
 
     def kill_session(self, session_name: str) -> bool:
-        """Mark a session as finished using the Redis-based SessionManager."""
-        logger.info(f"Attempting to finish session: '{session_name}' (Redis-based)")
+        """Stop the session's tmux session and mark it finished in Redis."""
+        logger.info(f"Attempting to kill session: '{session_name}'")
+        try:
+            killed = subprocess.run(["tmux", "kill-session", "-t", session_name], capture_output=True, text=True).returncode == 0
+        except (OSError, CalledProcessError):
+            killed = False
+        if killed:
+            logger.info(f"Tmux session '{session_name}' killed.")
+
         redis_client = DestoRedisClient()
         session_manager = SessionManager(redis_client)
-
-        # Find session by name
         session = session_manager.get_session_by_name(session_name)
         if not session:
-            logger.error(f"Session '{session_name}' not found in Redis.")
+            if killed:
+                self.sessions.pop(session_name, None)
+                return True
+            logger.error(f"Session '{session_name}' not found.")
             return False
 
-        # Mark as finished
-        result = session_manager.finish_session(session.session_id)
-        if result:
+        if session_manager.finish_session(session.session_id):
             logger.success(f"Session '{session_name}' marked as finished in Redis.")
-            if session_name in self.sessions:
-                del self.sessions[session_name]
+            self.sessions.pop(session_name, None)
             return True
-        else:
-            logger.error(f"Failed to mark session '{session_name}' as finished in Redis.")
-            return False
+        logger.error(f"Failed to mark session '{session_name}' as finished in Redis.")
+        return killed
 
     def kill_all_sessions(self) -> Tuple[int, int, list]:
         """Mark all sessions as finished using the Redis-based SessionManager.
