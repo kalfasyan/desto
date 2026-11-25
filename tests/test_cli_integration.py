@@ -32,36 +32,24 @@ class TestCLIIntegration:
 
         manager = CLISessionManager(log_dir=temp_dirs["log_dir"], scripts_dir=temp_dirs["scripts_dir"])
 
-        with (
-            patch("desto.cli.session_manager.subprocess.run"),
-            patch("desto.redis.session_manager.SessionManager.create_session") as mock_create_session,
-            patch("desto.redis.session_manager.SessionManager.start_session") as mock_start_session,
-            patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[]),
-            patch("desto.redis.session_manager.SessionManager.finish_session", return_value=True),
-        ):
-            # Mock session object for creation and lookup
-            mock_session = Mock()
-            mock_session.session_id = "session_id_123"
-            mock_session.session_name = "integration_test"
-            mock_session.start_time = None
-            mock_session.status = Mock(value="running")
-            mock_create_session.return_value = mock_session
-            mock_start_session.return_value = True
+        manager._service = Mock()
+        manager._service.start_tmux_session.return_value = True
+        manager._service.kill_session.return_value = True
 
-            # Start a session (no session exists yet)
-            with patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=None):
-                result = manager.start_session("integration_test", "echo 'hello world'")
-                assert result is True
+        mock_session = Mock()
+        mock_session.session_id = "session_id_123"
+        mock_session.session_name = "integration_test"
+        mock_session.start_time = None
+        mock_session.status = Mock(value="running")
 
-            # List sessions (simulate session present)
-            with patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[mock_session]):
-                sessions = manager.list_sessions()
-                assert "integration_test" in sessions
+        assert manager.start_session("integration_test", "echo 'hello world'") is True
 
-            # Kill the session (session exists)
-            with patch("desto.redis.session_manager.SessionManager.get_session_by_name", return_value=mock_session):
-                result = manager.kill_session("integration_test")
-                assert result is True
+        with patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[mock_session]):
+            sessions = manager.list_sessions()
+            assert "integration_test" in sessions
+
+        assert manager.kill_session("integration_test") is True
+        manager._service.kill_session.assert_called_once_with("integration_test")
 
     def test_log_management_integration(self, temp_dirs):
         """Test log management integration."""
@@ -102,18 +90,10 @@ class TestCLIIntegration:
             content = manager.get_log_content("nonexistent")
             assert content is None
 
-        # Test handling subprocess errors
-        with (
-            patch("desto.cli.session_manager.subprocess.run") as mock_run,
-            patch("desto.redis.session_manager.SessionManager.list_all_sessions", return_value=[]),
-        ):
-            mock_run.side_effect = FileNotFoundError("tmux not found")
-
-            sessions = manager.list_sessions()
-            assert sessions == {}
-
-            result = manager.start_session("test", "echo hello")
-            assert result is False
+        # A launch the service refuses is reported as a failure
+        manager._service = Mock()
+        manager._service.start_tmux_session.return_value = False
+        assert manager.start_session("test", "echo hello") is False
 
     @pytest.mark.skip(reason="Test has mocking issues - needs fixing")
     def test_cli_commands_integration(self, temp_dirs):
