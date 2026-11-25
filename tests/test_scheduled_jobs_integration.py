@@ -233,7 +233,7 @@ class TestCombinedFunctionalityIntegration:
         tmux_manager.resume_updates = MagicMock()
 
         # This should not crash and should create proper UI elements
-        tmux_manager.confirm_kill_all_sessions()
+        tmux_manager.dialogs.confirm_kill_all_sessions()
 
         # Should have called pause updates
         tmux_manager.pause_updates.assert_called_once()
