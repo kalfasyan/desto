@@ -194,7 +194,6 @@ def test_service_kill_stops_tmux(dirs, session_name):
     assert wait_until(lambda: not tmux_alive(session_name))
 
 
-@pytest.mark.xfail(strict=True, reason="`desto-cli sessions kill` marks the session finished but leaves tmux running (plan F3)")
 def test_cli_kill_stops_tmux(dirs, session_name):
     from desto.cli.session_manager import CLISessionManager
 
