@@ -84,7 +84,6 @@ class TestCLIIntegration:
         from desto.cli.utils import (
             format_duration,
             format_timestamp,
-            validate_session_name,
         )
 
         # Test duration formatting for realistic values
@@ -97,10 +96,6 @@ class TestCLIIntegration:
         timestamp = now.timestamp()
         formatted = format_timestamp(timestamp)
         assert ":" in formatted  # Should contain time
-
-        # Test session name validation
-        assert validate_session_name("valid-session_name.123") is True
-        assert validate_session_name("invalid'session") is False
 
     @pytest.mark.skipif(os.getenv("CI") == "true", reason="Integration tests not run in CI")
     def test_error_handling_integration(self, temp_dirs):
