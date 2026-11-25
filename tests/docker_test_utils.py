@@ -151,14 +151,14 @@ def wait_for_http(url, timeout=30, interval=0.5):
 
     Returns True if service responded 200 within timeout.
     """
-    import requests
+    from urllib.request import urlopen
 
     start = time.time()
     while time.time() - start < timeout:
         try:
-            r = requests.get(url, timeout=3)
-            if r.status_code == 200:
-                return True
+            with urlopen(url, timeout=3) as r:
+                if r.status == 200:
+                    return True
         except Exception:
             pass
         time.sleep(interval)

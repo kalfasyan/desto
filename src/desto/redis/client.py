@@ -62,6 +62,3 @@ class DestoRedisClient:
 
     def get_session_key(self, session_name: str) -> str:
         return f"{self.session_prefix}{session_name}"
-
-    def get_status_key(self, session_name: str) -> str:
-        return f"{self.status_prefix}{session_name}"
