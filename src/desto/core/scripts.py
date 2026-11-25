@@ -6,6 +6,7 @@ way whichever front end started it.
 
 import re
 import shlex
+import sys
 from pathlib import Path
 
 DEFAULT_EXTENSIONS = (".sh", ".py")
@@ -77,6 +78,35 @@ def chain_command(chain, python_executable: str = "python3", continue_on_error: 
         marker = f"echo {shlex.quote(f'=== Running script {idx} of {total}: {Path(script_path).name} ===')}"
         parts.append(f"{marker} && ({build_execution_command(script_path, arguments, python_executable)})")
     return (" ; " if continue_on_error else " && ").join(parts)
+
+
+def completion_hook(session_name: str, exit_code_ref: str = "$SCRIPT_EXIT_CODE", python_executable: str | None = None) -> str:
+    """Shell snippet that records the session's exit code in Redis and sends the finish notification."""
+    python = python_executable or sys.executable
+    return f"{shlex.quote(python)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
+
+
+def session_script(session_name: str, command: str, log_file) -> str:
+    """The bash script a desto tmux session runs: banners and output go to log_file, then the exit code to Redis.
+
+    Every launch path (dashboard, TUI, CLI and scheduled runs) uses this, so their logs look the same.
+    A log file that already exists is appended to, after a NEW SESSION separator.
+    """
+    log = shlex.quote(str(log_file))
+    if Path(log_file).exists():
+        pre = f"printf '\\n---- NEW SESSION (%s) -----\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" >> {log} && printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" >> {log}"
+    else:
+        pre = f"printf '\\n=== SCRIPT STARTING at %s ===\\n' \"$(date)\" > {log}"
+    return "\n".join(
+        [
+            pre,
+            f"({command}) >> {log} 2>&1",
+            "SCRIPT_EXIT_CODE=$?",
+            f'printf \'\\n=== SCRIPT FINISHED at %s (exit code: %s) ===\\n\' "$(date)" "$SCRIPT_EXIT_CODE" >> {log}',
+            completion_hook(session_name),
+            "exit $SCRIPT_EXIT_CODE",
+        ]
+    )
 
 
 def create_script(scripts_dir: Path, name: str, code: str, kind: str = "bash") -> Path:

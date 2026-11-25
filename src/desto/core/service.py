@@ -9,9 +9,7 @@ import getpass
 import json
 import os
 import re
-import shlex
 import subprocess
-import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -22,6 +20,7 @@ from typing import Callable, Optional
 from loguru import logger
 
 from desto.app.config import config as ui_settings
+from desto.core import scripts
 from desto.core.formatting import ScheduledJobRow, SessionRow, count_by_category, decode_hash, metrics_key, scheduled_job_rows, session_rows, summarize_jobs
 from desto.core.scheduled_jobs import ScheduledJobsMixin
 from desto.core.session_metrics import read_history, read_summaries
@@ -321,18 +320,7 @@ class DestoService(ScheduledJobsMixin):
 
     def _logged_command(self, session_name, command, log_file) -> str:
         """Wrap command so its output, start/finish banners and exit code end up in log_file and Redis."""
-        quoted_log_file = shlex.quote(str(log_file))
-        if log_file.exists():
-            pre = f'printf \'\\n---- NEW SESSION (%s) -----\\n\' "$(date \'+%Y-%m-%d %H:%M:%S\')" >> {quoted_log_file} && printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" >> {quoted_log_file}'
-        else:
-            pre = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" > {quoted_log_file}'
-        return f"""
-    {pre}
-    ({command}) >> {quoted_log_file} 2>&1
-    SCRIPT_EXIT_CODE=$?
-    printf "\\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\\n" "$(date)" >> {quoted_log_file}
-    {self.get_job_completion_command(session_name, use_variable=True)}
-    """.strip()
+        return scripts.session_script(session_name, command, log_file)
 
     def _start_redis_monitoring(self, session_name):
         """Keep the session's heartbeat fresh and mark it finished once its tmux session is gone."""
@@ -360,11 +348,7 @@ class DestoService(ScheduledJobsMixin):
             session_name: Name of the session
             use_variable: If True, uses $SCRIPT_EXIT_CODE variable instead of $?
         """
-        exit_code_ref = "$SCRIPT_EXIT_CODE" if use_variable else "$?"
-        if not self.use_redis:
-            return f"touch '{self.LOG_DIR}/{session_name}.finished'"
-        # The bundled hook module works from an installed package, not just a source checkout
-        return f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} {exit_code_ref}"
+        return scripts.completion_hook(session_name, "$SCRIPT_EXIT_CODE" if use_variable else "$?")
 
     def rerun_session(self, session_name, command) -> bool:
         """Launch the same command again in a new session (name-2, name-3, ...)."""

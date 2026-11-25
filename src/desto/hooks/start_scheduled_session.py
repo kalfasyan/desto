@@ -6,14 +6,11 @@ This ensures scheduled jobs get the same Redis tracking as manually started sess
 """
 
 import os
-import shlex
 import subprocess
 import sys
 
 # Ensure loguru outputs to both stdout and a file, and set level to DEBUG
 import sys as _sys
-import threading
-import time
 from pathlib import Path
 
 from loguru import logger
@@ -43,44 +40,6 @@ try:
 except Exception as e:
     print(f"[SCHEDULED WRAPPER] ERROR: Could not add log file handler for '{_log_path}': {e}")
     logger.error(f"[SCHEDULED WRAPPER] Could not add log file handler for '{_log_path}': {e}")
-
-
-def start_redis_monitoring(session_name, desto_manager):
-    """Monitor tmux session and update Redis - same logic as TmuxManager._start_redis_monitoring."""
-
-    def monitor():
-        try:
-            while True:
-                time.sleep(1)
-                result = subprocess.run(
-                    ["tmux", "list-sessions", "-F", "#{session_name}"],
-                    capture_output=True,
-                    text=True,
-                )
-
-                if result.returncode != 0 or session_name not in result.stdout:
-                    # Session finished (entire tmux session ended)
-                    try:
-                        # Try to get exit status from Redis job
-                        job_status = desto_manager.get_job_status(session_name)
-                        if job_status not in ["finished", "failed"]:
-                            # Session ended but job wasn't marked complete - mark as finished
-                            desto_manager.finish_job(session_name, 0)
-                            logger.debug(f"Session '{session_name}' ended - marked as finished in Redis")
-                        else:
-                            logger.debug(f"Session '{session_name}' ended - already marked as {job_status} in Redis")
-
-                        # Mark session as finished
-                        desto_manager.session_manager.finish_session(session_name)
-                        break
-                    except Exception as e:
-                        logger.debug(f"Error updating Redis for finished session {session_name}: {e}")
-                        break
-        except Exception as e:
-            logger.debug(f"Error in Redis monitoring for {session_name}: {e}")
-
-    # Start monitoring in a daemon thread
-    threading.Thread(target=monitor, daemon=True).start()
 
 
 def main():
@@ -226,54 +185,11 @@ def main():
             if "job" in locals():
                 logger.info(f"[SCHEDULED WRAPPER] Job object: id={getattr(job, 'job_id', None)}, session_id={getattr(job, 'session_id', None)}, status={getattr(job, 'status', None)}")
 
-            # Compose the wrapped command to run in tmux
-            mark_finished_cmd = f"{shlex.quote(sys.executable)} -m desto.hooks.mark_job_finished {shlex.quote(session_name)} $SCRIPT_EXIT_CODE"
+            # Same wrapper as sessions started from the dashboard, TUI and CLI: banners, log file, exit code to Redis
+            from desto.core.scripts import session_script
 
-            # Build the log file path in Python
             log_file = _log_dir / f"{session_name}.log"
-
-            # Determine if this is a chain (multiple scripts separated by '&&')
-            # For simplicity, if '&&' is in the command, treat as chain
-            is_chain = "&&" in command
-
-            def extract_script_name(parts):
-                # Try to find a part that looks like a script file
-                from pathlib import Path as _Path
-
-                for p in parts:
-                    if p.endswith(".py") or p.endswith(".sh") or (p.startswith("'./") and len(p) > 3):
-                        return _Path(p.strip("'\"")).name
-                # Fallback: look for first arg after 'python3' or 'bash'
-                for i, p in enumerate(parts):
-                    if p in ("python3", "bash") and i + 1 < len(parts):
-                        return _Path(parts[i + 1].strip("'\"")).name
-                # Fallback: last part
-                return _Path(parts[-1]).name if parts else "script"
-
-            if is_chain:
-                # Split the command into scripts (naive split on '&&')
-                script_cmds = [c.strip() for c in command.split("&&")]
-                total_scripts = len(script_cmds)
-                marked_cmds = []
-                # Add SCRIPT STARTING marker with timestamp before the first script
-                starting_marker = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" >> \'{log_file}\''
-                marked_cmds.append(starting_marker)
-                for idx, scmd in enumerate(script_cmds):
-                    parts = scmd.split()
-                    script_name = extract_script_name(parts)
-                    marker = f"printf \"\\n=== Running script {idx + 1} of {total_scripts}: {script_name} ===\\n\" >> '{log_file}'"
-                    # Run the script and append its output to the log file
-                    run_script = f"({scmd}) >> '{log_file}' 2>&1"
-                    marked_cmds.append(f"{marker} && {run_script}")
-                chained_cmd = " && ".join(marked_cmds)
-                bash_cmd = f'{chained_cmd}; SCRIPT_EXIT_CODE=$?; printf "\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n" "$(date)" >> \'{log_file}\'; {mark_finished_cmd}; exit $SCRIPT_EXIT_CODE'
-            else:
-                parts = command.split()
-                script_name = extract_script_name(parts)
-                starting_marker = f'printf "\\n=== SCRIPT STARTING at %s ===\\n" "$(date)" >> \'{log_file}\''
-                marker = f"printf \"\\n=== Running script: {script_name} ===\\n\" >> '{log_file}'"
-                run_script = f"({command}) >> '{log_file}' 2>&1"
-                bash_cmd = f'{starting_marker} && {marker} && {run_script}; SCRIPT_EXIT_CODE=$?; printf "\n=== SCRIPT FINISHED at %s (exit code: $SCRIPT_EXIT_CODE) ===\n" "$(date)" >> \'{log_file}\'; {mark_finished_cmd}; exit $SCRIPT_EXIT_CODE'
+            bash_cmd = session_script(session_name, command, log_file)
 
             tmux_cmd = ["tmux", "new-session", "-d", "-s", session_name, "bash", "-c", bash_cmd]
             logger.info(f"[SCHEDULED WRAPPER] Running tmux command: {tmux_cmd}")
