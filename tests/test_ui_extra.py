@@ -64,12 +64,6 @@ def test_chain_current_script(tmp_path):
         mock_note.assert_called()
 
 
-def test_get_log_info_block(tmp_path):
-    ui_manager = make_ui_manager(tmp_path)
-    info = ui_manager.get_log_info_block(tmp_path / "myscript.sh", "sess")
-    assert "# Script: myscript.sh" in info
-
-
 def test_refresh_chain_queue_display_empty(tmp_path):
     ui_manager = make_ui_manager(tmp_path)
     ui_manager.chain_queue_display = MagicMock()

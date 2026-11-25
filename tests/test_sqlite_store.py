@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from desto.redis.models import DestoJob, DestoSession, FavoriteCommand, JobStatus, SessionStatus
+from desto.redis.models import DestoJob, DestoSession, JobStatus, SessionStatus
 from desto.redis.sqlite_store import SQLiteStore
 
 
@@ -59,19 +59,6 @@ def sample_job():
         end_time=None,
         exit_code=None,
         error_message=None,
-    )
-
-
-@pytest.fixture
-def sample_favorite():
-    """Create a sample favorite for testing."""
-    return FavoriteCommand(
-        favorite_id="test-fav-001",
-        name="Deploy Script",
-        command="bash deploy.sh --production",
-        created_at=datetime(2025, 1, 10, 8, 0, 0),
-        last_used_at=datetime(2025, 1, 15, 12, 0, 0),
-        use_count=5,
     )
 
 
@@ -262,33 +249,6 @@ class TestJobOperations:
         assert result.exit_code == 0
 
 
-class TestFavoriteOperations:
-    def test_save_favorite(self, sqlite_store, sample_favorite):
-        assert sqlite_store.save_favorite(sample_favorite) is True
-
-    def test_get_all_favorites(self, sqlite_store):
-        for i in range(3):
-            fav = FavoriteCommand(
-                favorite_id=f"fav-{i}",
-                name=f"Command {i}",
-                command=f"echo {i}",
-                created_at=datetime(2025, 1, 10, 8 + i, 0, 0),
-                use_count=i * 2,
-            )
-            sqlite_store.save_favorite(fav)
-
-        favorites = sqlite_store.get_all_favorites()
-        assert len(favorites) == 3
-        # Should be sorted by use_count DESC
-        assert favorites[0].use_count >= favorites[1].use_count
-
-    def test_delete_favorite(self, sqlite_store, sample_favorite):
-        sqlite_store.save_favorite(sample_favorite)
-        assert sqlite_store.delete_favorite("test-fav-001") is True
-        favorites = sqlite_store.get_all_favorites()
-        assert len(favorites) == 0
-
-
 class TestDisabledStore:
     def test_disabled_save_session(self, disabled_store, sample_session):
         assert disabled_store.save_session(sample_session) is False
@@ -302,31 +262,8 @@ class TestDisabledStore:
     def test_disabled_save_job(self, disabled_store, sample_job):
         assert disabled_store.save_job(sample_job) is False
 
-    def test_disabled_save_favorite(self, disabled_store, sample_favorite):
-        assert disabled_store.save_favorite(sample_favorite) is False
-
-    def test_disabled_get_stats(self, disabled_store):
-        assert disabled_store.get_stats() == {"sessions": 0, "jobs": 0, "favorites": 0}
-
 
 class TestUtilityMethods:
-    def test_get_stats(self, sqlite_store, sample_session, sample_job, sample_favorite):
-        sqlite_store.save_session(sample_session)
-        sqlite_store.save_job(sample_job)
-        sqlite_store.save_favorite(sample_favorite)
-
-        stats = sqlite_store.get_stats()
-        assert stats == {"sessions": 1, "jobs": 1, "favorites": 1}
-
-    def test_clear_all(self, sqlite_store, sample_session, sample_job, sample_favorite):
-        sqlite_store.save_session(sample_session)
-        sqlite_store.save_job(sample_job)
-        sqlite_store.save_favorite(sample_favorite)
-
-        assert sqlite_store.clear_all() is True
-        stats = sqlite_store.get_stats()
-        assert stats == {"sessions": 0, "jobs": 0, "favorites": 0}
-
     def test_thread_safety(self, sqlite_store, sample_session):
         """Test that concurrent writes don't corrupt data."""
         import threading
@@ -347,8 +284,7 @@ class TestUtilityMethods:
         for t in threads:
             t.join()
 
-        stats = sqlite_store.get_stats()
-        assert stats["sessions"] == 10
+        assert sqlite_store.get_session_count() == 10
 
 
 class TestConnectionManagement:
@@ -596,62 +532,6 @@ class TestJobEdgeCases:
         assert result.exit_code == 0
 
 
-class TestFavoriteEdgeCases:
-    def test_favorite_with_none_timestamps(self, sqlite_store):
-        """Favorites with None timestamps should round-trip correctly."""
-        fav = FavoriteCommand(
-            favorite_id="fav-none-times",
-            name="Simple Command",
-            command="ls -la",
-            created_at=None,
-            last_used_at=None,
-            use_count=0,
-        )
-        sqlite_store.save_favorite(fav)
-        favorites = sqlite_store.get_all_favorites()
-        assert len(favorites) == 1
-        assert favorites[0].created_at is None
-        assert favorites[0].last_used_at is None
-
-    def test_delete_nonexistent_favorite(self, sqlite_store):
-        """Deleting a nonexistent favorite should still return True."""
-        result = sqlite_store.delete_favorite("nonexistent-fav")
-        assert result is True
-
-    def test_get_all_favorites_empty(self, sqlite_store):
-        """Empty store returns empty favorites list."""
-        assert sqlite_store.get_all_favorites() == []
-
-    def test_favorites_sorted_by_use_count(self, sqlite_store):
-        """Favorites should be sorted by use_count DESC, then name ASC."""
-        for i, (name, count) in enumerate([("Alpha", 5), ("Beta", 10), ("Gamma", 5)]):
-            fav = FavoriteCommand(
-                favorite_id=f"fav-{i}",
-                name=name,
-                command=f"echo {name}",
-                use_count=count,
-            )
-            sqlite_store.save_favorite(fav)
-
-        favorites = sqlite_store.get_all_favorites()
-        assert len(favorites) == 3
-        assert favorites[0].name == "Beta"  # highest use_count
-        assert favorites[1].name == "Alpha"  # same count, alphabetical
-        assert favorites[2].name == "Gamma"
-
-    def test_update_favorite(self, sqlite_store, sample_favorite):
-        """Updating a favorite should overwrite fields."""
-        sqlite_store.save_favorite(sample_favorite)
-
-        sample_favorite.use_count = 100
-        sample_favorite.last_used_at = datetime(2025, 6, 1, 12, 0, 0)
-        sqlite_store.save_favorite(sample_favorite)
-
-        favorites = sqlite_store.get_all_favorites()
-        assert len(favorites) == 1
-        assert favorites[0].use_count == 100
-
-
 class TestDisabledStoreExtended:
     def test_disabled_get_session_by_name(self, disabled_store):
         assert disabled_store.get_session_by_name("anything") is None
@@ -667,15 +547,6 @@ class TestDisabledStoreExtended:
 
     def test_disabled_get_jobs_for_session(self, disabled_store):
         assert disabled_store.get_jobs_for_session("anything") == []
-
-    def test_disabled_get_all_favorites(self, disabled_store):
-        assert disabled_store.get_all_favorites() == []
-
-    def test_disabled_delete_favorite(self, disabled_store):
-        assert disabled_store.delete_favorite("anything") is False
-
-    def test_disabled_clear_all(self, disabled_store):
-        assert disabled_store.clear_all() is False
 
     def test_disabled_close(self, disabled_store):
         """Close on disabled store should not error."""
@@ -714,7 +585,7 @@ class TestThreadSafetyExtended:
         assert sqlite_store.get_session_count() == 20
 
     def test_concurrent_writes_to_different_tables(self, sqlite_store):
-        """Test concurrent writes across sessions, jobs, and favorites."""
+        """Test concurrent writes across the sessions and jobs tables."""
         session = DestoSession(
             session_id="parent-session",
             session_name="parent",
@@ -734,25 +605,26 @@ class TestThreadSafetyExtended:
                 )
                 sqlite_store.save_job(job)
 
-        def write_favorites():
+        def write_sessions():
             for i in range(10):
-                fav = FavoriteCommand(
-                    favorite_id=f"cfav-{i}",
-                    name=f"Fav {i}",
-                    command=f"echo {i}",
+                sqlite_store.save_session(
+                    DestoSession(
+                        session_id=f"csession-{i}",
+                        session_name=f"csession-{i}",
+                        tmux_session_name=f"csession-{i}",
+                        status=SessionStatus.RUNNING,
+                    )
                 )
-                sqlite_store.save_favorite(fav)
 
         t1 = threading.Thread(target=write_jobs)
-        t2 = threading.Thread(target=write_favorites)
+        t2 = threading.Thread(target=write_sessions)
         t1.start()
         t2.start()
         t1.join()
         t2.join()
 
-        stats = sqlite_store.get_stats()
-        assert stats["jobs"] == 10
-        assert stats["favorites"] == 10
+        assert len(sqlite_store.get_jobs_for_session("parent-session")) == 10
+        assert sqlite_store.get_session_count() == 11
 
 
 class TestEnvironmentVariableDefaults:
@@ -789,15 +661,3 @@ class TestSchemaIndices:
         ]
         for idx in expected:
             assert idx in indices
-
-
-class TestClearAllPartial:
-    def test_clear_all_with_only_sessions(self, sqlite_store, sample_session):
-        """clear_all works when only sessions exist."""
-        sqlite_store.save_session(sample_session)
-        assert sqlite_store.clear_all() is True
-        assert sqlite_store.get_stats() == {"sessions": 0, "jobs": 0, "favorites": 0}
-
-    def test_clear_all_empty_store(self, sqlite_store):
-        """clear_all on empty store should succeed."""
-        assert sqlite_store.clear_all() is True

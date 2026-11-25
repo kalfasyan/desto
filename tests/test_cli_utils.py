@@ -7,8 +7,6 @@ from desto.cli.utils import (
     format_duration,
     format_timestamp,
     setup_logging,
-    truncate_text,
-    validate_session_name,
 )
 
 
@@ -128,78 +126,3 @@ class TestSetupLogging:
 
         mock_logger.remove.assert_called_once()
         mock_logger.add.assert_called()
-
-
-class TestValidateSessionName:
-    """Test session name validation."""
-
-    def test_validate_empty_name(self):
-        """Test validation of empty session name."""
-        assert validate_session_name("") is False
-        assert validate_session_name(None) is False
-
-    def test_validate_valid_names(self):
-        """Test validation of valid session names."""
-        assert validate_session_name("simple") is True
-        assert validate_session_name("with-dashes") is True
-        assert validate_session_name("with_underscores") is True
-        assert validate_session_name("with123numbers") is True
-        assert validate_session_name("session.name") is True
-
-    def test_validate_invalid_names(self):
-        """Test validation of invalid session names."""
-        assert validate_session_name('with"quotes') is False
-        assert validate_session_name("with'quotes") is False
-        assert validate_session_name("with\\backslash") is False
-        assert validate_session_name("with\nnewline") is False
-        assert validate_session_name("with\rcarriage") is False
-        assert validate_session_name("with\ttab") is False
-
-
-class TestTruncateText:
-    """Test text truncation."""
-
-    def test_truncate_short_text(self):
-        """Test truncating text shorter than max length."""
-        text = "short"
-        result = truncate_text(text, 10)
-        assert result == "short"
-
-    def test_truncate_exact_length(self):
-        """Test truncating text at exact max length."""
-        text = "exactly10!"
-        result = truncate_text(text, 10)
-        assert result == "exactly10!"
-
-    def test_truncate_long_text(self):
-        """Test truncating text longer than max length."""
-        text = "this is a very long text that needs truncation"
-        result = truncate_text(text, 20)
-        assert result == "this is a very lo..."
-        assert len(result) == 20
-
-    def test_truncate_very_short_max_length(self):
-        """Test truncating with very short max length."""
-        text = "longtext"
-        result = truncate_text(text, 3)
-        assert result == "..."
-
-    def test_truncate_max_length_less_than_ellipsis(self):
-        """Test truncating with max length less than ellipsis."""
-        text = "longtext"
-        result = truncate_text(text, 2)
-        assert result == ".."
-        assert len(result) == 2
-
-    def test_truncate_max_length_zero(self):
-        """Test truncating with max length of zero."""
-        text = "anytext"
-        result = truncate_text(text, 0)
-        assert result == ""
-
-    def test_truncate_unicode_text(self):
-        """Test truncating text with unicode characters."""
-        text = "Hello 世界 🌍"
-        result = truncate_text(text, 8)
-        assert result == "Hello..."
-        assert len(result) == 8

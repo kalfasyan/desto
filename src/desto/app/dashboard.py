@@ -38,13 +38,6 @@ def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager, state: Dashboard
     um.refresh_log_display()
 
 
-def run_updates(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
-    """Run every periodic update once (kept for callers and tests)."""
-    run_fast_updates(um, tm, state)
-    tm.update_sessions_status(force=False)
-    tm.check_and_run_scheduled_jobs()
-
-
 def _create_timers(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
     state.timers.extend(
         [
