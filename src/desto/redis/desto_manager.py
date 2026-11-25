@@ -159,11 +159,6 @@ class DestoManager:
 
         return result
 
-    def get_session_status(self, session_name: str) -> Optional[str]:
-        """Get session status by name."""
-        session = self.session_manager.get_session_by_name(session_name)
-        return session.status.value if session else None
-
     def get_job_status(self, session_name: str) -> str:
         """Get job status for a session."""
         session = self.session_manager.get_session_by_name(session_name)
@@ -172,11 +167,6 @@ class DestoManager:
 
         return self.job_manager.get_session_job_status(session.session_id)
 
-    def is_session_finished(self, session_name: str) -> bool:
-        """Check if session is finished."""
-        status = self.get_session_status(session_name)
-        return status in ["finished", "failed"] if status else False
-
     def update_heartbeat(self, session_name: str) -> bool:
         """Update session heartbeat."""
         session = self.session_manager.get_session_by_name(session_name)
@@ -184,28 +174,6 @@ class DestoManager:
             return False
 
         return self.session_manager.update_heartbeat(session.session_id)
-
-    def get_all_active_sessions(self):
-        """Get all active sessions with their job information."""
-        sessions = self.session_manager.list_active_sessions()
-        result = {}
-
-        for session in sessions:
-            jobs = self.job_manager.get_jobs_for_session(session.session_id)
-            current_job = self.job_manager.get_current_job_for_session(session.session_id)
-
-            session_data = session.to_dict()
-            session_data.update(
-                {
-                    "job_count": len(jobs),
-                    "current_job_status": current_job.status.value if current_job else "none",
-                    "overall_job_status": self.job_manager.get_session_job_status(session.session_id),
-                }
-            )
-
-            result[session.session_name] = session_data
-
-        return result
 
     # ─── SQLite Persistence Helpers ───────────────────────────────────────
 

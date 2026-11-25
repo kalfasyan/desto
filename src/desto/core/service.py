@@ -599,13 +599,3 @@ class DestoService(ScheduledJobsMixin):
             logger.error(error_msg)
             self.notify(error_msg, "negative")
             return 0
-
-    def get_script_run_time(self, created_time, session_name):
-        """Return the elapsed seconds of a session, up to its end time if it has ended."""
-        try:
-            session = self.desto_manager.session_manager.get_session_by_name(session_name)
-            end_time = session.end_time.timestamp() if session and session.end_time else time.time()
-            return int(end_time - created_time)
-        except Exception as e:
-            logger.warning(f"Failed to get script run time for {session_name}: {e}")
-            return int(time.time() - created_time)
