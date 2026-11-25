@@ -33,7 +33,7 @@ class DashboardState:
 
 def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
     um.update_ui_system_info()
-    tm.tick_live_durations()
+    tm.dashboard.tick_live_durations()
     process_pending_updates(um, state)
     um.refresh_log_display()
 
@@ -41,7 +41,7 @@ def run_fast_updates(um: UserInterfaceManager, tm: TmuxManager, state: Dashboard
 def run_updates(um: UserInterfaceManager, tm: TmuxManager, state: DashboardState) -> None:
     """Run every periodic update once (kept for callers and tests)."""
     run_fast_updates(um, tm, state)
-    tm.update_sessions_status(force=False)
+    tm.dashboard.update_sessions_status(force=False)
     tm.check_and_run_scheduled_jobs()
 
 
@@ -49,7 +49,7 @@ def _create_timers(um: UserInterfaceManager, tm: TmuxManager, state: DashboardSt
     state.timers.extend(
         [
             ui.timer(FAST_INTERVAL, lambda: run_fast_updates(um, tm, state)),
-            ui.timer(SESSIONS_INTERVAL, lambda: tm.update_sessions_status(force=False)),
+            ui.timer(SESSIONS_INTERVAL, lambda: tm.dashboard.update_sessions_status(force=False)),
             ui.timer(SCHEDULER_INTERVAL, tm.check_and_run_scheduled_jobs),
         ]
     )
@@ -83,7 +83,7 @@ def process_pending_updates(um: UserInterfaceManager, state: DashboardState) -> 
         event = session_event_message(state.pending_updates.popleft())
         if event:
             ui.notification(event[0], type=event[1])
-    um.tmux_manager.update_sessions_status(force=False)
+    um.tmux_manager.dashboard.update_sessions_status(force=False)
 
 
 def build_dashboard(show_logout: bool) -> None:
