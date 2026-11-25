@@ -66,6 +66,8 @@ uv run --extra dev ruff check . --fix
 uv run --extra dev ruff format
 ```
 
+CI fails when `ruff format --check src tests` would change a file. To keep `git blame` past the big reformat, run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
+
 Pre-commit will run these checks automatically (see `.pre-commit-config.yaml`).
 
 ## Code of Conduct
