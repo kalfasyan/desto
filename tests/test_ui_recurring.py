@@ -28,7 +28,7 @@ FIRST_RUN = (datetime.now() + timedelta(days=1)).replace(second=0, microsecond=0
 
 def schedule(ui_manager, unit, count=1):
     error_label, dialog = SimpleNamespace(text=""), MagicMock()
-    ui_manager.confirm_schedule(
+    ui_manager.schedule_dialog.confirm(
         SimpleNamespace(value=FIRST_RUN.strftime("%Y-%m-%d")),
         SimpleNamespace(value=FIRST_RUN.strftime("%H:%M")),
         error_label,

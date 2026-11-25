@@ -206,7 +206,6 @@ def test_clear_sessions_container_calls_ui_clear(mock_redis_class, mock_ui, mock
     mock_redis_class.return_value = mock_redis_instance
     # Patch sessions_container directly
     tmux = TmuxManager(mock_ui, mock_logger, log_dir=tmp_path, scripts_dir=tmp_path)
-    tmux.sessions_container = Mock()
-    tmux.sessions_container.clear = Mock()
-    tmux.clear_sessions_container()
-    tmux.sessions_container.clear.assert_called()
+    tmux.dashboard.sessions_container = Mock()
+    tmux.dashboard.clear_sessions_container()
+    tmux.dashboard.sessions_container.clear.assert_called()
